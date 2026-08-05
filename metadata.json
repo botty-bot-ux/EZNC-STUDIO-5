@@ -1,0 +1,6 @@
+{
+  "name": "ЧПУ CAD/CAM Редактор G-code",
+  "description": "Графический редактор и генератор G-code для ЧПУ станков (NcStudio, Mach3, LinuxCNC) с учетом трансформаций, расположения стены и оптимизацией траекторий.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
