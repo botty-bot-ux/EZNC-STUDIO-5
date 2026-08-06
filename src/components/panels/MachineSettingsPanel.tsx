@@ -214,10 +214,10 @@ export const MachineSettingsPanel: React.FC = () => {
                 });
               }
             }}
-            className="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-amber-200 font-medium focus:border-amber-500 focus:outline-none cursor-pointer"
+            className="w-full bg-slate-100/80 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 font-semibold focus:border-blue-500 focus:bg-white focus:outline-none cursor-pointer transition-all"
           >
             {SHEET_PRESETS.map((p) => (
-              <option key={p.id} value={p.id} className="bg-slate-900 text-slate-100">
+              <option key={p.id} value={p.id} className="bg-white text-slate-800">
                 {p.label}
               </option>
             ))}
@@ -226,10 +226,10 @@ export const MachineSettingsPanel: React.FC = () => {
 
         {/* DIMENSIONS & COLOR SELECTION IF ENABLED */}
         {stockSheet.enabled && stockSheet.preset !== 'none' && (
-          <div className="space-y-2.5 pt-1 border-t border-slate-800/80">
+          <div className="space-y-2.5 pt-2.5 border-t border-slate-200">
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="text-slate-400 block mb-1 text-[10px]">Длина X (мм)</label>
+                <label className="text-slate-500 block mb-1 text-[10px]">Длина X (мм)</label>
                 <input
                   type="number"
                   value={stockSheet.widthX}
@@ -242,12 +242,12 @@ export const MachineSettingsPanel: React.FC = () => {
                       },
                     })
                   }
-                  className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 font-mono text-[11px] text-amber-300 font-bold"
+                  className="w-full bg-slate-100/80 border border-slate-200 rounded-lg px-2.5 py-1.5 font-mono text-[11px] text-slate-800 font-bold focus:bg-white focus:border-blue-500 focus:outline-none transition-all"
                 />
               </div>
 
               <div>
-                <label className="text-slate-400 block mb-1 text-[10px]">Ширина Y (мм)</label>
+                <label className="text-slate-500 block mb-1 text-[10px]">Ширина Y (мм)</label>
                 <input
                   type="number"
                   value={stockSheet.widthY}
@@ -260,14 +260,14 @@ export const MachineSettingsPanel: React.FC = () => {
                       },
                     })
                   }
-                  className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 font-mono text-[11px] text-amber-300 font-bold"
+                  className="w-full bg-slate-100/80 border border-slate-200 rounded-lg px-2.5 py-1.5 font-mono text-[11px] text-slate-800 font-bold focus:bg-white focus:border-blue-500 focus:outline-none transition-all"
                 />
               </div>
             </div>
 
             {/* COLOR ACCENT PICKER FOR DASHED LINE */}
             <div>
-              <label className="text-slate-400 block mb-1.5 text-[10px]">Цвет пунктирной линии</label>
+              <label className="text-slate-500 block mb-1.5 text-[10px]">Цвет пунктирной линии</label>
               <div className="flex items-center gap-2">
                 {[
                   { color: '#f59e0b', name: 'Оранжевый' },
@@ -291,8 +291,8 @@ export const MachineSettingsPanel: React.FC = () => {
                     }
                     className={`w-5 h-5 rounded-full transition-transform border ${
                       (stockSheet.color || '#f59e0b') === item.color
-                        ? 'ring-2 ring-white scale-110 border-transparent'
-                        : 'border-slate-700 hover:scale-105'
+                        ? 'ring-2 ring-blue-500 scale-110 border-transparent'
+                        : 'border-slate-300 hover:scale-105'
                     }`}
                     style={{ backgroundColor: item.color }}
                   />
@@ -304,63 +304,63 @@ export const MachineSettingsPanel: React.FC = () => {
       </div>
 
       {/* 4. TOOL, SPINDLE & FEEDS */}
-      <div className="space-y-3 pt-2 border-t border-slate-800">
-        <div className="flex items-center gap-1.5 font-bold text-slate-300">
-          <Wrench className="w-4 h-4 text-blue-400" />
+      <div className="space-y-3 pt-3.5 border-t border-slate-200/80">
+        <div className="flex items-center gap-1.5 font-bold text-slate-800">
+          <Wrench className="w-4 h-4 text-blue-600" />
           <span>Инструмент и Подачи</span>
         </div>
 
         <div className="grid grid-cols-2 gap-2">
           <div>
-            <label className="text-slate-400 block mb-1">Диаметр фрезы (мм)</label>
+            <label className="text-slate-500 block mb-1">Диаметр фрезы (мм)</label>
             <input
               type="number"
               step="0.001"
               value={machine.toolDiameter}
               onChange={(e) => updateMachine({ toolDiameter: parseFloat(e.target.value) || 3.175 })}
-              className="w-full bg-slate-950 border border-slate-800 rounded px-2.5 py-1.5 font-mono font-bold text-amber-300"
+              className="w-full bg-slate-100/80 border border-slate-200 rounded-lg px-2.5 py-1.5 font-mono font-bold text-slate-800 focus:bg-white focus:border-blue-500 focus:outline-none transition-all"
             />
           </div>
 
           <div>
-            <label className="text-slate-400 block mb-1">Обороты шпинделя (об/мин)</label>
+            <label className="text-slate-500 block mb-1">Обороты шпинделя (об/мин)</label>
             <input
               type="number"
               value={machine.spindleSpeed}
               onChange={(e) => updateMachine({ spindleSpeed: parseInt(e.target.value) || 15000 })}
-              className="w-full bg-slate-950 border border-slate-800 rounded px-2.5 py-1.5 font-mono text-yellow-300"
+              className="w-full bg-slate-100/80 border border-slate-200 rounded-lg px-2.5 py-1.5 font-mono text-slate-800 focus:bg-white focus:border-blue-500 focus:outline-none transition-all"
             />
           </div>
         </div>
 
         <div className="grid grid-cols-3 gap-2">
           <div>
-            <label className="text-slate-400 block mb-1 text-[10px]">Подача резания</label>
+            <label className="text-slate-500 block mb-1 text-[10px]">Подача резания</label>
             <input
               type="number"
               value={machine.feedCut}
               onChange={(e) => updateMachine({ feedCut: parseFloat(e.target.value) || 1000 })}
-              className="w-full bg-slate-950 border border-slate-800 rounded px-2 py-1 font-mono text-[11px]"
+              className="w-full bg-slate-100/80 border border-slate-200 rounded-lg px-2 py-1.5 font-mono text-[11px] text-slate-800 focus:bg-white focus:border-blue-500 focus:outline-none transition-all"
             />
           </div>
 
           <div>
-            <label className="text-slate-400 block mb-1 text-[10px]">Подача врезания Z</label>
+            <label className="text-slate-500 block mb-1 text-[10px]">Подача врезания Z</label>
             <input
               type="number"
               value={machine.feedPlunge}
               onChange={(e) => updateMachine({ feedPlunge: parseFloat(e.target.value) || 300 })}
-              className="w-full bg-slate-950 border border-slate-800 rounded px-2 py-1 font-mono text-[11px]"
+              className="w-full bg-slate-100/80 border border-slate-200 rounded-lg px-2 py-1.5 font-mono text-[11px] text-slate-800 focus:bg-white focus:border-blue-500 focus:outline-none transition-all"
             />
           </div>
 
           <div>
-            <label className="text-slate-400 block mb-1 text-[10px]">Подача сверления</label>
+            <label className="text-slate-500 block mb-1 text-[10px]">Подача сверления</label>
             <input
               type="number"
               value={machine.feedDrill}
               onChange={(e) => updateMachine({ feedDrill: parseFloat(e.target.value) || 500 })}
-              className="w-full bg-slate-950 border border-slate-800 rounded px-2 py-1 font-mono text-[11px]"
+              className="w-full bg-slate-100/80 border border-slate-200 rounded-lg px-2 py-1.5 font-mono text-[11px] text-slate-800 focus:bg-white focus:border-blue-500 focus:outline-none transition-all"
             />
           </div>
         </div>

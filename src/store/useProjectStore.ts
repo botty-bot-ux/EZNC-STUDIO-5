@@ -4,6 +4,7 @@ import {
   ActiveTool,
   CADObject,
   MachineSettings,
+  NewCADObjectInput,
   OperationItem,
   PostprocessorTemplates,
   ProjectData,
@@ -16,124 +17,12 @@ import { extractProjectDataFromNC, parseGcodeToCadObjects, parseGcodeToSegments 
 import { DEFAULT_TEMPLATES } from '../lib/postprocessor/templates';
 import { analyzeProjectWarnings } from '../lib/utils/warnings';
 import { optimizeCADObjects, OptimizationResult } from '../lib/geometry/optimizer';
-
-const LOCAL_STORAGE_KEY = 'cnc_studio_project_v1';
-
-const INITIAL_MACHINE: MachineSettings = {
-  units: 'mm',
-  controllerProfile: 'ncstudio',
-  bounds: {
-    xMin: -1200,
-    xMax: 0,
-    yMin: -900,
-    yMax: 0,
-  },
-  stockSheet: {
-    enabled: true,
-    preset: '1000x1000',
-    widthX: 1000,
-    widthY: 1000,
-    color: '#f59e0b',
-  },
-  workOffset: {
-    x: 0,
-    y: 0,
-  },
-  safeZ: 10,
-  spindleSpeed: 15000,
-  spindleDwell: 3000,
-  feedCut: 1200,
-  feedPlunge: 300,
-  feedDrill: 500,
-  toolDiameter: 3.175,
-  toolName: 'Фреза 3.175мм',
-  useCannedCycles: true,
-};
-
-// Initial default sample objects in the -X (Up) / -Y (Left) quadrant from (0,0) at Bottom-Right
-const INITIAL_OBJECTS: CADObject[] = [
-  {
-    id: 'obj_hole_1',
-    name: 'Отверстие 11мм (X-100 Y-100)',
-    type: 'point',
-    x: -100,
-    y: -100,
-    diameter: 11.0,
-    depth: 33,
-    drillMode: '11mm',
-    operationType: 'drill',
-  },
-  {
-    id: 'obj_hole_2',
-    name: 'Отверстие 9мм (X-200 Y-100)',
-    type: 'point',
-    x: -200,
-    y: -100,
-    diameter: 9.0,
-    depth: 33,
-    drillMode: '9mm',
-    operationType: 'drill',
-  },
-  {
-    id: 'obj_line_1',
-    name: 'Линия X 200мм',
-    type: 'line',
-    startX: -50,
-    startY: -50,
-    endX: -250,
-    endY: -50,
-    depth: 5,
-    operationType: 'cut',
-  },
-  {
-    id: 'obj_line_2',
-    name: 'Линия Y 150мм',
-    type: 'line',
-    startX: -250,
-    startY: -50,
-    endX: -250,
-    endY: -200,
-    depth: 5,
-    operationType: 'cut',
-  },
-];
-
-const INITIAL_OPERATIONS: OperationItem[] = [
-  {
-    id: 'op_drill_holes',
-    name: 'Сверление отверстий',
-    enabled: true,
-    type: 'drill',
-    linkedObjectIds: ['obj_hole_1', 'obj_hole_2'],
-    safeZ: 5,
-    startZ: 0,
-    finalDepth: 33,
-    passDepth: 16,
-    spindleSpeed: 15000,
-    feedCut: 1200,
-    feedPlunge: 300,
-    feedDrill: 1000,
-    direction: 'cw',
-    comment: 'Сверление отверстий 11мм и 9мм',
-  },
-  {
-    id: 'op_cut_lines',
-    name: 'Резка по линиям',
-    enabled: true,
-    type: 'cutContour',
-    linkedObjectIds: ['obj_line_1', 'obj_line_2'],
-    safeZ: 10,
-    startZ: 0,
-    finalDepth: 5,
-    passDepth: 5,
-    spindleSpeed: 15000,
-    feedCut: 1200,
-    feedPlunge: 300,
-    feedDrill: 500,
-    direction: 'cw',
-    comment: 'Контурная резка по линиям',
-  },
-];
+import {
+  INITIAL_MACHINE,
+  INITIAL_OBJECTS,
+  INITIAL_OPERATIONS,
+  LOCAL_STORAGE_KEY,
+} from './initialState';
 
 interface HistoryState {
   objects: CADObject[];
@@ -154,6 +43,9 @@ interface ProjectStore {
   activeTab: ActiveTab;
   viewMode: ViewMode;
 
+  snapToGrid: boolean;
+  gridStep: number;
+
   generatedGcode: string;
   manualGcode: string;
   toolpathSegments: ToolpathSegment[];
@@ -162,11 +54,18 @@ interface ProjectStore {
   historyUndo: HistoryState[];
   historyRedo: HistoryState[];
 
+  leftPanelOpen: boolean;
+  rightPanelOpen: boolean;
+  toggleLeftPanel: () => void;
+  toggleRightPanel: () => void;
+
   // Actions
   setProjectName: (name: string) => void;
   setActiveTool: (tool: ActiveTool) => void;
   setActiveTab: (tab: ActiveTab) => void;
   setViewMode: (mode: ViewMode) => void;
+  setSnapToGrid: (snap: boolean) => void;
+  setGridStep: (step: number) => void;
   setSelectedObjectId: (id: string | null) => void;
   setSelectedOperationId: (id: string | null) => void;
 
@@ -174,7 +73,7 @@ interface ProjectStore {
 
   reorderObjects: (newObjects: CADObject[]) => void;
   optimizeRoute: () => OptimizationResult | null;
-  addObject: (obj: CADObject) => void;
+  addObject: (obj: NewCADObjectInput) => void;
   updateObject: (id: string, partial: Partial<CADObject>, saveHistory?: boolean) => void;
   recordHistory: () => void;
   deleteObject: (id: string) => void;
@@ -287,6 +186,9 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
     activeTab: 'properties',
     viewMode: 'edit',
 
+    snapToGrid: true,
+    gridStep: 10,
+
     generatedGcode: initialGen.gcode,
     manualGcode: initialGen.gcode,
     toolpathSegments: initialGen.segments,
@@ -295,11 +197,27 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
     historyUndo: [],
     historyRedo: [],
 
+    leftPanelOpen: true,
+    rightPanelOpen: true,
+    toggleLeftPanel: () => set((state) => ({ leftPanelOpen: !state.leftPanelOpen })),
+    toggleRightPanel: () => set((state) => ({ rightPanelOpen: !state.rightPanelOpen })),
+
     setProjectName: (name: string) => syncAndSave({ projectName: name }),
 
     setActiveTool: (tool: ActiveTool) => set({ activeTool: tool }),
-    setActiveTab: (tab: ActiveTab) => set({ activeTab: tab }),
-    setViewMode: (mode: ViewMode) => set({ viewMode: mode }),
+    setActiveTab: (tab: ActiveTab) =>
+      set((state) => ({
+        activeTab: tab,
+        viewMode: tab === 'gcode' ? 'gcode' : state.viewMode === 'gcode' ? 'edit' : state.viewMode,
+      })),
+    setViewMode: (mode: ViewMode) =>
+      set((state) => ({
+        viewMode: mode,
+        activeTab: mode === 'gcode' ? 'gcode' : state.activeTab === 'gcode' ? 'properties' : state.activeTab,
+        rightPanelOpen: mode === 'gcode' ? true : state.rightPanelOpen,
+      })),
+    setSnapToGrid: (snap: boolean) => set({ snapToGrid: snap }),
+    setGridStep: (step: number) => set({ gridStep: step }),
 
     setSelectedObjectId: (id: string | null) =>
       set({
@@ -355,8 +273,13 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
       return res;
     },
 
-    addObject: (newObj: CADObject) => {
+    addObject: (rawObj: NewCADObjectInput) => {
       pushHistory(get());
+      const newObj: CADObject = {
+        ...rawObj,
+        id: rawObj.id || `obj_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      } as CADObject;
+
       const newObjs = [...get().objects, newObj];
 
       // Auto link to first matching operation or create new default operation if missing

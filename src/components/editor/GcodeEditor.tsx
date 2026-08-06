@@ -25,39 +25,37 @@ export const GcodeEditor: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-full bg-white/70 backdrop-blur-xl text-slate-800 overflow-hidden">
+    <div className="flex flex-col h-full w-full bg-white text-slate-800 overflow-hidden">
       {/* Editor toolbar */}
-      <div className="h-12 bg-slate-100/80 border-b border-slate-200/80 px-4 flex items-center justify-between shrink-0 select-none shadow-sm">
-        <div className="flex items-center gap-2 text-xs font-mono text-slate-600 font-semibold">
-          <span className="w-2.5 h-2.5 rounded-full bg-emerald-600 shadow-sm" />
-          <span>G-CODE EDITOR (NcStudio 5 / *.NC / *.CNC)</span>
+      <div className="py-2 px-3 bg-slate-100/90 border-b border-slate-200 flex items-center justify-between gap-2 shrink-0 select-none shadow-sm">
+        <div className="flex items-center gap-1.5 text-[11px] font-mono text-slate-600 font-semibold truncate">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+          <span className="truncate">NcStudio (*.NC)</span>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
           <button
             onClick={regenerateGcode}
-            title="Перегенерировать G-код из графической сцены"
-            className="px-3 py-1.5 bg-white/80 hover:bg-white text-slate-700 text-xs font-semibold rounded-lg border border-slate-200 flex items-center gap-1.5 transition-all shadow-sm"
+            title="Пересоздать G-код из графической сцены"
+            className="p-1.5 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium rounded-lg border border-slate-200 flex items-center gap-1 transition-all shadow-sm"
           >
-            <RefreshCw className="w-3.5 h-3.5 text-blue-600" />
-            <span className="hidden sm:inline">Пересоздать из сцены</span>
+            <RefreshCw className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+            <span className="hidden sm:inline text-[11px]">Обновить</span>
           </button>
 
           <button
             onClick={parseManualGcode}
-            title="Распарсить измененный код и показать траекторию на холсте"
-            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 shadow-md shadow-blue-500/25 transition-all"
+            title="Распарсить и показать траекторию на холсте"
+            className="p-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium rounded-lg flex items-center gap-1 shadow-sm transition-all"
           >
-            <Play className="w-3.5 h-3.5" />
-            <span>Визуализировать код</span>
+            <Play className="w-3.5 h-3.5 shrink-0" />
+            <span className="text-[11px]">Траектория</span>
           </button>
-
-          <div className="h-4 w-[1px] bg-slate-300 mx-1" />
 
           <button
             onClick={handleCopy}
-            title="Скопировать весь код"
-            className="p-2 bg-white/80 hover:bg-white text-slate-700 hover:text-slate-900 rounded-lg border border-slate-200 transition-all shadow-sm"
+            title="Скопировать G-код"
+            className="p-1.5 bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 rounded-lg border border-slate-200 transition-all shadow-sm"
           >
             <Copy className="w-3.5 h-3.5" />
           </button>
@@ -65,7 +63,7 @@ export const GcodeEditor: React.FC = () => {
           <button
             onClick={handleDownload}
             title="Скачать файл .nc"
-            className="p-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg shadow-md shadow-emerald-600/25 transition-all"
+            className="p-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg shadow-sm transition-all"
           >
             <Download className="w-3.5 h-3.5" />
           </button>
@@ -82,15 +80,15 @@ export const GcodeEditor: React.FC = () => {
           value={manualGcode}
           onChange={(value) => updateManualGcode(value || '')}
           options={{
-            fontSize: 13,
+            fontSize: 12,
             fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
-            minimap: { enabled: true },
+            minimap: { enabled: false },
             lineNumbers: 'on',
             scrollBeyondLastLine: false,
             automaticLayout: true,
             tabSize: 2,
             wordWrap: 'on',
-            padding: { top: 12, bottom: 12 },
+            padding: { top: 8, bottom: 8 },
           }}
         />
       </div>

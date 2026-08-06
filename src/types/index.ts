@@ -82,6 +82,14 @@ export type CADObject =
   | CircleObject
   | ArcObject;
 
+export type NewCADObjectInput =
+  | (Omit<PointHoleObject, 'id'> & { id?: string })
+  | (Omit<LineObject, 'id'> & { id?: string })
+  | (Omit<PolylineObject, 'id'> & { id?: string })
+  | (Omit<RectangleObject, 'id'> & { id?: string })
+  | (Omit<CircleObject, 'id'> & { id?: string })
+  | (Omit<ArcObject, 'id'> & { id?: string });
+
 export interface StockSheetSettings {
   enabled: boolean;
   preset: string; // 'none' | '1000x1000' | '1500x1500' | '2000x1000' | '2440x1220' | '2500x1250' | '2800x2070' | '3000x1500' | 'custom'
