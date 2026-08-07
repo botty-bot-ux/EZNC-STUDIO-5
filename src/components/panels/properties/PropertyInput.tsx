@@ -19,13 +19,15 @@ export const PropertyInput: React.FC<PropertyInputProps> = ({
 }) => {
   return (
     <div>
-      <label className="text-slate-500 block mb-1 font-medium">{label}</label>
+      <label className="text-[11px] text-slate-400 block mb-0.5 font-medium truncate" title={label}>
+        {label}
+      </label>
       <input
         type="number"
         step={step}
         value={value}
         onChange={(e) => onChange(parseFloat(e.target.value) || fallbackValue)}
-        className={`w-full bg-slate-100/80 border border-slate-200 rounded-lg px-2.5 py-1.5 font-mono focus:bg-white focus:border-blue-500 focus:outline-none transition-all ${className}`}
+        className={`w-full bg-slate-50 border border-slate-200/90 rounded-lg px-2 py-1 text-xs font-mono focus:bg-white focus:border-blue-500 focus:outline-none transition-all ${className}`}
       />
     </div>
   );

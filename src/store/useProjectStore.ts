@@ -161,9 +161,22 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
       if (parsed && parsed.objects && parsed.machine) {
         initName = parsed.name || initName;
         initMachine = { ...INITIAL_MACHINE, ...parsed.machine };
+        if (initMachine.safeZ === 10) {
+          initMachine.safeZ = 20;
+        }
         initObjects = parsed.objects;
         initOperations = parsed.operations || [];
         initTemplates = parsed.postprocessorTemplates || DEFAULT_TEMPLATES;
+
+        // Automatically upgrade old default templates to new standard NC Studio 5 template
+        if (
+          !initTemplates.header ||
+          !initTemplates.header.includes('G21') ||
+          initTemplates.header.includes('%') ||
+          initTemplates.header.includes('NC-Studio')
+        ) {
+          initTemplates = DEFAULT_TEMPLATES;
+        }
       }
     }
   } catch {
@@ -187,7 +200,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
     viewMode: 'edit',
 
     snapToGrid: true,
-    gridStep: 10,
+    gridStep: 1,
 
     generatedGcode: initialGen.gcode,
     manualGcode: initialGen.gcode,
@@ -427,8 +440,37 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
     },
 
     parseManualGcode: () => {
-      const segs = parseGcodeToSegments(get().manualGcode);
-      set({ toolpathSegments: segs, viewMode: 'preview' });
+      const gcode = get().manualGcode;
+      const segs = parseGcodeToSegments(gcode);
+      const importedCadObjects = parseGcodeToCadObjects(gcode);
+
+      if (importedCadObjects.length > 0) {
+        pushHistory(get());
+        const newOps: OperationItem[] = importedCadObjects.map((obj, idx) => ({
+          id: `op_imp_${idx + 1}`,
+          name: `Обработка ${obj.name}`,
+          enabled: true,
+          type: obj.type === 'point' ? 'drill' : 'cutContour',
+          linkedObjectIds: [obj.id],
+          safeZ: get().machine.safeZ,
+          startZ: 0,
+          finalDepth: obj.depth || 5,
+          passDepth: obj.depth || 5,
+          spindleSpeed: get().machine.spindleSpeed,
+          feedCut: (obj as any).importedFeedCut || get().machine.feedCut || 1200,
+          feedPlunge: (obj as any).importedFeedPlunge || get().machine.feedPlunge || 300,
+          feedDrill: get().machine.feedDrill || 500,
+          direction: 'cw',
+        }));
+
+        syncAndSave({
+          objects: importedCadObjects,
+          operations: newOps,
+          viewMode: 'preview',
+        });
+      } else {
+        set({ toolpathSegments: segs, viewMode: 'preview' });
+      }
     },
 
     regenerateGcode: () => {
@@ -500,12 +542,30 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
         const importedCadObjects = parseGcodeToCadObjects(fileContent);
         const cleanName = fileName?.replace(/\.[^/.]+$/, '') || 'Импортированная_Программа_NC';
 
-        set({
+        const newOps: OperationItem[] = importedCadObjects.map((obj, idx) => ({
+          id: `op_imp_${idx + 1}`,
+          name: `Обработка ${obj.name}`,
+          enabled: true,
+          type: obj.type === 'point' ? 'drill' : 'cutContour',
+          linkedObjectIds: [obj.id],
+          safeZ: get().machine.safeZ,
+          startZ: 0,
+          finalDepth: obj.depth || 5,
+          passDepth: obj.depth || 5,
+          spindleSpeed: get().machine.spindleSpeed,
+          feedCut: (obj as any).importedFeedCut || get().machine.feedCut || 1200,
+          feedPlunge: (obj as any).importedFeedPlunge || get().machine.feedPlunge || 300,
+          feedDrill: get().machine.feedDrill || 500,
+          direction: 'cw',
+        }));
+
+        syncAndSave({
           projectName: cleanName,
           manualGcode: fileContent,
-          generatedGcode: fileContent,
-          toolpathSegments: parsedSegments,
           objects: importedCadObjects.length > 0 ? importedCadObjects : get().objects,
+          operations: newOps.length > 0 ? newOps : get().operations,
+          selectedObjectId: null,
+          selectedOperationId: null,
           viewMode: 'preview',
         });
 

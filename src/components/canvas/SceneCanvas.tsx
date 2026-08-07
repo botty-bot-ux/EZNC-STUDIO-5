@@ -404,6 +404,8 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
       const dy = mousePx.y - dragStartCanvasPt.y;
       setPan((prev) => ({ x: prev.x + dx, y: prev.y + dy }));
       setDragStartCanvasPt(mousePx);
+      setCurrentMouseProgPt(rawWorldPt);
+      onCursorMove?.(rawWorldPt);
       return;
     }
 
@@ -517,6 +519,12 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
     setDragObjInitial(null);
   };
 
+  const handleMouseLeave = () => {
+    setCurrentMouseProgPt(null);
+    setActiveSnapInfo(null);
+    onCursorMove?.(null);
+  };
+
   const handleWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
     e.preventDefault();
     if (!canvasRef.current) return;
@@ -543,6 +551,7 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseLeave}
         onWheel={handleWheel}
         className="w-full h-full cursor-crosshair block"
       />
@@ -560,6 +569,7 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
       />
 
       <CanvasControls
+        cursorPos={currentMouseProgPt}
         zoom={zoom}
         snapToGrid={snapToGrid}
         objectSnapEnabled={objectSnapEnabled}

@@ -113,6 +113,7 @@ export interface MachineSettings {
     y: number;
   };
   safeZ: number;
+  cutDepth?: number;
   clearanceZ?: number;
   spindleSpeed: number;
   spindleDwell: number; // milliseconds
@@ -174,6 +175,7 @@ export interface ToolpathSegment {
   centerX?: number;
   centerY?: number;
   radius?: number;
+  feed?: number;
   operationId?: string;
   objectId?: string;
 }

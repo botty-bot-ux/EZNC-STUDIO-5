@@ -5,7 +5,6 @@ import {defineConfig} from 'vite';
 
 export default defineConfig(() => {
   return {
-    base: '/EZNC-STUDIO-5/',
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {

@@ -123,19 +123,33 @@ export const MachineSettingsPanel: React.FC = () => {
           </div>
         </div>
 
-        <div>
-          <div className="flex items-center justify-between mb-1">
-            <label className="text-slate-500 block font-medium">Безопасная Z (мм)</label>
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className="text-slate-500 block mb-1 font-medium">Безопасная Z (мм)</label>
+            <input
+              type="number"
+              value={machine.safeZ}
+              onChange={(e) => updateMachine({ safeZ: parseFloat(e.target.value) || 10 })}
+              className="w-full bg-slate-100/80 border border-slate-200 rounded-lg px-2.5 py-1.5 font-mono text-emerald-700 font-bold focus:bg-white transition-all"
+            />
+            <span className="text-[10px] text-slate-400 block mt-1 leading-tight">
+              Высота быстрых переездов
+            </span>
           </div>
-          <input
-            type="number"
-            value={machine.safeZ}
-            onChange={(e) => updateMachine({ safeZ: parseFloat(e.target.value) || 10 })}
-            className="w-full bg-slate-100/80 border border-slate-200 rounded-lg px-2.5 py-1.5 font-mono text-emerald-700 font-bold focus:bg-white transition-all"
-          />
-          <span className="text-[10px] text-slate-400 block mt-1 leading-tight">
-            Высота быстрых переездов над струбцинами и заготовкой
-          </span>
+
+          <div>
+            <label className="text-slate-500 block mb-1 font-medium">Глубина резания Z (мм)</label>
+            <input
+              type="number"
+              step="0.5"
+              value={machine.cutDepth ?? 5}
+              onChange={(e) => updateMachine({ cutDepth: parseFloat(e.target.value) || 5 })}
+              className="w-full bg-slate-100/80 border border-slate-200 rounded-lg px-2.5 py-1.5 font-mono text-blue-700 font-bold focus:bg-white transition-all"
+            />
+            <span className="text-[10px] text-slate-400 block mt-1 leading-tight">
+              Глубина погружения реза
+            </span>
+          </div>
         </div>
       </div>
 

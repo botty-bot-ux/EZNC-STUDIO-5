@@ -38,6 +38,11 @@ export function generateGcode(
 
   // Helper to append a rapid move
   const addRapidMove = (target: { x: number; y: number; z: number }, comment?: string) => {
+    const dist = Math.hypot(target.x - currentPos.x, target.y - currentPos.y, target.z - currentPos.z);
+    if (dist < 0.0001) {
+      return;
+    }
+
     const xStr = formatNum(target.x);
     const yStr = formatNum(target.y);
     const zStr = formatNum(target.z);
@@ -71,6 +76,11 @@ export function generateGcode(
     operationId?: string,
     objectId?: string
   ) => {
+    const dist = Math.hypot(target.x - currentPos.x, target.y - currentPos.y, target.z - currentPos.z);
+    if (dist < 0.0001) {
+      return;
+    }
+
     const xStr = formatNum(target.x);
     const yStr = formatNum(target.y);
     const zStr = formatNum(target.z);
@@ -164,7 +174,7 @@ export function generateGcode(
     const opFeedCut = linkedOp?.feedCut || machine.feedCut || 1000;
     const opFeedPlunge = linkedOp?.feedPlunge || machine.feedPlunge || 300;
     const opFeedDrill = linkedOp?.feedDrill || machine.feedDrill || 500;
-    const totalDepth = Math.abs(linkedOp?.finalDepth ?? obj.depth ?? 5);
+    const totalDepth = Math.abs(linkedOp?.finalDepth ?? machine.cutDepth ?? obj.depth ?? 5);
 
     // Single pass directly to total depth (1 проход)
     const zPasses: number[] = [-totalDepth];
@@ -521,11 +531,7 @@ export function generateGcode(
  */
 export function generateNCFileWithMetadata(exportData: any, gcode: string): string {
   const jsonStr = JSON.stringify(exportData);
-  const headerBlock = `;==========================================
-; NCSTUDIO PROJECT DATA (v1.0)
-; NCSTUDIO_PROJECT:${jsonStr}
-;==========================================
-`;
+  const headerBlock = `; NCSTUDIO_PROJECT:${jsonStr}\n`;
   return headerBlock + gcode;
 }
 

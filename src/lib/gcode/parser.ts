@@ -38,51 +38,91 @@ export function extractProjectDataFromNC(content: string): ProjectData | null {
 /**
  * Converts cutting paths from a raw G-code file into CAD Polyline/Point objects for scene editing.
  */
-export function parseGcodeToCadObjects(gcode: string): CADObject[] {
+export function parseGcodeToCadObjects(
+  gcode: string
+): (CADObject & { importedFeedCut?: number; importedFeedPlunge?: number })[] {
   const segments = parseGcodeToSegments(gcode);
   const feedSegments = segments.filter((s) => s.type === 'feed' || s.type === 'arc_cw' || s.type === 'arc_ccw');
 
   if (feedSegments.length === 0) return [];
 
-  const objects: CADObject[] = [];
+  const objects: (CADObject & { importedFeedCut?: number; importedFeedPlunge?: number })[] = [];
   let currentPoints: Point2D[] = [];
   let currentMaxDepth = 0;
+  let currentFeedCut: number | undefined = undefined;
+  let currentFeedPlunge: number | undefined = undefined;
 
   const pushPolyline = () => {
     if (currentPoints.length >= 2) {
-      objects.push({
-        id: `imported_poly_${objects.length + 1}`,
-        name: `Импортированный контур ${objects.length + 1}`,
-        type: 'polyline',
-        points: [...currentPoints],
-        closed:
-          currentPoints.length > 2 &&
-          Math.hypot(
-            currentPoints[0].x - currentPoints[currentPoints.length - 1].x,
-            currentPoints[0].y - currentPoints[currentPoints.length - 1].y
-          ) < 0.1,
-        depth: Math.abs(currentMaxDepth) || 5,
-        operationType: 'cut',
-        visible: true,
-      });
+      // Deduplicate consecutive points within 0.001mm
+      const deduped: Point2D[] = [];
+      for (const pt of currentPoints) {
+        if (
+          deduped.length === 0 ||
+          Math.hypot(pt.x - deduped[deduped.length - 1].x, pt.y - deduped[deduped.length - 1].y) > 0.001
+        ) {
+          deduped.push(pt);
+        }
+      }
+
+      if (deduped.length >= 2) {
+        objects.push({
+          id: `imported_poly_${objects.length + 1}`,
+          name: `Импортированный контур ${objects.length + 1}`,
+          type: 'polyline',
+          points: deduped,
+          closed:
+            deduped.length > 2 &&
+            Math.hypot(
+              deduped[0].x - deduped[deduped.length - 1].x,
+              deduped[0].y - deduped[deduped.length - 1].y
+            ) < 0.1,
+          depth: Math.abs(currentMaxDepth) || 5,
+          operationType: 'cut',
+          visible: true,
+          importedFeedCut: currentFeedCut,
+          importedFeedPlunge: currentFeedPlunge,
+        });
+      }
     }
     currentPoints = [];
     currentMaxDepth = 0;
+    currentFeedCut = undefined;
+    currentFeedPlunge = undefined;
   };
 
   for (const seg of feedSegments) {
+    // If start of segment is far from previous segment's end point, finish previous contour first
+    if (currentPoints.length > 0) {
+      const lastPt = currentPoints[currentPoints.length - 1];
+      if (Math.hypot(lastPt.x - seg.startX, lastPt.y - seg.startY) > 0.1) {
+        pushPolyline();
+      }
+    }
+
     if (seg.endZ < 0) {
       currentMaxDepth = Math.max(currentMaxDepth, Math.abs(seg.endZ));
     }
 
+    const len2D = Math.hypot(seg.endX - seg.startX, seg.endY - seg.startY);
+
+    // Pure Z-plunge or Z-retract move (2D distance < 0.001mm)
+    if (len2D < 0.001) {
+      if (seg.feed) {
+        if (seg.endZ < seg.startZ) {
+          currentFeedPlunge = seg.feed;
+        }
+      }
+      continue;
+    }
+
+    // 2D cutting move
+    if (seg.feed) {
+      currentFeedCut = seg.feed;
+    }
+
     if (currentPoints.length === 0) {
       currentPoints.push({ x: seg.startX, y: seg.startY });
-    } else {
-      const lastPt = currentPoints[currentPoints.length - 1];
-      if (Math.hypot(lastPt.x - seg.startX, lastPt.y - seg.startY) > 0.1) {
-        pushPolyline();
-        currentPoints.push({ x: seg.startX, y: seg.startY });
-      }
     }
     currentPoints.push({ x: seg.endX, y: seg.endY });
   }
@@ -99,6 +139,7 @@ export function parseGcodeToSegments(gcode: string): ToolpathSegment[] {
   let curX = 0;
   let curY = 0;
   let curZ = 10;
+  let curFeed: number | undefined = undefined;
   let isAbsolute = true;
   let activeMotion: 'G0' | 'G1' | 'G2' | 'G3' | null = null;
 
@@ -150,6 +191,8 @@ export function parseGcodeToSegments(gcode: string): ToolpathSegment[] {
         arcI = val;
       } else if (cmd === 'J') {
         arcJ = val;
+      } else if (cmd === 'F') {
+        curFeed = val;
       }
     }
 
@@ -175,6 +218,7 @@ export function parseGcodeToSegments(gcode: string): ToolpathSegment[] {
           endX: nextX,
           endY: nextY,
           endZ: nextZ,
+          feed: curFeed,
         });
       } else if (activeMotion === 'G2' || activeMotion === 'G3') {
         segments.push({
@@ -188,6 +232,7 @@ export function parseGcodeToSegments(gcode: string): ToolpathSegment[] {
           endZ: nextZ,
           centerX: curX + arcI,
           centerY: curY + arcJ,
+          feed: curFeed,
         });
       }
 

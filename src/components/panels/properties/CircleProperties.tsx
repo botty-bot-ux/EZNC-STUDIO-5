@@ -9,23 +9,23 @@ interface CirclePropertiesProps {
 
 export const CircleProperties: React.FC<CirclePropertiesProps> = ({ obj, onUpdate }) => {
   return (
-    <div className="space-y-3">
+    <div className="space-y-2.5">
       <div className="grid grid-cols-2 gap-2">
-        <PropertyInput label="Центр X" value={obj.centerX} onChange={(centerX) => onUpdate({ centerX })} />
-        <PropertyInput label="Центр Y" value={obj.centerY} onChange={(centerY) => onUpdate({ centerY })} />
+        <PropertyInput label="Центр X, мм" value={obj.centerX} onChange={(centerX) => onUpdate({ centerX })} />
+        <PropertyInput label="Центр Y, мм" value={obj.centerY} onChange={(centerY) => onUpdate({ centerY })} />
       </div>
 
-      <div className="grid grid-cols-2 gap-2">
+      <div>
         <PropertyInput
-          label="Радиус R (мм)"
+          label="Радиус R, мм"
           value={obj.radius}
           onChange={(radius) => onUpdate({ radius })}
           step="0.5"
           className="text-emerald-700 font-bold"
           fallbackValue={1}
         />
-        <PropertyInput label="Глубина Z (мм)" value={obj.depth} onChange={(depth) => onUpdate({ depth })} step="0.5" />
       </div>
     </div>
   );
 };
+

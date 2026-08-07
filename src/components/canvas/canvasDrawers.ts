@@ -166,11 +166,13 @@ export function drawGrid(
   const fadeDist = Math.max(35, Math.min(80, Math.round(50 * Math.sqrt(zoom))));
 
   // 3. Dynamic step calculation so grid lines are comfortably spaced
-  let step = gridStep || 10;
-  const minPx = 25;
+  let step = gridStep || 1;
+  const minPx = 15;
 
   while (step * zoom < minPx) {
-    if (step < 50) step *= 2;
+    if (step < 5) step = 5;
+    else if (step < 10) step = 10;
+    else if (step < 50) step *= 2;
     else if (step < 100) step = 100;
     else step *= 2;
   }

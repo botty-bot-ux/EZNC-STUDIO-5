@@ -1,28 +1,23 @@
 import { PostprocessorTemplates } from '../../types';
 
 export const DEFAULT_TEMPLATES: PostprocessorTemplates = {
-  header: `;==========================================
-; ЧПУ Управляющая программа NC-Studio (*.NC / *.CNC)
-; Постпроцессор: NcStudio v5 / Vectric Aspire
-;==========================================
-%
-T1M6
-G0 Z{safeZ}
-G0 X0.000 Y0.000 S{spindleSpeed} M3`,
+  header: `G21 G17 G90 G40 G49 G80
+S{spindleSpeed} M03
+G04 P3.0
+G00 X0.000 Y0.000`,
 
-  footer: `;==========================================
-; Завершение программы NC-Studio
-;==========================================
-G0 Z{safeZ}
-G0 X0.000 Y0.000
+  footer: `G00 Z{safeZ}
+M05
+G00 X0.000 Y0.000
 M30`,
 
-  toolChange: `; Смена инструмента: {toolName}
-M5
-G0 Z{safeZ}
+  toolChange: `M05
+G00 Z{safeZ}
 T1M6`,
 
-  spindleStart: `S{spindleSpeed} M3\nG4 P{spindleDwell}`,
-  spindleStop: `M5`,
+  spindleStart: `S{spindleSpeed} M03\nG04 P3.0`,
+  spindleStop: `M05`,
 };
+
+
 

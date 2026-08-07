@@ -1,8 +1,7 @@
 {
   "name": "ЧПУ CAD/CAM Редактор G-code",
   "short_name": "G-code CAD/CAM",
-  "start_url": ".",
-  "scope": ".",
+  "start_url": "/",
   "display": "standalone",
   "background_color": "#0f172a",
   "theme_color": "#0ea5e9",
