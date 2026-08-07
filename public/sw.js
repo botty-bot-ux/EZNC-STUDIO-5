@@ -1,9 +1,7 @@
-const CACHE_NAME = 'cnc-gcode-v1';
+const CACHE_NAME = 'cnc-gcode-v2';
 const ASSETS_TO_CACHE = [
-  '/',
-  '/index.html',
-  '/src/main.tsx',
-  '/src/index.css'
+  './',
+  './index.html'
 ];
 
 self.addEventListener('install', (event) => {
@@ -55,7 +53,7 @@ self.addEventListener('fetch', (event) => {
       }).catch(() => {
         // Fallback for navigation
         if (event.request.mode === 'navigate') {
-          return caches.match('/index.html');
+          return caches.match('./index.html');
         }
       });
     })
