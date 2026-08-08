@@ -3,381 +3,449 @@ import {
   Shield,
   Square,
   Wrench,
+  AlertCircle,
+  AlertTriangle,
+  CheckCircle2,
+  Info,
 } from 'lucide-react';
 import { useProjectStore } from '../../store/useProjectStore';
 
-const SHEET_PRESETS = [
-  { id: 'none', label: '❌ Без заготовки (Скрыть)', x: 0, y: 0 },
-  { id: '1000x1000', label: '1000 × 1000 мм', x: 1000, y: 1000 },
-  { id: '1500x1500', label: '1500 × 1500 мм', x: 1500, y: 1500 },
-  { id: '2000x1000', label: '2000 × 1000 мм', x: 2000, y: 1000 },
-  { id: '2440x1220', label: '2440 × 1220 мм (Фанера/МДФ)', x: 2440, y: 1220 },
-  { id: '2500x1250', label: '2500 × 1250 мм', x: 2500, y: 1250 },
-  { id: '2800x2070', label: '2800 × 2070 мм (ЛДСП)', x: 2800, y: 2070 },
-  { id: '3000x1500', label: '3000 × 1500 мм', x: 3000, y: 1500 },
-  { id: 'custom', label: '✏️ Свой размер...', x: 1000, y: 1000 },
-];
+const WIDTH_OPTIONS = [884, 984, 1284, 1484, 1684, 1884, 2084];
+const HEIGHT_OPTIONS = [250, 370, 1084, 1124, 1204];
 
 export const MachineSettingsPanel: React.FC = () => {
-  const { machine, updateMachine } = useProjectStore();
+  const { machine, updateMachine, warnings, setSelectedObjectId } = useProjectStore();
 
   const stockSheet = machine.stockSheet || {
     enabled: true,
     preset: '1000x1000',
     widthX: 1000,
     widthY: 1000,
-    color: '#f59e0b',
+    color: '#22c55e',
   };
 
-  const currentPresetVal = !stockSheet.enabled
-    ? 'none'
-    : stockSheet.preset || '1000x1000';
+  const widthVal = stockSheet.widthY;
+  const heightVal = stockSheet.widthX;
+
+  const widthOptions = WIDTH_OPTIONS.includes(widthVal)
+    ? WIDTH_OPTIONS
+    : [widthVal, ...WIDTH_OPTIONS].sort((a, b) => a - b);
+
+  const heightOptions = HEIGHT_OPTIONS.includes(heightVal)
+    ? HEIGHT_OPTIONS
+    : [heightVal, ...HEIGHT_OPTIONS].sort((a, b) => a - b);
+
+  const isPreset3 =
+    machine.cutDepth === 17.5 &&
+    stockSheet.widthY === 1684 &&
+    stockSheet.widthX === 1084 &&
+    machine.spindleSpeed === 18000 &&
+    machine.feedCut === 2000 &&
+    machine.feedPlunge === 700 &&
+    machine.feedDrill === 700;
+
+  const isPreset8 =
+    machine.cutDepth === 33 &&
+    stockSheet.widthY === 2084 &&
+    stockSheet.widthX === 370 &&
+    machine.spindleSpeed === 15000 &&
+    machine.feedCut === 700 &&
+    machine.feedPlunge === 700 &&
+    machine.feedDrill === 700;
+
+  const applyPreset3 = () => {
+    updateMachine({
+      cutDepth: 17.5,
+      spindleSpeed: 18000,
+      feedCut: 2000,
+      feedPlunge: 700,
+      feedDrill: 700,
+      toolDiameter: 3.0,
+      stockSheet: {
+        enabled: true,
+        preset: 'custom',
+        widthY: 1684,
+        widthX: 1084,
+        color: '#22c55e',
+      },
+    });
+  };
+
+  const applyPreset8 = () => {
+    updateMachine({
+      cutDepth: 33,
+      spindleSpeed: 15000,
+      feedCut: 700,
+      feedPlunge: 700,
+      feedDrill: 700,
+      toolDiameter: 8.0,
+      stockSheet: {
+        enabled: true,
+        preset: 'custom',
+        widthY: 2084,
+        widthX: 370,
+        color: '#22c55e',
+      },
+    });
+  };
+
+  const errors = warnings.filter((w) => w.level === 'error');
+  const warnList = warnings.filter((w) => w.level === 'warning');
+  const infos = warnings.filter((w) => w.level === 'info');
 
   return (
-    <div className="p-4 space-y-5 text-xs text-slate-800 overflow-y-auto h-full">
-      {/* 1. WORK OFFSETS */}
-      <div className="bg-white/80 p-3.5 rounded-xl border border-slate-200 shadow-sm space-y-2.5">
-        <span className="font-bold text-slate-700 block text-xs uppercase tracking-wider">
-          Смещение Рабочего Нуля (Offset)
-        </span>
-
-        <div className="grid grid-cols-2 gap-2">
-          <div>
-            <label className="text-slate-500 block mb-1">Смещение X (Offset X)</label>
-            <input
-              type="number"
-              value={machine.workOffset.x}
-              onChange={(e) => updateMachine({ workOffset: { ...machine.workOffset, x: parseFloat(e.target.value) || 0 } })}
-              className="w-full bg-slate-100/80 border border-slate-200 rounded-lg px-2.5 py-1.5 font-mono text-slate-800 focus:bg-white transition-all"
-            />
-          </div>
-
-          <div>
-            <label className="text-slate-500 block mb-1">Смещение Y (Offset Y)</label>
-            <input
-              type="number"
-              value={machine.workOffset.y}
-              onChange={(e) => updateMachine({ workOffset: { ...machine.workOffset, y: parseFloat(e.target.value) || 0 } })}
-              className="w-full bg-slate-100/80 border border-slate-200 rounded-lg px-2.5 py-1.5 font-mono text-slate-800 focus:bg-white transition-all"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* 2. MACHINE BOUNDS & SAFETY */}
-      <div className="space-y-3 pt-2 border-t border-slate-200/80">
-        <div className="flex items-center gap-1.5 font-bold text-slate-800">
-          <Shield className="w-4 h-4 text-emerald-600" />
-          <span>Рабочая Зона и Безопасность Z</span>
-        </div>
-
-        <p className="text-[11px] text-slate-500 leading-relaxed">
-          Начало координат (0,0) находится в правом нижнем углу. Ось -X направлена вверх, ось -Y — влево.
-        </p>
-
-        <div className="grid grid-cols-2 gap-2">
-          <div>
-            <label className="text-slate-500 block mb-1">Зона X (мин..макс)</label>
-            <div className="flex items-center gap-1">
-              <input
-                type="number"
-                value={machine.bounds.xMin}
-                onChange={(e) =>
-                  updateMachine({ bounds: { ...machine.bounds, xMin: parseFloat(e.target.value) || -1200 } })
-                }
-                className="w-full bg-slate-100/80 border border-slate-200 rounded-lg px-2 py-1 font-mono text-[11px] text-slate-800 focus:bg-white transition-all"
-              />
-              <span className="text-slate-400">..</span>
-              <input
-                type="number"
-                value={machine.bounds.xMax}
-                onChange={(e) =>
-                  updateMachine({ bounds: { ...machine.bounds, xMax: parseFloat(e.target.value) || 0 } })
-                }
-                className="w-full bg-slate-100/80 border border-slate-200 rounded-lg px-2 py-1 font-mono text-[11px] text-slate-800 focus:bg-white transition-all"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="text-slate-500 block mb-1">Зона Y (мин..макс)</label>
-            <div className="flex items-center gap-1">
-              <input
-                type="number"
-                value={machine.bounds.yMin}
-                onChange={(e) =>
-                  updateMachine({ bounds: { ...machine.bounds, yMin: parseFloat(e.target.value) || -900 } })
-                }
-                className="w-full bg-slate-100/80 border border-slate-200 rounded-lg px-2 py-1 font-mono text-[11px] text-slate-800 focus:bg-white transition-all"
-              />
-              <span className="text-slate-400">..</span>
-              <input
-                type="number"
-                value={machine.bounds.yMax}
-                onChange={(e) =>
-                  updateMachine({ bounds: { ...machine.bounds, yMax: parseFloat(e.target.value) || 0 } })
-                }
-                className="w-full bg-slate-100/80 border border-slate-200 rounded-lg px-2 py-1 font-mono text-[11px] text-slate-800 focus:bg-white transition-all"
-              />
-            </div>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-2">
-          <div>
-            <label className="text-slate-500 block mb-1 font-medium">Безопасная Z (мм)</label>
-            <input
-              type="number"
-              value={machine.safeZ}
-              onChange={(e) => updateMachine({ safeZ: parseFloat(e.target.value) || 10 })}
-              className="w-full bg-slate-100/80 border border-slate-200 rounded-lg px-2.5 py-1.5 font-mono text-emerald-700 font-bold focus:bg-white transition-all"
-            />
-            <span className="text-[10px] text-slate-400 block mt-1 leading-tight">
-              Высота быстрых переездов
-            </span>
-          </div>
-
-          <div>
-            <label className="text-slate-500 block mb-1 font-medium">Глубина резания Z (мм)</label>
-            <input
-              type="number"
-              step="0.5"
-              value={machine.cutDepth ?? 5}
-              onChange={(e) => updateMachine({ cutDepth: parseFloat(e.target.value) || 5 })}
-              className="w-full bg-slate-100/80 border border-slate-200 rounded-lg px-2.5 py-1.5 font-mono text-blue-700 font-bold focus:bg-white transition-all"
-            />
-            <span className="text-[10px] text-slate-400 block mt-1 leading-tight">
-              Глубина погружения реза
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* 3. STOCK SHEET TEMPLATES / ЗАГОТОВКА ЛИСТА */}
-      <div className="bg-white/80 p-3.5 rounded-xl border border-slate-200 shadow-sm space-y-3">
+    <div className="p-3 space-y-3 text-xs text-slate-800 overflow-y-auto h-full custom-scrollbar">
+      {/* 1. ЗАГОТОВКА ЛИСТА */}
+      <div className="bg-white/90 p-3 rounded-xl border border-slate-200/80 shadow-2xs space-y-2">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1.5 font-bold text-amber-700 text-xs">
-            <Square className="w-4 h-4" />
-            <span>Шаблон Листа Заготовки</span>
-          </div>
+          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+            <Square className="w-3.5 h-3.5 text-emerald-600" />
+            Заготовка листа
+          </span>
+
           <label className="relative inline-flex items-center cursor-pointer">
             <input
               type="checkbox"
-              checked={stockSheet.enabled && stockSheet.preset !== 'none'}
+              checked={stockSheet.enabled}
               onChange={(e) =>
                 updateMachine({
                   stockSheet: {
                     ...stockSheet,
                     enabled: e.target.checked,
-                    preset: e.target.checked
-                      ? stockSheet.preset === 'none'
-                        ? '1000x1000'
-                        : stockSheet.preset
-                      : 'none',
+                    preset: e.target.checked ? 'custom' : 'none',
+                    color: '#22c55e',
                   },
                 })
               }
               className="sr-only peer"
             />
-            <div className="w-7 h-4 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-amber-500"></div>
+            <div className="w-7 h-4 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-emerald-500" />
           </label>
         </div>
 
-        <p className="text-[11px] text-slate-400 leading-tight">
-          Отображение контура листа материала пунктиром другого цвета в редакторе.
-        </p>
-
-        {/* PRESET SELECT DROPDOWN */}
-        <div>
-          <label className="text-slate-400 block mb-1 font-medium text-[11px]">Выберите шаблон листа</label>
-          <select
-            value={currentPresetVal}
-            onChange={(e) => {
-              const val = e.target.value;
-              if (val === 'none') {
-                updateMachine({
-                  stockSheet: {
-                    ...stockSheet,
-                    enabled: false,
-                    preset: 'none',
-                  },
-                });
-                return;
-              }
-
-              const presetObj = SHEET_PRESETS.find((p) => p.id === val);
-              if (presetObj && val !== 'custom') {
-                updateMachine({
-                  stockSheet: {
-                    enabled: true,
-                    preset: val,
-                    widthX: presetObj.x,
-                    widthY: presetObj.y,
-                    color: stockSheet.color || '#f59e0b',
-                  },
-                });
-              } else {
-                updateMachine({
-                  stockSheet: {
-                    enabled: true,
-                    preset: 'custom',
-                    widthX: stockSheet.widthX || 1000,
-                    widthY: stockSheet.widthY || 1000,
-                    color: stockSheet.color || '#f59e0b',
-                  },
-                });
-              }
-            }}
-            className="w-full bg-slate-100/80 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 font-semibold focus:border-blue-500 focus:bg-white focus:outline-none cursor-pointer transition-all"
-          >
-            {SHEET_PRESETS.map((p) => (
-              <option key={p.id} value={p.id} className="bg-white text-slate-800">
-                {p.label}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* DIMENSIONS & COLOR SELECTION IF ENABLED */}
-        {stockSheet.enabled && stockSheet.preset !== 'none' && (
-          <div className="space-y-2.5 pt-2.5 border-t border-slate-200">
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="text-slate-500 block mb-1 text-[10px]">Длина X (мм)</label>
-                <input
-                  type="number"
-                  value={stockSheet.widthX}
-                  onChange={(e) =>
-                    updateMachine({
-                      stockSheet: {
-                        ...stockSheet,
-                        preset: 'custom',
-                        widthX: parseFloat(e.target.value) || 0,
-                      },
-                    })
-                  }
-                  className="w-full bg-slate-100/80 border border-slate-200 rounded-lg px-2.5 py-1.5 font-mono text-[11px] text-slate-800 font-bold focus:bg-white focus:border-blue-500 focus:outline-none transition-all"
-                />
-              </div>
-
-              <div>
-                <label className="text-slate-500 block mb-1 text-[10px]">Ширина Y (мм)</label>
-                <input
-                  type="number"
-                  value={stockSheet.widthY}
-                  onChange={(e) =>
-                    updateMachine({
-                      stockSheet: {
-                        ...stockSheet,
-                        preset: 'custom',
-                        widthY: parseFloat(e.target.value) || 0,
-                      },
-                    })
-                  }
-                  className="w-full bg-slate-100/80 border border-slate-200 rounded-lg px-2.5 py-1.5 font-mono text-[11px] text-slate-800 font-bold focus:bg-white focus:border-blue-500 focus:outline-none transition-all"
-                />
-              </div>
+        {stockSheet.enabled && (
+          <div className="grid grid-cols-2 gap-2 pt-1">
+            <div>
+              <label className="text-[10px] text-slate-500 block mb-0.5 font-medium">
+                Ширина (Y, мм)
+              </label>
+              <select
+                value={widthVal}
+                onChange={(e) => {
+                  const nextVal = parseFloat(e.target.value) || 1284;
+                  updateMachine({
+                    stockSheet: {
+                      ...stockSheet,
+                      enabled: true,
+                      preset: 'custom',
+                      widthY: nextVal,
+                      color: '#22c55e',
+                    },
+                  });
+                }}
+                className="w-full bg-slate-100/80 border border-slate-200/90 rounded-lg px-2 py-1.5 text-xs text-slate-800 font-bold focus:border-emerald-500 focus:bg-white focus:outline-none cursor-pointer transition-all"
+              >
+                {widthOptions.map((w) => (
+                  <option key={w} value={w}>
+                    {w} мм
+                  </option>
+                ))}
+              </select>
             </div>
 
-            {/* COLOR ACCENT PICKER FOR DASHED LINE */}
             <div>
-              <label className="text-slate-500 block mb-1.5 text-[10px]">Цвет пунктирной линии</label>
-              <div className="flex items-center gap-2">
-                {[
-                  { color: '#f59e0b', name: 'Оранжевый' },
-                  { color: '#a855f7', name: 'Фиолетовый' },
-                  { color: '#ec4899', name: 'Розовый' },
-                  { color: '#10b981', name: 'Изумрудный' },
-                  { color: '#06b6d4', name: 'Бирюзовый' },
-                  { color: '#eab308', name: 'Желтый' },
-                ].map((item) => (
-                  <button
-                    key={item.color}
-                    type="button"
-                    title={item.name}
-                    onClick={() =>
-                      updateMachine({
-                        stockSheet: {
-                          ...stockSheet,
-                          color: item.color,
-                        },
-                      })
-                    }
-                    className={`w-5 h-5 rounded-full transition-transform border ${
-                      (stockSheet.color || '#f59e0b') === item.color
-                        ? 'ring-2 ring-blue-500 scale-110 border-transparent'
-                        : 'border-slate-300 hover:scale-105'
-                    }`}
-                    style={{ backgroundColor: item.color }}
-                  />
+              <label className="text-[10px] text-slate-500 block mb-0.5 font-medium">
+                Высота (X, мм)
+              </label>
+              <select
+                value={heightVal}
+                onChange={(e) => {
+                  const nextVal = parseFloat(e.target.value) || 1084;
+                  updateMachine({
+                    stockSheet: {
+                      ...stockSheet,
+                      enabled: true,
+                      preset: 'custom',
+                      widthX: nextVal,
+                      color: '#22c55e',
+                    },
+                  });
+                }}
+                className="w-full bg-slate-100/80 border border-slate-200/90 rounded-lg px-2 py-1.5 text-xs text-slate-800 font-bold focus:border-emerald-500 focus:bg-white focus:outline-none cursor-pointer transition-all"
+              >
+                {heightOptions.map((h) => (
+                  <option key={h} value={h}>
+                    {h} мм
+                  </option>
                 ))}
-              </div>
+              </select>
             </div>
           </div>
         )}
       </div>
 
-      {/* 4. TOOL, SPINDLE & FEEDS */}
-      <div className="space-y-3 pt-3.5 border-t border-slate-200/80">
-        <div className="flex items-center gap-1.5 font-bold text-slate-800">
-          <Wrench className="w-4 h-4 text-blue-600" />
-          <span>Инструмент и Подачи</span>
+      {/* 2. ИНСТРУМЕНТ И РЕЖИМЫ */}
+      <div className="bg-white/90 p-3 rounded-xl border border-slate-200/80 shadow-2xs space-y-2.5">
+        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+          <Wrench className="w-3.5 h-3.5 text-amber-600" />
+          Инструмент и режимы
+        </span>
+
+        {/* Быстрые шаблоны */}
+        <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-100/80 rounded-lg">
+          <button
+            type="button"
+            onClick={applyPreset3}
+            className={`py-1.5 px-2 rounded-md font-bold text-xs transition-all cursor-pointer ${
+              isPreset3
+                ? 'bg-emerald-600 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+            }`}
+          >
+            Фреза 3 мм
+          </button>
+          <button
+            type="button"
+            onClick={applyPreset8}
+            className={`py-1.5 px-2 rounded-md font-bold text-xs transition-all cursor-pointer ${
+              isPreset8
+                ? 'bg-emerald-600 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+            }`}
+          >
+            Фреза 8 мм
+          </button>
         </div>
 
-        <div className="grid grid-cols-2 gap-2">
+        {/* Spindle & Feeds */}
+        <div className="space-y-2 pt-1">
           <div>
-            <label className="text-slate-500 block mb-1">Диаметр фрезы (мм)</label>
-            <input
-              type="number"
-              step="0.001"
-              value={machine.toolDiameter}
-              onChange={(e) => updateMachine({ toolDiameter: parseFloat(e.target.value) || 3.175 })}
-              className="w-full bg-slate-100/80 border border-slate-200 rounded-lg px-2.5 py-1.5 font-mono font-bold text-slate-800 focus:bg-white focus:border-blue-500 focus:outline-none transition-all"
-            />
-          </div>
-
-          <div>
-            <label className="text-slate-500 block mb-1">Обороты шпинделя (об/мин)</label>
+            <label className="text-[10px] text-slate-500 block mb-0.5 font-medium">
+              Обороты (об/мин)
+            </label>
             <input
               type="number"
               value={machine.spindleSpeed}
               onChange={(e) => updateMachine({ spindleSpeed: parseInt(e.target.value) || 15000 })}
-              className="w-full bg-slate-100/80 border border-slate-200 rounded-lg px-2.5 py-1.5 font-mono text-slate-800 focus:bg-white focus:border-blue-500 focus:outline-none transition-all"
+              className="w-full bg-slate-100/80 border border-slate-200/90 rounded-lg px-2.5 py-1.5 font-mono font-bold text-slate-800 text-xs focus:bg-white focus:border-amber-500 focus:outline-none transition-all"
             />
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-[10px] text-slate-500 block mb-0.5 font-medium">
+                Подача (F cut)
+              </label>
+              <input
+                type="number"
+                value={machine.feedCut}
+                onChange={(e) => updateMachine({ feedCut: parseFloat(e.target.value) || 1000 })}
+                className="w-full bg-slate-100/80 border border-slate-200/90 rounded-lg px-2.5 py-1.5 font-mono font-bold text-slate-800 text-xs focus:bg-white focus:border-amber-500 focus:outline-none transition-all"
+              />
+            </div>
+
+            <div>
+              <label className="text-[10px] text-slate-500 block mb-0.5 font-medium">
+                Врезание (F plunge)
+              </label>
+              <input
+                type="number"
+                value={machine.feedPlunge}
+                onChange={(e) => {
+                  const val = parseFloat(e.target.value) || 700;
+                  updateMachine({ feedPlunge: val, feedDrill: val });
+                }}
+                className="w-full bg-slate-100/80 border border-slate-200/90 rounded-lg px-2.5 py-1.5 font-mono font-bold text-slate-800 text-xs focus:bg-white focus:border-amber-500 focus:outline-none transition-all"
+              />
+            </div>
+          </div>
+
+          {/* Высоты Z */}
+          <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100">
+            <div>
+              <label className="text-[10px] text-slate-500 block mb-0.5 font-medium">
+                Безопасная Z (мм)
+              </label>
+              <input
+                type="number"
+                value={machine.safeZ}
+                onChange={(e) => updateMachine({ safeZ: parseFloat(e.target.value) || 20 })}
+                className="w-full bg-emerald-50/60 border border-emerald-200/80 rounded-lg px-2.5 py-1.5 font-mono font-bold text-emerald-800 text-xs focus:bg-white focus:border-emerald-500 focus:outline-none transition-all"
+              />
+            </div>
+
+            <div>
+              <label className="text-[10px] text-slate-500 block mb-0.5 font-medium">
+                Глубина реза Z (мм)
+              </label>
+              <input
+                type="number"
+                step="0.5"
+                value={machine.cutDepth ?? 5}
+                onChange={(e) => updateMachine({ cutDepth: parseFloat(e.target.value) || 5 })}
+                className="w-full bg-blue-50/60 border border-blue-200/80 rounded-lg px-2.5 py-1.5 font-mono font-bold text-blue-800 text-xs focus:bg-white focus:border-blue-500 focus:outline-none transition-all"
+              />
+            </div>
           </div>
         </div>
+      </div>
 
-        <div className="grid grid-cols-3 gap-2">
+      {/* 3. РАБОЧАЯ ЗОНА СТАНКА */}
+      <div className="bg-white/90 p-3 rounded-xl border border-slate-200/80 shadow-2xs space-y-2">
+        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+          <Shield className="w-3.5 h-3.5 text-purple-600" />
+          Границы рабочей зоны
+        </span>
+
+        <div className="grid grid-cols-2 gap-2">
           <div>
-            <label className="text-slate-500 block mb-1 text-[10px]">Подача резания</label>
-            <input
-              type="number"
-              value={machine.feedCut}
-              onChange={(e) => updateMachine({ feedCut: parseFloat(e.target.value) || 1000 })}
-              className="w-full bg-slate-100/80 border border-slate-200 rounded-lg px-2 py-1.5 font-mono text-[11px] text-slate-800 focus:bg-white focus:border-blue-500 focus:outline-none transition-all"
-            />
+            <label className="text-[10px] text-slate-500 block mb-0.5 font-medium">
+              Ось X (мин..макс)
+            </label>
+            <div className="flex items-center gap-1">
+              <input
+                type="number"
+                value={machine.bounds.xMin}
+                onChange={(e) =>
+                  updateMachine({
+                    bounds: { ...machine.bounds, xMin: parseFloat(e.target.value) || -1200 },
+                  })
+                }
+                className="w-full bg-slate-100/80 border border-slate-200/90 rounded-lg px-1.5 py-1 font-mono text-[11px] text-slate-800 font-bold focus:bg-white focus:outline-none transition-all text-center"
+              />
+              <span className="text-slate-300 font-bold">..</span>
+              <input
+                type="number"
+                value={machine.bounds.xMax}
+                onChange={(e) =>
+                  updateMachine({
+                    bounds: { ...machine.bounds, xMax: parseFloat(e.target.value) || 0 },
+                  })
+                }
+                className="w-full bg-slate-100/80 border border-slate-200/90 rounded-lg px-1.5 py-1 font-mono text-[11px] text-slate-800 font-bold focus:bg-white focus:outline-none transition-all text-center"
+              />
+            </div>
           </div>
 
           <div>
-            <label className="text-slate-500 block mb-1 text-[10px]">Подача врезания Z</label>
-            <input
-              type="number"
-              value={machine.feedPlunge}
-              onChange={(e) => updateMachine({ feedPlunge: parseFloat(e.target.value) || 300 })}
-              className="w-full bg-slate-100/80 border border-slate-200 rounded-lg px-2 py-1.5 font-mono text-[11px] text-slate-800 focus:bg-white focus:border-blue-500 focus:outline-none transition-all"
-            />
-          </div>
-
-          <div>
-            <label className="text-slate-500 block mb-1 text-[10px]">Подача сверления</label>
-            <input
-              type="number"
-              value={machine.feedDrill}
-              onChange={(e) => updateMachine({ feedDrill: parseFloat(e.target.value) || 500 })}
-              className="w-full bg-slate-100/80 border border-slate-200 rounded-lg px-2 py-1.5 font-mono text-[11px] text-slate-800 focus:bg-white focus:border-blue-500 focus:outline-none transition-all"
-            />
+            <label className="text-[10px] text-slate-500 block mb-0.5 font-medium">
+              Ось Y (мин..макс)
+            </label>
+            <div className="flex items-center gap-1">
+              <input
+                type="number"
+                value={machine.bounds.yMin}
+                onChange={(e) =>
+                  updateMachine({
+                    bounds: { ...machine.bounds, yMin: parseFloat(e.target.value) || -900 },
+                  })
+                }
+                className="w-full bg-slate-100/80 border border-slate-200/90 rounded-lg px-1.5 py-1 font-mono text-[11px] text-slate-800 font-bold focus:bg-white focus:outline-none transition-all text-center"
+              />
+              <span className="text-slate-300 font-bold">..</span>
+              <input
+                type="number"
+                value={machine.bounds.yMax}
+                onChange={(e) =>
+                  updateMachine({
+                    bounds: { ...machine.bounds, yMax: parseFloat(e.target.value) || 0 },
+                  })
+                }
+                className="w-full bg-slate-100/80 border border-slate-200/90 rounded-lg px-1.5 py-1 font-mono text-[11px] text-slate-800 font-bold focus:bg-white focus:outline-none transition-all text-center"
+              />
+            </div>
           </div>
         </div>
+      </div>
+
+      {/* 4. ОШИБКИ И ПРЕДУПРЕЖДЕНИЯ */}
+      <div className="bg-white/90 p-3 rounded-xl border border-slate-200/80 shadow-2xs space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+            <AlertCircle className="w-3.5 h-3.5 text-rose-600" />
+            Проверка безопасности ({warnings.length})
+          </span>
+        </div>
+
+        {warnings.length === 0 ? (
+          <div className="p-3 text-center text-emerald-700 bg-emerald-50/80 border border-emerald-200/80 rounded-lg space-y-1">
+            <div className="flex items-center justify-center gap-1.5 font-bold text-xs text-emerald-800">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>Все проверки пройдены</span>
+            </div>
+            <p className="text-[10px] text-emerald-600/90">
+              Ошибок и выходов за пределы рабочей зоны станка не обнаружено.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-2 pt-1">
+            {/* ERRORS */}
+            {errors.map((item) => (
+              <div
+                key={item.id}
+                className="p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-rose-900 space-y-1"
+              >
+                <div className="flex items-center justify-between gap-1">
+                  <div className="flex items-center gap-1.5 font-bold text-xs text-rose-700">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                    <span>{item.title}</span>
+                  </div>
+
+                  {item.objectId && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedObjectId(item.objectId || null)}
+                      className="text-[10px] bg-rose-100 hover:bg-rose-200 text-rose-800 px-2 py-0.5 rounded font-medium transition-colors shrink-0"
+                    >
+                      Перейти
+                    </button>
+                  )}
+                </div>
+                <p className="text-[10px] text-rose-800/90 leading-relaxed">{item.message}</p>
+              </div>
+            ))}
+
+            {/* WARNINGS */}
+            {warnList.map((item) => (
+              <div
+                key={item.id}
+                className="p-2.5 bg-amber-50 border border-amber-200 rounded-lg text-amber-900 space-y-1"
+              >
+                <div className="flex items-center justify-between gap-1">
+                  <div className="flex items-center gap-1.5 font-bold text-xs text-amber-700">
+                    <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                    <span>{item.title}</span>
+                  </div>
+
+                  {item.objectId && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedObjectId(item.objectId || null)}
+                      className="text-[10px] bg-amber-100 hover:bg-amber-200 text-amber-800 px-2 py-0.5 rounded font-medium transition-colors shrink-0"
+                    >
+                      Перейти
+                    </button>
+                  )}
+                </div>
+                <p className="text-[10px] text-amber-800/90 leading-relaxed">{item.message}</p>
+              </div>
+            ))}
+
+            {/* INFOS */}
+            {infos.map((item) => (
+              <div
+                key={item.id}
+                className="p-2.5 bg-blue-50 border border-blue-200 rounded-lg text-blue-900 space-y-1"
+              >
+                <div className="flex items-center gap-1.5 font-bold text-xs text-blue-700">
+                  <Info className="w-3.5 h-3.5 shrink-0" />
+                  <span>{item.title}</span>
+                </div>
+                <p className="text-[10px] text-blue-800/90 leading-relaxed">{item.message}</p>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

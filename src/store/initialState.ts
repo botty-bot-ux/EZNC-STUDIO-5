@@ -37,7 +37,7 @@ export const INITIAL_MACHINE: MachineSettings = {
 export const INITIAL_OBJECTS: CADObject[] = [
   {
     id: 'obj_hole_1',
-    name: 'Отверстие 11мм (X-100 Y-100)',
+    name: 'Отверстие 1 (X-100 Y-100)',
     type: 'point',
     x: -100,
     y: -100,
@@ -48,7 +48,7 @@ export const INITIAL_OBJECTS: CADObject[] = [
   },
   {
     id: 'obj_hole_2',
-    name: 'Отверстие 9мм (X-200 Y-100)',
+    name: 'Отверстие 2 (X-200 Y-100)',
     type: 'point',
     x: -200,
     y: -100,

@@ -196,7 +196,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
     selectedObjectId: null,
     selectedOperationId: null,
     activeTool: 'select',
-    activeTab: 'properties',
+    activeTab: 'gcode',
     viewMode: 'edit',
 
     snapToGrid: true,
@@ -226,7 +226,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
     setViewMode: (mode: ViewMode) =>
       set((state) => ({
         viewMode: mode,
-        activeTab: mode === 'gcode' ? 'gcode' : state.activeTab === 'gcode' ? 'properties' : state.activeTab,
+        activeTab: mode === 'gcode' ? 'gcode' : state.activeTab === 'gcode' ? 'machine' : state.activeTab,
         rightPanelOpen: mode === 'gcode' ? true : state.rightPanelOpen,
       })),
     setSnapToGrid: (snap: boolean) => set({ snapToGrid: snap }),
@@ -235,13 +235,11 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
     setSelectedObjectId: (id: string | null) =>
       set({
         selectedObjectId: id,
-        activeTab: id ? 'properties' : get().activeTab,
       }),
 
     setSelectedOperationId: (id: string | null) =>
       set({
         selectedOperationId: id,
-        activeTab: id ? 'properties' : get().activeTab,
       }),
 
     updateMachine: (partial: Partial<MachineSettings>) => {
@@ -442,30 +440,69 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
     parseManualGcode: () => {
       const gcode = get().manualGcode;
       const segs = parseGcodeToSegments(gcode);
-      const importedCadObjects = parseGcodeToCadObjects(gcode);
 
-      if (importedCadObjects.length > 0) {
+      const extracted = extractProjectDataFromNC(gcode);
+      if (extracted && Array.isArray(extracted.objects) && extracted.objects.length > 0) {
         pushHistory(get());
-        const newOps: OperationItem[] = importedCadObjects.map((obj, idx) => ({
-          id: `op_imp_${idx + 1}`,
-          name: `Обработка ${obj.name}`,
-          enabled: true,
-          type: obj.type === 'point' ? 'drill' : 'cutContour',
-          linkedObjectIds: [obj.id],
-          safeZ: get().machine.safeZ,
-          startZ: 0,
-          finalDepth: obj.depth || 5,
-          passDepth: obj.depth || 5,
-          spindleSpeed: get().machine.spindleSpeed,
-          feedCut: (obj as any).importedFeedCut || get().machine.feedCut || 1200,
-          feedPlunge: (obj as any).importedFeedPlunge || get().machine.feedPlunge || 300,
-          feedDrill: get().machine.feedDrill || 500,
-          direction: 'cw',
-        }));
+        syncAndSave({
+          objects: extracted.objects,
+          operations: extracted.operations || get().operations,
+          viewMode: 'preview',
+        });
+        return;
+      }
+
+      const existingObjs = get().objects;
+      const updatedCadObjects = parseGcodeToCadObjects(gcode, existingObjs);
+
+      if (updatedCadObjects.length > 0) {
+        pushHistory(get());
+
+        const existingOps = get().operations;
+        const updatedObjIds = new Set(updatedCadObjects.map((o) => o.id));
+
+        let finalOps = existingOps
+          .map((op) => ({
+            ...op,
+            linkedObjectIds: op.linkedObjectIds.filter((id) => updatedObjIds.has(id)),
+          }))
+          .filter((op) => op.linkedObjectIds.length > 0);
+
+        const currentLinkedIds = new Set(finalOps.flatMap((op) => op.linkedObjectIds));
+        const unlinkedObjs = updatedCadObjects.filter((o) => !currentLinkedIds.has(o.id));
+
+        if (unlinkedObjs.length > 0) {
+          if (finalOps.length > 0) {
+            finalOps[0] = {
+              ...finalOps[0],
+              linkedObjectIds: [...finalOps[0].linkedObjectIds, ...unlinkedObjs.map((o) => o.id)],
+            };
+          } else {
+            finalOps = [
+              {
+                id: `op_${Date.now()}`,
+                name: 'Обработка контуров',
+                enabled: true,
+                type: 'cutContour',
+                linkedObjectIds: unlinkedObjs.map((o) => o.id),
+                safeZ: get().machine.safeZ,
+                startZ: 0,
+                finalDepth: unlinkedObjs[0]?.depth || 5,
+                passDepth: unlinkedObjs[0]?.depth || 5,
+                spindleSpeed: get().machine.spindleSpeed,
+                feedCut: get().machine.feedCut || 1200,
+                feedPlunge: get().machine.feedPlunge || 300,
+                feedDrill: get().machine.feedDrill || 500,
+                direction: 'cw',
+              },
+            ];
+          }
+        }
 
         syncAndSave({
-          objects: importedCadObjects,
-          operations: newOps,
+          objects: updatedCadObjects,
+          operations: finalOps,
+          toolpathSegments: segs,
           viewMode: 'preview',
         });
       } else {

@@ -18,8 +18,11 @@ export const PropertyInput: React.FC<PropertyInputProps> = ({
   fallbackValue = 0,
 }) => {
   return (
-    <div>
-      <label className="text-[11px] text-slate-400 block mb-0.5 font-medium truncate" title={label}>
+    <div className="flex items-center gap-1.5 w-full">
+      <label
+        className="text-[11px] text-slate-500 font-medium whitespace-nowrap shrink-0 min-w-[32px]"
+        title={label}
+      >
         {label}
       </label>
       <input
@@ -32,3 +35,4 @@ export const PropertyInput: React.FC<PropertyInputProps> = ({
     </div>
   );
 };
+

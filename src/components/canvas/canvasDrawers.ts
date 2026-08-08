@@ -355,7 +355,7 @@ export function drawMachineBoundsAndStock(
   // Stock Sheet
   const stock = machine.stockSheet;
   if (stock && stock.enabled && stock.preset !== 'none' && stock.widthX > 0 && stock.widthY > 0) {
-    const stockColor = stock.color || '#f59e0b';
+    const stockColor = '#22c55e'; // Зеленый цвет
     const sP1 = worldToCanvas(-stock.widthX, -stock.widthY, pan, zoom);
     const sP2 = worldToCanvas(0, 0, pan, zoom);
 
@@ -364,9 +364,7 @@ export function drawMachineBoundsAndStock(
     const sW = Math.abs(sP2.x - sP1.x);
     const sH = Math.abs(sP2.y - sP1.y);
 
-    ctx.fillStyle = stockColor + '12';
-    ctx.fillRect(sX, sY, sW, sH);
-
+    // Только пунктирная линия
     ctx.strokeStyle = stockColor;
     ctx.lineWidth = 1.8;
     ctx.setLineDash([8, 5]);

@@ -198,7 +198,9 @@ export const LayerItemAccordion: React.FC<LayerItemAccordionProps> = ({
                 isSelected ? 'text-blue-950 font-bold' : 'text-slate-800'
               } ${!isVisible ? 'line-through opacity-70' : ''}`}
             >
-              {obj.name}
+              {obj.type === 'point'
+                ? obj.name.replace(/Ø?\d+(\.\d+)?\s*мм\s*/gi, ' ').replace(/\s+/g, ' ').trim()
+                : obj.name}
             </span>
           )}
         </div>

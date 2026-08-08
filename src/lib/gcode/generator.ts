@@ -165,9 +165,7 @@ export function generateGcode(
 
   // PROCESS VISIBLE OBJECTS DIRECTLY
   for (const obj of visibleObjects) {
-    gcodeLines.push(`\n; ------------------------------------------`);
-    gcodeLines.push(`; ОБЪЕКТ: ${obj.name} (${obj.type})`);
-    gcodeLines.push(`; ------------------------------------------`);
+    gcodeLines.push(`\n;[ID: ${obj.id}] ${obj.name} (${obj.type})`);
 
     const linkedOp = operations.find((op) => op.enabled && op.linkedObjectIds.includes(obj.id));
 

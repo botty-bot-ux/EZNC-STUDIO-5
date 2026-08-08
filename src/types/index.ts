@@ -160,7 +160,7 @@ export interface WarningItem {
 }
 
 export type ActiveTool = 'select' | 'point' | 'line' | 'polyline' | 'rectangle' | 'circle' | 'arc';
-export type ActiveTab = 'properties' | 'machine' | 'gcode' | 'warnings';
+export type ActiveTab = 'machine' | 'gcode';
 export type ViewMode = 'edit' | 'preview' | 'gcode';
 
 export interface ToolpathSegment {

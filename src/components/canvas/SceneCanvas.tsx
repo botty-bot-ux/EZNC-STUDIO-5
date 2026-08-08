@@ -253,7 +253,7 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
     // Active tool drawing dispatch
     if (activeTool === 'point') {
       addObject({
-        name: `Отверстие Ø11мм (${objects.length + 1})`,
+        name: `Отверстие ${objects.length + 1}`,
         type: 'point',
         x: snapPt.x,
         y: snapPt.y,

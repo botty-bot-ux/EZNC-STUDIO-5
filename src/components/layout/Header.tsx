@@ -261,7 +261,7 @@ export const Header: React.FC = () => {
         {/* Warnings badge button */}
         {(errorCount > 0 || warningCount > 0) && (
           <button
-            onClick={() => setActiveTab('warnings')}
+            onClick={() => setActiveTab('machine')}
             title={errorCount > 0 ? `${errorCount} ошибок` : `${warningCount} предупреждений`}
             className={`flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-xs font-medium border transition-all ${
               errorCount > 0

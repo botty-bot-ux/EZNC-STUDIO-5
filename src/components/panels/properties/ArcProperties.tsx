@@ -9,7 +9,7 @@ interface ArcPropertiesProps {
 
 export const ArcProperties: React.FC<ArcPropertiesProps> = ({ obj, onUpdate }) => {
   return (
-    <div className="space-y-2.5">
+    <div className="space-y-2">
       <div className="grid grid-cols-2 gap-2">
         <PropertyInput
           label="X1, мм"
@@ -42,22 +42,22 @@ export const ArcProperties: React.FC<ArcPropertiesProps> = ({ obj, onUpdate }) =
 
       <div className="grid grid-cols-2 gap-2">
         <PropertyInput
-          label="Центр Xc, мм"
+          label="Xc, мм"
           value={obj.centerX}
           onChange={(centerX) => onUpdate({ centerX })}
           className="text-cyan-700"
         />
         <PropertyInput
-          label="Центр Yc, мм"
+          label="Yc, мм"
           value={obj.centerY}
           onChange={(centerY) => onUpdate({ centerY })}
           className="text-cyan-700"
         />
       </div>
 
-      <div>
+      <div className="grid grid-cols-2 gap-2">
         <PropertyInput
-          label="Радиус R, мм"
+          label="R, мм"
           value={obj.radius}
           onChange={(radius) => onUpdate({ radius: Math.max(0.1, radius) })}
           step="0.5"
@@ -66,18 +66,18 @@ export const ArcProperties: React.FC<ArcPropertiesProps> = ({ obj, onUpdate }) =
         />
       </div>
 
-      <div>
-        <label className="text-[11px] text-slate-400 block mb-1 font-medium">Направление дуги</label>
+      <div className="flex items-center gap-2">
+        <label className="text-[11px] text-slate-500 font-medium shrink-0">Дуга:</label>
         <button
           type="button"
           onClick={() => onUpdate({ clockwise: !obj.clockwise })}
-          className={`w-full py-1.5 px-3 rounded-lg font-semibold text-xs border transition-all flex items-center justify-center gap-1.5 shadow-sm ${
+          className={`flex-1 py-1 px-2 rounded-lg font-semibold text-xs border transition-all flex items-center justify-center gap-1 shadow-xs ${
             obj.clockwise
               ? 'bg-cyan-50 border-cyan-300 text-cyan-800 hover:bg-cyan-100'
               : 'bg-emerald-50 border-emerald-300 text-emerald-800 hover:bg-emerald-100'
           }`}
         >
-          <span>{obj.clockwise ? '↻ По часовой (G02)' : '↺ Против часовой (G03)'}</span>
+          <span>{obj.clockwise ? '↻ G02 (по час.)' : '↺ G03 (против)'}</span>
         </button>
       </div>
     </div>

@@ -1,27 +1,41 @@
 import React from 'react';
-import Editor from '@monaco-editor/react';
-import { Copy, Download, Play, RefreshCw } from 'lucide-react';
+import Editor, { OnMount } from '@monaco-editor/react';
+import { RefreshCw } from 'lucide-react';
 import { useProjectStore } from '../../store/useProjectStore';
-import { saveAs } from 'file-saver';
 
 export const GcodeEditor: React.FC = () => {
   const {
     manualGcode,
     updateManualGcode,
     parseManualGcode,
-    regenerateGcode,
-    projectName,
   } = useProjectStore();
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(manualGcode);
-    alert('G-код скопирован в буфер обмена!');
-  };
+  const handleEditorDidMount: OnMount = (editor) => {
+    editor.onDidChangeCursorPosition((e) => {
+      const position = e.position;
+      const model = editor.getModel();
+      if (!model) return;
 
-  const handleDownload = () => {
-    const blob = new Blob([manualGcode], { type: 'text/plain;charset=utf-8' });
-    const cleanName = projectName.trim().replace(/\s+/g, '_') || 'program';
-    saveAs(blob, `${cleanName}.nc`);
+      const currentLine = position.lineNumber;
+
+      let foundId: string | null = null;
+      for (let l = currentLine; l >= 1; l--) {
+        const lineText = model.getLineContent(l);
+        const match = lineText.match(/\[ID:\s*([^\]]+)\]/i);
+        if (match && match[1]) {
+          foundId = match[1].trim();
+          break;
+        }
+      }
+
+      if (foundId) {
+        const { objects, selectedObjectId, setSelectedObjectId } = useProjectStore.getState();
+        const exists = objects.some((o) => o.id === foundId);
+        if (exists && selectedObjectId !== foundId) {
+          setSelectedObjectId(foundId);
+        }
+      }
+    });
   };
 
   return (
@@ -35,37 +49,12 @@ export const GcodeEditor: React.FC = () => {
 
         <div className="flex items-center gap-1">
           <button
-            onClick={regenerateGcode}
-            title="Пересоздать G-код из графической сцены"
-            className="p-1.5 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium rounded-lg border border-slate-200 flex items-center gap-1 transition-all shadow-sm"
-          >
-            <RefreshCw className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-            <span className="hidden sm:inline text-[11px]">Обновить</span>
-          </button>
-
-          <button
             onClick={parseManualGcode}
-            title="Распарсить и показать траекторию на холсте"
-            className="p-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium rounded-lg flex items-center gap-1 shadow-sm transition-all"
+            title="Применить изменения G-кода и обновить объекты в графическом редакторе"
+            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
           >
-            <Play className="w-3.5 h-3.5 shrink-0" />
-            <span className="text-[11px]">Траектория</span>
-          </button>
-
-          <button
-            onClick={handleCopy}
-            title="Скопировать G-код"
-            className="p-1.5 bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 rounded-lg border border-slate-200 transition-all shadow-sm"
-          >
-            <Copy className="w-3.5 h-3.5" />
-          </button>
-
-          <button
-            onClick={handleDownload}
-            title="Скачать файл .nc"
-            className="p-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg shadow-sm transition-all"
-          >
-            <Download className="w-3.5 h-3.5" />
+            <RefreshCw className="w-3.5 h-3.5 shrink-0" />
+            <span className="text-[11px]">Обновить графический редактор</span>
           </button>
         </div>
       </div>
@@ -79,6 +68,7 @@ export const GcodeEditor: React.FC = () => {
           theme="vs"
           value={manualGcode}
           onChange={(value) => updateManualGcode(value || '')}
+          onMount={handleEditorDidMount}
           options={{
             fontSize: 12,
             fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
