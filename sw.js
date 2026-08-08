@@ -1,8 +1,5 @@
-const CACHE_NAME = 'cnc-gcode-v2';
-const ASSETS_TO_CACHE = [
-  './',
-  './index.html'
-];
+const CACHE_NAME = 'cnc-gcode-v1';
+const ASSETS_TO_CACHE = ['./', './index.html'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
