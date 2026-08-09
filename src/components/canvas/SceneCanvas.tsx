@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useProjectStore } from '../../store/useProjectStore';
-import { Point2D } from '../../types';
+import { CADObject, Point2D } from '../../types';
 import { CanvasControls } from './CanvasControls';
 import { CanvasHud } from './CanvasHud';
 import {
@@ -8,6 +8,7 @@ import {
   findHandleHit,
   findMagneticSnapPoint,
   findObjectBodyHit,
+  findObjectsInBox,
 } from './canvasHitTest';
 import {
   drawAxisOrigin,
@@ -15,6 +16,8 @@ import {
   drawDrawingPreview,
   drawGrid,
   drawMachineBoundsAndStock,
+  drawMeasurementTool,
+  drawSelectionBox,
   drawSnapIndicator,
   drawToolpathSegments,
 } from './canvasDrawers';
@@ -31,6 +34,42 @@ interface SceneCanvasProps {
   onCursorMove?: (pt: Point2D | null) => void;
 }
 
+function shiftCADObject(obj: CADObject, dx: number, dy: number): Partial<CADObject> {
+  if (obj.type === 'point') {
+    return { x: obj.x + dx, y: obj.y + dy };
+  }
+  if (obj.type === 'line') {
+    return {
+      startX: obj.startX + dx,
+      startY: obj.startY + dy,
+      endX: obj.endX + dx,
+      endY: obj.endY + dy,
+    };
+  }
+  if (obj.type === 'rectangle') {
+    return { x: obj.x + dx, y: obj.y + dy };
+  }
+  if (obj.type === 'circle') {
+    return { centerX: obj.centerX + dx, centerY: obj.centerY + dy };
+  }
+  if (obj.type === 'arc') {
+    return {
+      startX: obj.startX + dx,
+      startY: obj.startY + dy,
+      endX: obj.endX + dx,
+      endY: obj.endY + dy,
+      centerX: obj.centerX + dx,
+      centerY: obj.centerY + dy,
+    };
+  }
+  if (obj.type === 'polyline' && obj.points) {
+    return {
+      points: obj.points.map((p) => ({ x: p.x + dx, y: p.y + dy })),
+    };
+  }
+  return {};
+}
+
 export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -38,10 +77,15 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
   const {
     objects,
     selectedObjectId,
+    selectedObjectIds,
     setSelectedObjectId,
+    setSelectedObjectIds,
+    toggleObjectSelection,
     addObject,
     updateObject,
     deleteObject,
+    deleteSelectedObjects,
+    recordHistory,
     machine,
     toolpathSegments,
     viewMode,
@@ -66,13 +110,29 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
   const [dragStartCanvasPt, setDragStartCanvasPt] = useState<Point2D>({ x: 0, y: 0 });
   const [dragStartWorldPt, setDragStartWorldPt] = useState<Point2D>({ x: 0, y: 0 });
   const [dragObjInitial, setDragObjInitial] = useState<any>(null);
+  const [dragObjsInitialMap, setDragObjsInitialMap] = useState<Map<string, CADObject> | null>(null);
   const [hoveredHandle, setHoveredHandle] = useState<HoveredHandle | null>(null);
+
+  // Selection Box Marquee
+  const [selectionBoxStart, setSelectionBoxStart] = useState<Point2D | null>(null);
+  const [selectionBoxCurrent, setSelectionBoxCurrent] = useState<Point2D | null>(null);
 
   // Active Drawing Tool state
   const [drawStartPt, setDrawStartPt] = useState<Point2D | null>(null);
   const [drawArcStartPt, setDrawArcStartPt] = useState<Point2D | null>(null);
   const [drawArcEndPt, setDrawArcEndPt] = useState<Point2D | null>(null);
   const [currentMouseProgPt, setCurrentMouseProgPt] = useState<Point2D | null>(null);
+
+  // Active Measurement Tool state
+  const [measureStartPt, setMeasureStartPt] = useState<Point2D | null>(null);
+  const [measureEndPt, setMeasureEndPt] = useState<Point2D | null>(null);
+
+  useEffect(() => {
+    if (activeTool !== 'measure') {
+      setMeasureStartPt(null);
+      setMeasureEndPt(null);
+    }
+  }, [activeTool]);
 
   // Auto-fit canvas view
   const fitView = () => {
@@ -110,46 +170,63 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
   // Keyboard Shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (
+      const isInput =
         e.target instanceof HTMLInputElement ||
         e.target instanceof HTMLTextAreaElement ||
-        (e.target as HTMLElement).isContentEditable
-      ) {
+        ((e.target as HTMLElement)?.isContentEditable ?? false);
+
+      if (isInput) {
+        if (e.key === 'Escape') {
+          (e.target as HTMLElement).blur();
+          cancelDrawing();
+          setActiveTool('select');
+        }
         return;
       }
 
+      const key = e.key.toLowerCase();
+      const code = e.code;
+
       if (e.key === 'Escape') {
         cancelDrawing();
-        setSelectedObjectId(null);
-      } else if (e.key === 'Delete' || e.key === 'Backspace') {
-        if (selectedObjectId) {
-          deleteObject(selectedObjectId);
-        }
-      } else if (e.key.toLowerCase() === 's' && !e.ctrlKey && !e.metaKey) {
         setActiveTool('select');
-      } else if (e.key.toLowerCase() === 'h' && !e.ctrlKey && !e.metaKey) {
+        setSelectedObjectId(null);
+        setSelectedObjectIds([]);
+      } else if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (selectedObjectIds.length > 0) {
+          deleteSelectedObjects();
+        }
+      } else if ((code === 'KeyS' || key === 's' || key === 'ы') && !e.ctrlKey && !e.metaKey) {
+        setActiveTool('select');
+      } else if ((code === 'KeyH' || key === 'h' || key === 'р') && !e.ctrlKey && !e.metaKey) {
         setActiveTool('point');
-      } else if (e.key.toLowerCase() === 'l' && !e.ctrlKey && !e.metaKey) {
+      } else if ((code === 'KeyL' || key === 'l' || key === 'д') && !e.ctrlKey && !e.metaKey) {
         setActiveTool('line');
-      } else if (e.key.toLowerCase() === 'r' && !e.ctrlKey && !e.metaKey) {
+      } else if ((code === 'KeyR' || key === 'r' || key === 'к') && !e.ctrlKey && !e.metaKey) {
         setActiveTool('rectangle');
-      } else if (e.key.toLowerCase() === 'c' && !e.ctrlKey && !e.metaKey) {
+      } else if ((code === 'KeyC' || key === 'c' || key === 'с') && !e.ctrlKey && !e.metaKey) {
         setActiveTool('circle');
-      } else if (e.key.toLowerCase() === 'a' && !e.ctrlKey && !e.metaKey) {
+      } else if ((code === 'KeyA' || key === 'a' || key === 'ф') && !e.ctrlKey && !e.metaKey) {
         setActiveTool('arc');
-      } else if (e.key.toLowerCase() === 'f') {
+      } else if ((code === 'KeyM' || key === 'm' || key === 'ь') && !e.ctrlKey && !e.metaKey) {
+        setActiveTool('measure');
+      } else if ((code === 'KeyF' || key === 'f' || key === 'а') && !e.ctrlKey && !e.metaKey) {
         fitView();
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedObjectId, activeTool]);
+  }, [selectedObjectIds, activeTool, setActiveTool, setSelectedObjectId, setSelectedObjectIds, deleteSelectedObjects]);
 
   const cancelDrawing = () => {
     setDrawStartPt(null);
     setDrawArcStartPt(null);
     setDrawArcEndPt(null);
+    setMeasureStartPt(null);
+    setMeasureEndPt(null);
+    setSelectionBoxStart(null);
+    setSelectionBoxCurrent(null);
     setDragMode('none');
     setActiveSnapInfo(null);
   };
@@ -186,7 +263,12 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
     }
 
     // 5. CAD Objects
-    drawCADObjects(ctx, objects, selectedObjectId, hoveredHandle, dragMode, pan, zoom);
+    drawCADObjects(ctx, objects, selectedObjectIds, hoveredHandle, dragMode, pan, zoom, machine.toolDiameter);
+
+    // 5b. Selection Box Marquee
+    if (dragMode === 'selection_box' && selectionBoxStart && selectionBoxCurrent) {
+      drawSelectionBox(ctx, selectionBoxStart, selectionBoxCurrent);
+    }
 
     // 6. Active Drawing Preview
     drawDrawingPreview(
@@ -197,8 +279,21 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
       drawArcEndPt,
       currentMouseProgPt,
       pan,
-      zoom
+      zoom,
+      machine.toolDiameter
     );
+
+    // 6b. Measurement Tool Drawing
+    if (activeTool === 'measure') {
+      drawMeasurementTool(
+        ctx,
+        measureStartPt,
+        measureEndPt,
+        currentMouseProgPt,
+        pan,
+        zoom
+      );
+    }
 
     // 7. O-SNAP Indicator
     if (activeSnapInfo) {
@@ -210,6 +305,7 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
     gridStep,
     objects,
     selectedObjectId,
+    selectedObjectIds,
     toolpathSegments,
     viewMode,
     activeTool,
@@ -217,9 +313,13 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
     drawArcStartPt,
     drawArcEndPt,
     currentMouseProgPt,
+    measureStartPt,
+    measureEndPt,
     hoveredHandle,
     activeSnapInfo,
     dragMode,
+    selectionBoxStart,
+    selectionBoxCurrent,
     machine,
   ]);
 
@@ -246,7 +346,10 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
       snapToGrid,
       gridStep,
       pan,
-      zoom
+      zoom,
+      undefined,
+      undefined,
+      machine
     );
     setActiveSnapInfo(snapInfo);
 
@@ -358,7 +461,17 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
       return;
     }
 
-    // SELECT TOOL: Handle dragging or Object body dragging
+    if (activeTool === 'measure') {
+      if (!measureStartPt || (measureStartPt && measureEndPt)) {
+        setMeasureStartPt(snapPt);
+        setMeasureEndPt(null);
+      } else {
+        setMeasureEndPt(snapPt);
+      }
+      return;
+    }
+
+    // SELECT TOOL: Handle dragging or Object body dragging or Selection Box
     if (activeTool === 'select') {
       // 1. Check Handle Hit
       const handleHit = findHandleHit(objects, selectedObjectId, mousePx, pan, zoom);
@@ -377,15 +490,41 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
       // 2. Check Object Body Hit
       const hitObjId = findObjectBodyHit(objects, rawWorldPt, zoom);
       if (hitObjId) {
-        const targetObj = objects.find((o) => o.id === hitObjId);
-        setSelectedObjectId(hitObjId);
+        let currentSelectedIds = selectedObjectIds;
+        if (e.shiftKey) {
+          toggleObjectSelection(hitObjId);
+          currentSelectedIds = selectedObjectIds.includes(hitObjId)
+            ? selectedObjectIds.filter((id) => id !== hitObjId)
+            : [...selectedObjectIds, hitObjId];
+        } else {
+          if (!selectedObjectIds.includes(hitObjId)) {
+            setSelectedObjectIds([hitObjId]);
+            currentSelectedIds = [hitObjId];
+          }
+        }
+
         setDragMode('object');
         setDragStartCanvasPt(mousePx);
         setDragStartWorldPt(rawWorldPt);
-        setDragObjInitial({ ...targetObj });
+
+        // Build map of initial states for all selected objects
+        const initMap = new Map<string, CADObject>();
+        for (const obj of objects) {
+          if (currentSelectedIds.includes(obj.id)) {
+            initMap.set(obj.id, JSON.parse(JSON.stringify(obj)));
+          }
+        }
+        setDragObjsInitialMap(initMap);
+        const targetObj = objects.find((o) => o.id === hitObjId);
+        setDragObjInitial(targetObj ? { ...targetObj } : null);
       } else {
-        setSelectedObjectId(null);
-        setDragMode('pan');
+        // Clicked empty area
+        if (!e.shiftKey) {
+          setSelectedObjectIds([]);
+        }
+        setDragMode('selection_box');
+        setSelectionBoxStart(mousePx);
+        setSelectionBoxCurrent(mousePx);
         setDragStartCanvasPt(mousePx);
       }
     }
@@ -409,6 +548,14 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
       return;
     }
 
+    // 1b. Selection Box Mode
+    if (dragMode === 'selection_box') {
+      setSelectionBoxCurrent(mousePx);
+      setCurrentMouseProgPt(rawWorldPt);
+      onCursorMove?.(rawWorldPt);
+      return;
+    }
+
     // 2. Magnetic Snap Update
     const { point: snapPt, snapInfo } = findMagneticSnapPoint(
       rawWorldPt,
@@ -420,69 +567,41 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
       pan,
       zoom,
       selectedObjectId || undefined,
-      dragMode
+      dragMode,
+      machine
     );
     setActiveSnapInfo(snapInfo);
     setCurrentMouseProgPt(snapPt);
     onCursorMove?.(snapPt);
 
     // 3. Handle Dragging
-    if (dragMode !== 'none' && selectedObjectId && dragObjInitial) {
-      if (dragMode === 'object') {
+    if (dragMode !== 'none') {
+      if (dragMode === 'object' && dragObjsInitialMap && dragObjsInitialMap.size > 0) {
         const dx = snapPt.x - dragStartWorldPt.x;
         const dy = snapPt.y - dragStartWorldPt.y;
 
-        if (dragObjInitial.type === 'point') {
-          updateObject(selectedObjectId, {
-            x: dragObjInitial.x + dx,
-            y: dragObjInitial.y + dy,
-          });
-        } else if (dragObjInitial.type === 'line') {
-          updateObject(selectedObjectId, {
-            startX: dragObjInitial.startX + dx,
-            startY: dragObjInitial.startY + dy,
-            endX: dragObjInitial.endX + dx,
-            endY: dragObjInitial.endY + dy,
-          });
-        } else if (dragObjInitial.type === 'rectangle') {
-          updateObject(selectedObjectId, {
-            x: dragObjInitial.x + dx,
-            y: dragObjInitial.y + dy,
-          });
-        } else if (dragObjInitial.type === 'circle') {
-          updateObject(selectedObjectId, {
-            centerX: dragObjInitial.centerX + dx,
-            centerY: dragObjInitial.centerY + dy,
-          });
-        } else if (dragObjInitial.type === 'arc') {
-          updateObject(selectedObjectId, {
-            startX: dragObjInitial.startX + dx,
-            startY: dragObjInitial.startY + dy,
-            endX: dragObjInitial.endX + dx,
-            endY: dragObjInitial.endY + dy,
-            centerX: dragObjInitial.centerX + dx,
-            centerY: dragObjInitial.centerY + dy,
-          });
-        }
-      } else if (dragMode === 'line_start') {
-        updateObject(selectedObjectId, { startX: snapPt.x, startY: snapPt.y });
-      } else if (dragMode === 'line_end') {
-        updateObject(selectedObjectId, { endX: snapPt.x, endY: snapPt.y });
-      } else if (dragMode === 'arc_start') {
-        const curArc = objects.find((o) => o.id === selectedObjectId) as any;
-        if (curArc) {
-          const r = Math.hypot(snapPt.x - curArc.centerX, snapPt.y - curArc.centerY);
-          updateObject(selectedObjectId, { startX: snapPt.x, startY: snapPt.y, radius: r });
-        }
-      } else if (dragMode === 'arc_end') {
-        const curArc = objects.find((o) => o.id === selectedObjectId) as any;
-        if (curArc) {
-          const r = Math.hypot(snapPt.x - curArc.centerX, snapPt.y - curArc.centerY);
-          updateObject(selectedObjectId, { endX: snapPt.x, endY: snapPt.y, radius: r });
-        }
-      } else if (dragMode === 'arc_center') {
-        const curArc = objects.find((o) => o.id === selectedObjectId) as any;
-        if (curArc) {
+        dragObjsInitialMap.forEach((initObj, id) => {
+          const shiftedPartial = shiftCADObject(initObj, dx, dy);
+          updateObject(id, shiftedPartial, false);
+        });
+      } else if (selectedObjectId && dragObjInitial) {
+        if (dragMode === 'line_start') {
+          updateObject(selectedObjectId, { startX: snapPt.x, startY: snapPt.y }, false);
+        } else if (dragMode === 'line_end') {
+          updateObject(selectedObjectId, { endX: snapPt.x, endY: snapPt.y }, false);
+        } else if (dragMode === 'arc_start') {
+          const curArc = objects.find((o) => o.id === selectedObjectId) as any;
+          if (curArc) {
+            const r = Math.hypot(snapPt.x - curArc.centerX, snapPt.y - curArc.centerY);
+            updateObject(selectedObjectId, { startX: snapPt.x, startY: snapPt.y, radius: r }, false);
+          }
+        } else if (dragMode === 'arc_end') {
+          const curArc = objects.find((o) => o.id === selectedObjectId) as any;
+          if (curArc) {
+            const r = Math.hypot(snapPt.x - curArc.centerX, snapPt.y - curArc.centerY);
+            updateObject(selectedObjectId, { endX: snapPt.x, endY: snapPt.y, radius: r }, false);
+          }
+        } else if (dragMode === 'arc_center') {
           const dx = snapPt.x - dragObjInitial.centerX;
           const dy = snapPt.y - dragObjInitial.centerY;
           updateObject(selectedObjectId, {
@@ -492,7 +611,7 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
             startY: dragObjInitial.startY + dy,
             endX: dragObjInitial.endX + dx,
             endY: dragObjInitial.endY + dy,
-          });
+          }, false);
         }
       }
       return;
@@ -514,9 +633,41 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
     }
   };
 
-  const handleMouseUp = () => {
+  const handleMouseUp = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (dragMode === 'selection_box') {
+      if (selectionBoxStart && selectionBoxCurrent) {
+        const distPx = Math.hypot(
+          selectionBoxCurrent.x - selectionBoxStart.x,
+          selectionBoxCurrent.y - selectionBoxStart.y
+        );
+        if (distPx > 3) {
+          const w1 = canvasToWorld(selectionBoxStart.x, selectionBoxStart.y, pan, zoom);
+          const w2 = canvasToWorld(selectionBoxCurrent.x, selectionBoxCurrent.y, pan, zoom);
+          const box = {
+            minX: Math.min(w1.x, w2.x),
+            maxX: Math.max(w1.x, w2.x),
+            minY: Math.min(w1.y, w2.y),
+            maxY: Math.max(w1.y, w2.y),
+          };
+
+          const matchedIds = findObjectsInBox(objects, box);
+          if (e.shiftKey) {
+            const combined = Array.from(new Set([...selectedObjectIds, ...matchedIds]));
+            setSelectedObjectIds(combined);
+          } else {
+            setSelectedObjectIds(matchedIds);
+          }
+        }
+      }
+      setSelectionBoxStart(null);
+      setSelectionBoxCurrent(null);
+    } else if (dragMode === 'object' || dragMode !== 'none') {
+      recordHistory();
+    }
+
     setDragMode('none');
     setDragObjInitial(null);
+    setDragObjsInitialMap(null);
   };
 
   const handleMouseLeave = () => {
@@ -561,6 +712,8 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
         drawStartPt={drawStartPt}
         drawArcStartPt={drawArcStartPt}
         drawArcEndPt={drawArcEndPt}
+        measureStartPt={measureStartPt}
+        measureEndPt={measureEndPt}
         dragMode={dragMode}
         dragTargetObj={selectedObj}
         currentMouseProgPt={currentMouseProgPt}

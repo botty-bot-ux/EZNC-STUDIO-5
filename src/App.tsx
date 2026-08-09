@@ -6,41 +6,76 @@ import { SceneCanvas } from './components/canvas/SceneCanvas';
 import { useProjectStore } from './store/useProjectStore';
 
 export default function App() {
-  const { selectedObjectId, deleteObject, undo, redo } = useProjectStore();
+  const {
+    selectedObjectId,
+    selectedObjectIds,
+    deleteSelectedObjects,
+    undo,
+    redo,
+    setActiveTool,
+    setSelectedObjectId,
+    setSelectedObjectIds,
+  } = useProjectStore();
 
   // Global Keyboard Shortcuts
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't trigger if user is typing inside an input or textarea
-      if (
+      const isInput =
         document.activeElement?.tagName === 'INPUT' ||
         document.activeElement?.tagName === 'TEXTAREA' ||
-        (document.activeElement as HTMLElement)?.isContentEditable
-      ) {
+        (document.activeElement as HTMLElement)?.isContentEditable;
+
+      // ESC key: blur active input and reset active tool to "select and move"
+      if (e.key === 'Escape') {
+        if (isInput && document.activeElement instanceof HTMLElement) {
+          document.activeElement.blur();
+        }
+        setActiveTool('select');
+        setSelectedObjectId(null);
+        setSelectedObjectIds([]);
         return;
       }
 
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+      if (isInput) {
+        return;
+      }
+
+      const key = e.key.toLowerCase();
+      const code = e.code;
+
+      const isZ = code === 'KeyZ' || key === 'z' || key === 'я';
+      const isY = code === 'KeyY' || key === 'y' || key === 'н';
+
+      if ((e.ctrlKey || e.metaKey) && isZ) {
         e.preventDefault();
         if (e.shiftKey) {
           redo();
         } else {
           undo();
         }
-      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+      } else if ((e.ctrlKey || e.metaKey) && isY) {
         e.preventDefault();
         redo();
       } else if (e.key === 'Delete' || e.key === 'Backspace') {
-        if (selectedObjectId) {
+        if (selectedObjectIds.length > 0 || selectedObjectId) {
           e.preventDefault();
-          deleteObject(selectedObjectId);
+          deleteSelectedObjects();
         }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedObjectId, deleteObject, undo, redo]);
+  }, [
+    selectedObjectId,
+    selectedObjectIds,
+    deleteSelectedObjects,
+    undo,
+    redo,
+    setActiveTool,
+    setSelectedObjectId,
+    setSelectedObjectIds,
+  ]);
 
   return (
     <div className="flex flex-col h-screen w-screen bg-[#f8fafc] text-slate-800 overflow-hidden font-sans">

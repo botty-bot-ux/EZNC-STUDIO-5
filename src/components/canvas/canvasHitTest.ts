@@ -1,4 +1,4 @@
-import { CADObject, Point2D } from '../../types';
+import { CADObject, MachineSettings, Point2D } from '../../types';
 import {
   HoveredHandle,
   SnapPointInfo,
@@ -10,6 +10,7 @@ export type DragMode =
   | 'none'
   | 'pan'
   | 'object'
+  | 'selection_box'
   | 'line_start'
   | 'line_end'
   | 'polyline_point'
@@ -157,7 +158,8 @@ export function findMagneticSnapPoint(
   pan: Point2D,
   zoom: number,
   excludeObjectId?: string,
-  excludeHandleType?: DragMode
+  excludeHandleType?: DragMode,
+  machine?: MachineSettings
 ): { point: Point2D; snapInfo: SnapPointInfo | null } {
   if (!objectSnapEnabled) {
     return { point: applyGridSnap(rawWorldPt, snapToGrid, gridStep), snapInfo: null };
@@ -167,6 +169,55 @@ export function findMagneticSnapPoint(
   let closestSnap: SnapPointInfo | null = null;
   let minDistancePx = snapRadiusPx;
 
+  // 1. Stock Sheet & Origin Snap Candidates
+  const stock = machine?.stockSheet;
+  if (stock && stock.enabled && stock.preset !== 'none' && stock.widthX > 0 && stock.widthY > 0) {
+    const wX = stock.widthX;
+    const wY = stock.widthY;
+
+    const stockCandidates: { x: number; y: number; label: string; type: SnapPointInfo['type'] }[] = [
+      { x: 0, y: 0, label: 'Угол заготовки (Ноль X:0 Y:0)', type: 'corner' },
+      { x: -wX, y: 0, label: `Угол заготовки (X:-${wX} Y:0)`, type: 'corner' },
+      { x: 0, y: -wY, label: `Угол заготовки (X:0 Y:-${wY})`, type: 'corner' },
+      { x: -wX, y: -wY, label: `Дальний угол заготовки (-${wX}, -${wY})`, type: 'corner' },
+
+      { x: -wX / 2, y: 0, label: 'Середина передней границы заготовки', type: 'midpoint' },
+      { x: -wX / 2, y: -wY, label: 'Середина задней границы заготовки', type: 'midpoint' },
+      { x: 0, y: -wY / 2, label: 'Середина правой границы заготовки', type: 'midpoint' },
+      { x: -wX, y: -wY / 2, label: 'Середина левой границы заготовки', type: 'midpoint' },
+
+      { x: -wX / 2, y: -wY / 2, label: `Центр заготовки (${wX}×${wY}мм)`, type: 'center' },
+    ];
+
+    for (const cand of stockCandidates) {
+      const candPx = worldToCanvas(cand.x, cand.y, pan, zoom);
+      const distPx = Math.hypot(candPx.x - mousePx.x, candPx.y - mousePx.y);
+
+      if (distPx < minDistancePx) {
+        minDistancePx = distPx;
+        closestSnap = {
+          ...cand,
+          objectId: 'stock',
+        };
+      }
+    }
+  } else {
+    // Zero Origin (0,0) Fallback Snap
+    const zeroPx = worldToCanvas(0, 0, pan, zoom);
+    const distZeroPx = Math.hypot(zeroPx.x - mousePx.x, zeroPx.y - mousePx.y);
+    if (distZeroPx < minDistancePx) {
+      minDistancePx = distZeroPx;
+      closestSnap = {
+        x: 0,
+        y: 0,
+        label: 'Ноль системы координат (0,0)',
+        type: 'corner',
+        objectId: 'origin',
+      };
+    }
+  }
+
+  // 2. CAD Objects Snap
   for (const obj of objects) {
     if (obj.visible === false) continue;
 
@@ -264,3 +315,78 @@ export function findMagneticSnapPoint(
     snapInfo: null,
   };
 }
+
+/**
+ * Calculates world bounding box for a CAD object
+ */
+export function getObjectBoundingBox(obj: CADObject): { minX: number; maxX: number; minY: number; maxY: number } {
+  if (obj.type === 'point') {
+    const r = Math.max(obj.diameter / 2, 2);
+    return { minX: obj.x - r, maxX: obj.x + r, minY: obj.y - r, maxY: obj.y + r };
+  }
+  if (obj.type === 'line') {
+    return {
+      minX: Math.min(obj.startX, obj.endX),
+      maxX: Math.max(obj.startX, obj.endX),
+      minY: Math.min(obj.startY, obj.endY),
+      maxY: Math.max(obj.startY, obj.endY),
+    };
+  }
+  if (obj.type === 'rectangle') {
+    return {
+      minX: Math.min(obj.x, obj.x + obj.width),
+      maxX: Math.max(obj.x, obj.x + obj.width),
+      minY: Math.min(obj.y, obj.y + obj.height),
+      maxY: Math.max(obj.y, obj.y + obj.height),
+    };
+  }
+  if (obj.type === 'circle') {
+    return {
+      minX: obj.centerX - obj.radius,
+      maxX: obj.centerX + obj.radius,
+      minY: obj.centerY - obj.radius,
+      maxY: obj.centerY + obj.radius,
+    };
+  }
+  if (obj.type === 'arc') {
+    return {
+      minX: Math.min(obj.startX, obj.endX, obj.centerX - obj.radius),
+      maxX: Math.max(obj.startX, obj.endX, obj.centerX + obj.radius),
+      minY: Math.min(obj.startY, obj.endY, obj.centerY - obj.radius),
+      maxY: Math.max(obj.startY, obj.endY, obj.centerY + obj.radius),
+    };
+  }
+  if (obj.type === 'polyline' && obj.points && obj.points.length > 0) {
+    let minX = obj.points[0].x;
+    let maxX = obj.points[0].x;
+    let minY = obj.points[0].y;
+    let maxY = obj.points[0].y;
+    for (const p of obj.points) {
+      if (p.x < minX) minX = p.x;
+      if (p.x > maxX) maxX = p.x;
+      if (p.y < minY) minY = p.y;
+      if (p.y > maxY) maxY = p.y;
+    }
+    return { minX, maxX, minY, maxY };
+  }
+  return { minX: 0, maxX: 0, minY: 0, maxY: 0 };
+}
+
+/**
+ * Finds all visible objects whose bounding box overlaps or intersects with selection box bounds
+ */
+export function findObjectsInBox(
+  objects: CADObject[],
+  box: { minX: number; maxX: number; minY: number; maxY: number }
+): string[] {
+  const result: string[] = [];
+  for (const obj of objects) {
+    if (obj.visible === false) continue;
+    const bb = getObjectBoundingBox(obj);
+    if (bb.minX <= box.maxX && bb.maxX >= box.minX && bb.minY <= box.maxY && bb.maxY >= box.minY) {
+      result.push(obj.id);
+    }
+  }
+  return result;
+}
+

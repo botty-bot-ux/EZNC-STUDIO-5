@@ -37,7 +37,7 @@ interface LayerItemAccordionProps {
   totalCount: number;
   isSelected: boolean;
   isExpanded: boolean;
-  onSelect: () => void;
+  onSelect: (e?: React.MouseEvent) => void;
   onToggleExpand: () => void;
   onMoveUp: () => void;
   onMoveDown: () => void;

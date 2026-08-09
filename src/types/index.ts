@@ -159,7 +159,7 @@ export interface WarningItem {
   objectId?: string;
 }
 
-export type ActiveTool = 'select' | 'point' | 'line' | 'polyline' | 'rectangle' | 'circle' | 'arc';
+export type ActiveTool = 'select' | 'point' | 'line' | 'polyline' | 'rectangle' | 'circle' | 'arc' | 'measure';
 export type ActiveTab = 'machine' | 'gcode';
 export type ViewMode = 'edit' | 'preview' | 'gcode';
 

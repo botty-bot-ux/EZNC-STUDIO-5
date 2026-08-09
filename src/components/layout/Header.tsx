@@ -1,15 +1,14 @@
 import React, { useRef } from 'react';
 import {
   AlertTriangle,
-  Circle,
   CircleDot,
   Compass,
   FilePlus,
   FolderOpen,
   MousePointer,
   Redo,
+  Ruler,
   Save,
-  Square,
   TrendingUp,
   Undo,
   Zap,
@@ -146,30 +145,6 @@ export const Header: React.FC = () => {
           </button>
 
           <button
-            onClick={() => setActiveTool('rectangle')}
-            title="Прямоугольник (R)"
-            className={`p-2 rounded-lg transition-all ${
-              activeTool === 'rectangle'
-                ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
-            }`}
-          >
-            <Square className={`w-4 h-4 ${activeTool === 'rectangle' ? 'text-white' : 'text-amber-600'}`} />
-          </button>
-
-          <button
-            onClick={() => setActiveTool('circle')}
-            title="Окружность (C)"
-            className={`p-2 rounded-lg transition-all ${
-              activeTool === 'circle'
-                ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
-            }`}
-          >
-            <Circle className={`w-4 h-4 ${activeTool === 'circle' ? 'text-white' : 'text-emerald-600'}`} />
-          </button>
-
-          <button
             onClick={() => setActiveTool('arc')}
             title="Дуга окружности (A)"
             className={`p-2 rounded-lg transition-all ${
@@ -179,6 +154,18 @@ export const Header: React.FC = () => {
             }`}
           >
             <Compass className={`w-4 h-4 ${activeTool === 'arc' ? 'text-white' : 'text-cyan-600'}`} />
+          </button>
+
+          <button
+            onClick={() => setActiveTool('measure')}
+            title="Линейка / Штангенциркуль (M)"
+            className={`p-2 rounded-lg transition-all ${
+              activeTool === 'measure'
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+            }`}
+          >
+            <Ruler className={`w-4 h-4 ${activeTool === 'measure' ? 'text-white' : 'text-rose-500'}`} />
           </button>
         </div>
 

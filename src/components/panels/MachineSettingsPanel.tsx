@@ -217,6 +217,28 @@ export const MachineSettingsPanel: React.FC = () => {
           </button>
         </div>
 
+        {/* Диаметр фрезы */}
+        <div className="pt-1">
+          <label className="text-[10px] text-slate-500 block mb-0.5 font-medium">
+            Диаметр фрезы (мм)
+          </label>
+          <div className="flex items-center gap-1.5">
+            <input
+              type="number"
+              step="0.1"
+              min="0.1"
+              max="50"
+              value={machine.toolDiameter ?? 8}
+              onChange={(e) => {
+                const val = parseFloat(e.target.value) || 1;
+                updateMachine({ toolDiameter: Math.max(0.1, val) });
+              }}
+              className="w-full bg-amber-50/60 border border-amber-200/90 rounded-lg px-2.5 py-1.5 font-mono font-bold text-amber-900 text-xs focus:bg-white focus:border-amber-500 focus:outline-none transition-all"
+            />
+            <span className="text-slate-400 font-bold text-xs shrink-0">мм</span>
+          </div>
+        </div>
+
         {/* Spindle & Feeds */}
         <div className="space-y-2 pt-1">
           <div>

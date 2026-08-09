@@ -12,7 +12,9 @@ export const LeftToolbar: React.FC = () => {
   const {
     objects,
     selectedObjectId,
+    selectedObjectIds,
     setSelectedObjectId,
+    toggleObjectSelection,
     deleteObject,
     duplicateObject,
     updateObject,
@@ -137,7 +139,7 @@ export const LeftToolbar: React.FC = () => {
           </div>
         ) : (
           objects.map((obj, idx) => {
-            const isSelected = obj.id === selectedObjectId;
+            const isSelected = selectedObjectIds.includes(obj.id);
             const isExpanded = expandedIds.includes(obj.id);
 
             return (
@@ -148,7 +150,13 @@ export const LeftToolbar: React.FC = () => {
                 totalCount={objects.length}
                 isSelected={isSelected}
                 isExpanded={isExpanded}
-                onSelect={() => setSelectedObjectId(obj.id)}
+                onSelect={(e) => {
+                  if (e && (e.ctrlKey || e.shiftKey || e.metaKey)) {
+                    toggleObjectSelection(obj.id);
+                  } else {
+                    setSelectedObjectId(obj.id);
+                  }
+                }}
                 onToggleExpand={() => toggleExpand(obj.id)}
                 onMoveUp={() => moveObjectUp(idx)}
                 onMoveDown={() => moveObjectDown(idx)}

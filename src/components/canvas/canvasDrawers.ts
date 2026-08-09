@@ -500,17 +500,100 @@ export function drawToolpathSegments(
 export function drawCADObjects(
   ctx: CanvasRenderingContext2D,
   objects: CADObject[],
-  selectedObjectId: string | null,
+  selectedObjectIds: string[] | string | null,
   hoveredHandle: HoveredHandle | null,
   dragMode: DragMode,
   pan: Point2D,
-  zoom: number
+  zoom: number,
+  toolDiameter?: number
 ) {
+  const selArray = Array.isArray(selectedObjectIds)
+    ? selectedObjectIds
+    : selectedObjectIds
+    ? [selectedObjectIds]
+    : [];
   const wToC = (x: number, y: number) => worldToCanvas(x, y, pan, zoom);
+
+  // 1. TOOL CUTTER MARGIN LAYER (Semi-transparent gray band showing tool diameter)
+  if (toolDiameter && toolDiameter > 0) {
+    const toolPx = toolDiameter * zoom;
+    if (toolPx > 0.5) {
+      ctx.save();
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+
+      for (const obj of objects) {
+        if (obj.visible === false) continue;
+        const isSelected = selArray.includes(obj.id);
+        const isHoveredObj = hoveredHandle?.objectId === obj.id;
+
+        const cutterColor = isSelected
+          ? 'rgba(37, 99, 235, 0.22)'
+          : isHoveredObj
+          ? 'rgba(59, 130, 246, 0.20)'
+          : 'rgba(100, 116, 139, 0.22)';
+
+        ctx.strokeStyle = cutterColor;
+        ctx.lineWidth = toolPx;
+
+        if (obj.type === 'line') {
+          const p1 = wToC(obj.startX, obj.startY);
+          const p2 = wToC(obj.endX, obj.endY);
+          ctx.beginPath();
+          ctx.moveTo(p1.x, p1.y);
+          ctx.lineTo(p2.x, p2.y);
+          ctx.stroke();
+        } else if (obj.type === 'polyline') {
+          if (obj.points && obj.points.length >= 2) {
+            const pts = obj.points.map((p) => wToC(p.x, p.y));
+            ctx.beginPath();
+            ctx.moveTo(pts[0].x, pts[0].y);
+            for (let i = 1; i < pts.length; i++) {
+              ctx.lineTo(pts[i].x, pts[i].y);
+            }
+            if (obj.closed) ctx.closePath();
+            ctx.stroke();
+          }
+        } else if (obj.type === 'rectangle') {
+          const p1 = wToC(obj.x, obj.y);
+          const p2 = wToC(obj.x + obj.width, obj.y + obj.height);
+          const minX = Math.min(p1.x, p2.x);
+          const minY = Math.min(p1.y, p2.y);
+          const wPx = Math.abs(p2.x - p1.x);
+          const hPx = Math.abs(p2.y - p1.y);
+          ctx.strokeRect(minX, minY, wPx, hPx);
+        } else if (obj.type === 'circle') {
+          const cp = wToC(obj.centerX, obj.centerY);
+          const rPx = obj.radius * zoom;
+          ctx.beginPath();
+          ctx.arc(cp.x, cp.y, rPx, 0, Math.PI * 2);
+          ctx.stroke();
+        } else if (obj.type === 'arc') {
+          const cp = wToC(obj.centerX, obj.centerY);
+          const rPx = obj.radius * zoom;
+          const pStart = wToC(obj.startX, obj.startY);
+          const pEnd = wToC(obj.endX, obj.endY);
+          const a1 = Math.atan2(pStart.y - cp.y, pStart.x - cp.x);
+          const a2 = Math.atan2(pEnd.y - cp.y, pEnd.x - cp.x);
+          ctx.beginPath();
+          ctx.arc(cp.x, cp.y, rPx, a1, a2, !obj.clockwise);
+          ctx.stroke();
+        } else if (obj.type === 'point') {
+          const cp = wToC(obj.x, obj.y);
+          const rPx = (toolDiameter / 2) * zoom;
+          ctx.fillStyle = cutterColor;
+          ctx.beginPath();
+          ctx.arc(cp.x, cp.y, rPx, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+      ctx.restore();
+    }
+  }
 
   for (const obj of objects) {
     if (obj.visible === false) continue;
-    const isSelected = obj.id === selectedObjectId;
+    const isSelected = selArray.includes(obj.id);
     const isHoveredObj = hoveredHandle?.objectId === obj.id;
 
     ctx.lineWidth = isSelected ? 2.8 : isHoveredObj ? 2.5 : 2;
@@ -572,7 +655,7 @@ export function drawCADObjects(
       } else {
         // START HANDLE (POINT 1)
         const isStartHovered = isHoveredObj && hoveredHandle?.type === 'line_start';
-        const isStartActive = dragMode === 'line_start' && selectedObjectId === obj.id;
+        const isStartActive = dragMode === 'line_start' && isSelected;
         const rStart = isStartActive ? 10 : isStartHovered ? 8 : isSelected ? 7 : 5;
 
         if (isStartHovered || isStartActive || isSelected) {
@@ -602,7 +685,7 @@ export function drawCADObjects(
 
         // END HANDLE (POINT 2)
         const isEndHovered = isHoveredObj && hoveredHandle?.type === 'line_end';
-        const isEndActive = dragMode === 'line_end' && selectedObjectId === obj.id;
+        const isEndActive = dragMode === 'line_end' && isSelected;
         const rEnd = isEndActive ? 10 : isEndHovered ? 8 : isSelected ? 7 : 5;
 
         if (isEndHovered || isEndActive || isSelected) {
@@ -744,11 +827,64 @@ export function drawDrawingPreview(
   drawArcEndPt: Point2D | null,
   currentMouseProgPt: Point2D | null,
   pan: Point2D,
-  zoom: number
+  zoom: number,
+  toolDiameter?: number
 ) {
   if (activeTool === 'select' || !currentMouseProgPt) return;
 
   const wToC = (x: number, y: number) => worldToCanvas(x, y, pan, zoom);
+
+  // Draw tool diameter preview band
+  if (toolDiameter && toolDiameter > 0) {
+    const toolPx = toolDiameter * zoom;
+    if (toolPx > 0.5) {
+      ctx.save();
+      ctx.strokeStyle = 'rgba(100, 116, 139, 0.20)';
+      ctx.lineWidth = toolPx;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+
+      if (activeTool === 'line' && drawStartPt) {
+        const p1 = wToC(drawStartPt.x, drawStartPt.y);
+        const p2 = wToC(currentMouseProgPt.x, currentMouseProgPt.y);
+        ctx.beginPath();
+        ctx.moveTo(p1.x, p1.y);
+        ctx.lineTo(p2.x, p2.y);
+        ctx.stroke();
+      } else if (activeTool === 'rectangle' && drawStartPt) {
+        const p1 = wToC(drawStartPt.x, drawStartPt.y);
+        const p2 = wToC(currentMouseProgPt.x, currentMouseProgPt.y);
+        ctx.strokeRect(
+          Math.min(p1.x, p2.x),
+          Math.min(p1.y, p2.y),
+          Math.abs(p2.x - p1.x),
+          Math.abs(p2.y - p1.y)
+        );
+      } else if (activeTool === 'circle' && drawStartPt) {
+        const p1 = wToC(drawStartPt.x, drawStartPt.y);
+        const dx = currentMouseProgPt.x - drawStartPt.x;
+        const dy = currentMouseProgPt.y - drawStartPt.y;
+        const r = Math.hypot(dx, dy);
+        ctx.beginPath();
+        ctx.arc(p1.x, p1.y, r * zoom, 0, Math.PI * 2);
+        ctx.stroke();
+      } else if (activeTool === 'arc' && drawArcStartPt && drawArcEndPt) {
+        const arcData = getArcFrom3Points(drawArcStartPt, drawArcEndPt, currentMouseProgPt);
+        const cp = wToC(arcData.centerX, arcData.centerY);
+        const rPx = arcData.radius * zoom;
+        const pStart = wToC(drawArcStartPt.x, drawArcStartPt.y);
+        const pEnd = wToC(drawArcEndPt.x, drawArcEndPt.y);
+
+        const a1 = Math.atan2(pStart.y - cp.y, pStart.x - cp.x);
+        const a2 = Math.atan2(pEnd.y - cp.y, pEnd.x - cp.x);
+
+        ctx.beginPath();
+        ctx.arc(cp.x, cp.y, rPx, a1, a2, !arcData.clockwise);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+  }
 
   ctx.strokeStyle = '#f43f5e';
   ctx.lineWidth = 2;
@@ -887,5 +1023,204 @@ export function drawSnapIndicator(
   ctx.textBaseline = 'middle';
   ctx.fillText(labelText, sp.x, bgY + bgH / 2);
 
+  ctx.restore();
+}
+
+export function drawMeasurementTool(
+  ctx: CanvasRenderingContext2D,
+  measureStartPt: Point2D | null,
+  measureEndPt: Point2D | null,
+  currentMouseProgPt: Point2D | null,
+  pan: Point2D,
+  zoom: number
+) {
+  if (!measureStartPt) return;
+
+  const wToC = (x: number, y: number) => worldToCanvas(x, y, pan, zoom);
+
+  const p1 = wToC(measureStartPt.x, measureStartPt.y);
+  const targetPt = measureEndPt || currentMouseProgPt;
+  if (!targetPt) return;
+
+  const p2 = wToC(targetPt.x, targetPt.y);
+
+  const dx = targetPt.x - measureStartPt.x;
+  const dy = targetPt.y - measureStartPt.y;
+  const distance = Math.sqrt(dx * dx + dy * dy);
+  const angleRad = Math.atan2(dy, dx);
+
+  ctx.save();
+
+  // 1. Draw dX and dY projection lines (right-angle triangle)
+  ctx.strokeStyle = 'rgba(100, 116, 139, 0.45)'; // Slate-500 semi-transparent
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([4, 4]);
+
+  const cornerPt = wToC(targetPt.x, measureStartPt.y);
+
+  // Horizontal line (dX)
+  ctx.beginPath();
+  ctx.moveTo(p1.x, p1.y);
+  ctx.lineTo(cornerPt.x, cornerPt.y);
+  ctx.stroke();
+
+  // Vertical line (dY)
+  ctx.beginPath();
+  ctx.moveTo(cornerPt.x, cornerPt.y);
+  ctx.lineTo(p2.x, p2.y);
+  ctx.stroke();
+
+  ctx.restore();
+  ctx.save();
+
+  // 2. Main Dimension Line
+  ctx.strokeStyle = '#f43f5e'; // Rose-500
+  ctx.lineWidth = 2.5;
+  ctx.shadowColor = 'rgba(244, 63, 94, 0.3)';
+  ctx.shadowBlur = 8;
+
+  ctx.beginPath();
+  ctx.moveTo(p1.x, p1.y);
+  ctx.lineTo(p2.x, p2.y);
+  ctx.stroke();
+
+  // 3. Arrowheads or perpendicular ticks at endpoints
+  const drawTick = (px: number, py: number, angle: number) => {
+    const tickLen = 8;
+    ctx.beginPath();
+    ctx.moveTo(px - Math.sin(angle) * tickLen, py + Math.cos(angle) * tickLen);
+    ctx.lineTo(px + Math.sin(angle) * tickLen, py - Math.cos(angle) * tickLen);
+    ctx.strokeStyle = '#f43f5e';
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+  };
+
+  drawTick(p1.x, p1.y, angleRad);
+  drawTick(p2.x, p2.y, angleRad);
+
+  // Small dots at anchors
+  ctx.fillStyle = '#ffffff';
+  ctx.strokeStyle = '#f43f5e';
+  ctx.lineWidth = 2;
+  ctx.shadowBlur = 0;
+
+  ctx.beginPath();
+  ctx.arc(p1.x, p1.y, 4, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.arc(p2.x, p2.y, 4, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  // 4. Floating value badge at the middle of the line
+  const midX = (p1.x + p2.x) / 2;
+  const midY = (p1.y + p2.y) / 2;
+
+  ctx.restore();
+  ctx.save();
+
+  ctx.font = 'bold 12px monospace';
+  const labelText = `${distance.toFixed(3)} мм`;
+  const textWidth = ctx.measureText(labelText).width;
+  const badgeW = textWidth + 14;
+  const badgeH = 22;
+
+  // Background box for the main distance text
+  ctx.fillStyle = '#0f172a'; // Deep Slate-900
+  ctx.strokeStyle = '#f43f5e';
+  ctx.lineWidth = 1;
+  ctx.shadowColor = 'rgba(15, 23, 42, 0.25)';
+  ctx.shadowBlur = 6;
+
+  ctx.beginPath();
+  if (typeof ctx.roundRect === 'function') {
+    ctx.roundRect(midX - badgeW / 2, midY - badgeH / 2, badgeW, badgeH, 6);
+  } else {
+    ctx.rect(midX - badgeW / 2, midY - badgeH / 2, badgeW, badgeH);
+  }
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = '#ffffff';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(labelText, midX, midY);
+
+  // 5. Secondary delta dX, dY floating mini badges near their lines
+  ctx.font = 'bold 10px monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  // Let's place dX label in the middle of p1 and cornerPt
+  if (Math.abs(dx) > 0.5) {
+    const dXMidX = (p1.x + cornerPt.x) / 2;
+    const dXMidY = p1.y - 12; // slightly above
+    const dxText = `dX: ${Math.abs(dx).toFixed(2)}`;
+    const dxW = ctx.measureText(dxText).width + 8;
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+    ctx.strokeStyle = 'rgba(100, 116, 139, 0.4)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    if (typeof ctx.roundRect === 'function') {
+      ctx.roundRect(dXMidX - dxW / 2, dXMidY - 8, dxW, 16, 4);
+    } else {
+      ctx.rect(dXMidX - dxW / 2, dXMidY - 8, dxW, 16);
+    }
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#475569';
+    ctx.fillText(dxText, dXMidX, dXMidY);
+  }
+
+  // Let's place dY label in the middle of cornerPt and p2
+  if (Math.abs(dy) > 0.5) {
+    const dYMidX = cornerPt.x + (dx >= 0 ? 25 : -25); // slightly right/left
+    const dYMidY = (cornerPt.y + p2.y) / 2;
+    const dyText = `dY: ${Math.abs(dy).toFixed(2)}`;
+    const dyW = ctx.measureText(dyText).width + 8;
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+    ctx.strokeStyle = 'rgba(100, 116, 139, 0.4)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    if (typeof ctx.roundRect === 'function') {
+      ctx.roundRect(dYMidX - dyW / 2, dYMidY - 8, dyW, 16, 4);
+    } else {
+      ctx.rect(dYMidX - dyW / 2, dYMidY - 8, dyW, 16);
+    }
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#475569';
+    ctx.fillText(dyText, dYMidX, dYMidY);
+  }
+
+  ctx.restore();
+}
+
+/**
+ * Renders the box selection (marquee lasso frame) on the canvas
+ */
+export function drawSelectionBox(
+  ctx: CanvasRenderingContext2D,
+  boxStartPx: Point2D,
+  boxCurrentPx: Point2D
+) {
+  const left = Math.min(boxStartPx.x, boxCurrentPx.x);
+  const top = Math.min(boxStartPx.y, boxCurrentPx.y);
+  const width = Math.abs(boxCurrentPx.x - boxStartPx.x);
+  const height = Math.abs(boxCurrentPx.y - boxStartPx.y);
+
+  if (width < 1 && height < 1) return;
+
+  ctx.save();
+  ctx.fillStyle = 'rgba(59, 130, 246, 0.12)';
+  ctx.strokeStyle = '#2563eb';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([5, 5]);
+
+  ctx.fillRect(left, top, width, height);
+  ctx.strokeRect(left, top, width, height);
   ctx.restore();
 }

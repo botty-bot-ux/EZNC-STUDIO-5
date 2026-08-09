@@ -38,6 +38,7 @@ interface ProjectStore {
   templates: PostprocessorTemplates;
 
   selectedObjectId: string | null;
+  selectedObjectIds: string[];
   selectedOperationId: string | null;
   activeTool: ActiveTool;
   activeTab: ActiveTab;
@@ -67,6 +68,9 @@ interface ProjectStore {
   setSnapToGrid: (snap: boolean) => void;
   setGridStep: (step: number) => void;
   setSelectedObjectId: (id: string | null) => void;
+  setSelectedObjectIds: (ids: string[]) => void;
+  toggleObjectSelection: (id: string) => void;
+  selectAllObjects: () => void;
   setSelectedOperationId: (id: string | null) => void;
 
   updateMachine: (partial: Partial<MachineSettings>) => void;
@@ -75,8 +79,10 @@ interface ProjectStore {
   optimizeRoute: () => OptimizationResult | null;
   addObject: (obj: NewCADObjectInput) => void;
   updateObject: (id: string, partial: Partial<CADObject>, saveHistory?: boolean) => void;
+  updateSelectedObjects: (partial: Partial<CADObject>, saveHistory?: boolean) => void;
   recordHistory: () => void;
   deleteObject: (id: string) => void;
+  deleteSelectedObjects: () => void;
   duplicateObject: (id: string) => void;
 
   addOperation: (op: OperationItem) => void;
@@ -194,6 +200,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
     templates: initTemplates,
 
     selectedObjectId: null,
+    selectedObjectIds: [],
     selectedOperationId: null,
     activeTool: 'select',
     activeTab: 'gcode',
@@ -235,7 +242,32 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
     setSelectedObjectId: (id: string | null) =>
       set({
         selectedObjectId: id,
+        selectedObjectIds: id ? [id] : [],
       }),
+
+    setSelectedObjectIds: (ids: string[]) =>
+      set({
+        selectedObjectIds: ids,
+        selectedObjectId: ids.length > 0 ? ids[ids.length - 1] : null,
+      }),
+
+    toggleObjectSelection: (id: string) => {
+      const cur = get().selectedObjectIds;
+      const exists = cur.includes(id);
+      const newIds = exists ? cur.filter((i) => i !== id) : [...cur, id];
+      set({
+        selectedObjectIds: newIds,
+        selectedObjectId: newIds.length > 0 ? newIds[newIds.length - 1] : null,
+      });
+    },
+
+    selectAllObjects: () => {
+      const visibleIds = get().objects.filter((o) => o.visible !== false).map((o) => o.id);
+      set({
+        selectedObjectIds: visibleIds,
+        selectedObjectId: visibleIds.length > 0 ? visibleIds[visibleIds.length - 1] : null,
+      });
+    },
 
     setSelectedOperationId: (id: string | null) =>
       set({
@@ -321,6 +353,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
         objects: newObjs,
         operations: ops,
         selectedObjectId: newObj.id,
+        selectedObjectIds: [newObj.id],
       });
     },
 
@@ -336,17 +369,57 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
       syncAndSave({ objects: newObjs });
     },
 
+    updateSelectedObjects: (partial: Partial<CADObject>, saveHistory = true) => {
+      const selectedSet = new Set(get().selectedObjectIds);
+      if (selectedSet.size === 0) return;
+      if (saveHistory) {
+        pushHistory(get());
+      }
+      const newObjs = get().objects.map((o) =>
+        selectedSet.has(o.id) ? ({ ...o, ...partial } as CADObject) : o
+      );
+      syncAndSave({ objects: newObjs });
+    },
+
     deleteObject: (id: string) => {
+      const curIds = get().selectedObjectIds;
+      if (curIds.includes(id) && curIds.length > 1) {
+        get().deleteSelectedObjects();
+        return;
+      }
+
       pushHistory(get());
       const newObjs = get().objects.filter((o) => o.id !== id);
       const newOps = get().operations.map((op) => ({
         ...op,
         linkedObjectIds: op.linkedObjectIds.filter((objId) => objId !== id),
       }));
+      const remainingSelected = curIds.filter((i) => i !== id);
       syncAndSave({
         objects: newObjs,
         operations: newOps,
-        selectedObjectId: get().selectedObjectId === id ? null : get().selectedObjectId,
+        selectedObjectId: remainingSelected.length > 0 ? remainingSelected[remainingSelected.length - 1] : null,
+        selectedObjectIds: remainingSelected,
+      });
+    },
+
+    deleteSelectedObjects: () => {
+      const ids = get().selectedObjectIds;
+      if (ids.length === 0) return;
+
+      pushHistory(get());
+      const idSet = new Set(ids);
+      const newObjs = get().objects.filter((o) => !idSet.has(o.id));
+      const newOps = get().operations.map((op) => ({
+        ...op,
+        linkedObjectIds: op.linkedObjectIds.filter((objId) => !idSet.has(objId)),
+      }));
+
+      syncAndSave({
+        objects: newObjs,
+        operations: newOps,
+        selectedObjectId: null,
+        selectedObjectIds: [],
       });
     },
 
@@ -396,6 +469,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
         objects: newObjs,
         operations: newOps,
         selectedObjectId: copy.id,
+        selectedObjectIds: [copy.id],
       });
     },
 
@@ -650,15 +724,13 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
         machine: JSON.parse(JSON.stringify(get().machine)),
       };
 
-      set({
+      syncAndSave({
         objects: previous.objects,
         operations: previous.operations,
         machine: previous.machine,
         historyUndo: newUndo,
         historyRedo: [currentSnapshot, ...get().historyRedo],
       });
-
-      get().regenerateGcode();
     },
 
     redo: () => {
@@ -674,15 +746,13 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
         machine: JSON.parse(JSON.stringify(get().machine)),
       };
 
-      set({
+      syncAndSave({
         objects: next.objects,
         operations: next.operations,
         machine: next.machine,
         historyUndo: [...get().historyUndo, currentSnapshot],
         historyRedo: newRedo,
       });
-
-      get().regenerateGcode();
     },
   };
 });
