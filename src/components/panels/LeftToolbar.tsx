@@ -5,6 +5,7 @@ import {
   Maximize2,
   Minimize2,
 } from 'lucide-react';
+import { useShallow } from 'zustand/react/shallow';
 import { useProjectStore } from '../../store/useProjectStore';
 import { LayerItemAccordion } from './LayerItemAccordion';
 
@@ -21,7 +22,21 @@ export const LeftToolbar: React.FC = () => {
     reorderObjects,
     leftPanelOpen,
     toggleLeftPanel,
-  } = useProjectStore();
+  } = useProjectStore(
+    useShallow((s) => ({
+      objects: s.objects,
+      selectedObjectId: s.selectedObjectId,
+      selectedObjectIds: s.selectedObjectIds,
+      setSelectedObjectId: s.setSelectedObjectId,
+      toggleObjectSelection: s.toggleObjectSelection,
+      deleteObject: s.deleteObject,
+      duplicateObject: s.duplicateObject,
+      updateObject: s.updateObject,
+      reorderObjects: s.reorderObjects,
+      leftPanelOpen: s.leftPanelOpen,
+      toggleLeftPanel: s.toggleLeftPanel,
+    }))
+  );
 
   const [expandedIds, setExpandedIds] = useState<string[]>([]);
 

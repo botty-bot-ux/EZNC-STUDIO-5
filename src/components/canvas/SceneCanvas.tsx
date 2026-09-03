@@ -1,4 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { useProjectStore } from '../../store/useProjectStore';
 import { CADObject, Point2D } from '../../types';
 import { CanvasControls } from './CanvasControls';
@@ -24,10 +25,8 @@ import {
 import {
   HoveredHandle,
   SnapPointInfo,
-  applyGridSnap,
   canvasToWorld,
   getArcFrom3Points,
-  worldToCanvas,
 } from './canvasUtils';
 
 interface SceneCanvasProps {
@@ -70,6 +69,17 @@ function shiftCADObject(obj: CADObject, dx: number, dy: number): Partial<CADObje
   return {};
 }
 
+function translateObjectFull(obj: CADObject, dx: number, dy: number): CADObject {
+  return { ...obj, ...shiftCADObject(obj, dx, dy) } as CADObject;
+}
+
+// Live, uncommitted drag state. During a drag we only touch this local state and
+// redraw from it; the store is mutated exactly once on mouseup (see handleMouseUp).
+type LiveDrag =
+  | { mode: 'none' }
+  | { mode: 'translate'; dx: number; dy: number; ids: string[] }
+  | { mode: 'edit'; id: string; patch: Partial<CADObject> };
+
 export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -83,9 +93,8 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
     toggleObjectSelection,
     addObject,
     updateObject,
-    deleteObject,
+    updateObjectsBulk,
     deleteSelectedObjects,
-    recordHistory,
     machine,
     toolpathSegments,
     viewMode,
@@ -95,7 +104,29 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
     snapToGrid,
     setSnapToGrid,
     gridStep,
-  } = useProjectStore();
+  } = useProjectStore(
+    useShallow((s) => ({
+      objects: s.objects,
+      selectedObjectId: s.selectedObjectId,
+      selectedObjectIds: s.selectedObjectIds,
+      setSelectedObjectId: s.setSelectedObjectId,
+      setSelectedObjectIds: s.setSelectedObjectIds,
+      toggleObjectSelection: s.toggleObjectSelection,
+      addObject: s.addObject,
+      updateObject: s.updateObject,
+      updateObjectsBulk: s.updateObjectsBulk,
+      deleteSelectedObjects: s.deleteSelectedObjects,
+      machine: s.machine,
+      toolpathSegments: s.toolpathSegments,
+      viewMode: s.viewMode,
+      setViewMode: s.setViewMode,
+      activeTool: s.activeTool,
+      setActiveTool: s.setActiveTool,
+      snapToGrid: s.snapToGrid,
+      setSnapToGrid: s.setSnapToGrid,
+      gridStep: s.gridStep,
+    }))
+  );
 
   // Canvas Pan & Zoom
   const [pan, setPan] = useState<Point2D>({ x: 350, y: 350 });
@@ -109,8 +140,9 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
   const [dragMode, setDragMode] = useState<DragMode>('none');
   const [dragStartCanvasPt, setDragStartCanvasPt] = useState<Point2D>({ x: 0, y: 0 });
   const [dragStartWorldPt, setDragStartWorldPt] = useState<Point2D>({ x: 0, y: 0 });
-  const [dragObjInitial, setDragObjInitial] = useState<any>(null);
-  const [dragObjsInitialMap, setDragObjsInitialMap] = useState<Map<string, CADObject> | null>(null);
+  const [dragObjInitial, setDragObjInitial] = useState<CADObject | null>(null);
+  const [dragIds, setDragIds] = useState<string[]>([]);
+  const [liveDrag, setLiveDrag] = useState<LiveDrag>({ mode: 'none' });
   const [hoveredHandle, setHoveredHandle] = useState<HoveredHandle | null>(null);
 
   // Selection Box Marquee
@@ -133,6 +165,24 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
       setMeasureEndPt(null);
     }
   }, [activeTool]);
+
+  // Geometry actually drawn on the canvas: store objects with the uncommitted drag
+  // overlaid. This keeps the store untouched during pointer-move (no per-frame G-code
+  // regeneration) while still showing live feedback.
+  const displayObjects = useMemo<CADObject[]>(() => {
+    if (liveDrag.mode === 'translate') {
+      const idset = new Set(liveDrag.ids);
+      return objects.map((o) =>
+        idset.has(o.id) ? translateObjectFull(o, liveDrag.dx, liveDrag.dy) : o
+      );
+    }
+    if (liveDrag.mode === 'edit') {
+      return objects.map((o) =>
+        o.id === liveDrag.id ? ({ ...o, ...liveDrag.patch } as CADObject) : o
+      );
+    }
+    return objects;
+  }, [objects, liveDrag]);
 
   // Auto-fit canvas view
   const fitView = () => {
@@ -228,6 +278,9 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
     setSelectionBoxStart(null);
     setSelectionBoxCurrent(null);
     setDragMode('none');
+    setLiveDrag({ mode: 'none' });
+    setDragIds([]);
+    setDragObjInitial(null);
     setActiveSnapInfo(null);
   };
 
@@ -263,7 +316,7 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
     }
 
     // 5. CAD Objects
-    drawCADObjects(ctx, objects, selectedObjectIds, hoveredHandle, dragMode, pan, zoom, machine.toolDiameter);
+    drawCADObjects(ctx, displayObjects, selectedObjectIds, hoveredHandle, dragMode, pan, zoom, machine.toolDiameter);
 
     // 5b. Selection Box Marquee
     if (dragMode === 'selection_box' && selectionBoxStart && selectionBoxCurrent) {
@@ -303,7 +356,7 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
     pan,
     zoom,
     gridStep,
-    objects,
+    displayObjects,
     selectedObjectId,
     selectedObjectIds,
     toolpathSegments,
@@ -483,6 +536,8 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
           setDragStartCanvasPt(mousePx);
           setDragStartWorldPt(snapPt);
           setDragObjInitial({ ...targetObj });
+          setDragIds([]);
+          setLiveDrag({ mode: 'none' });
           return;
         }
       }
@@ -503,20 +558,14 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
           }
         }
 
+        // Body drag = pure translation of the selected set. Record which ids are being
+        // dragged; the store stays untouched until mouseup (live overlay drives redraw).
         setDragMode('object');
         setDragStartCanvasPt(mousePx);
         setDragStartWorldPt(rawWorldPt);
-
-        // Build map of initial states for all selected objects
-        const initMap = new Map<string, CADObject>();
-        for (const obj of objects) {
-          if (currentSelectedIds.includes(obj.id)) {
-            initMap.set(obj.id, JSON.parse(JSON.stringify(obj)));
-          }
-        }
-        setDragObjsInitialMap(initMap);
-        const targetObj = objects.find((o) => o.id === hitObjId);
-        setDragObjInitial(targetObj ? { ...targetObj } : null);
+        setDragObjInitial(null);
+        setDragIds(currentSelectedIds);
+        setLiveDrag({ mode: 'none' });
       } else {
         // Clicked empty area
         if (!e.shiftKey) {
@@ -574,44 +623,41 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
     setCurrentMouseProgPt(snapPt);
     onCursorMove?.(snapPt);
 
-    // 3. Handle Dragging
+    // 3. Handle Dragging — update the live overlay only (no store writes per frame)
     if (dragMode !== 'none') {
-      if (dragMode === 'object' && dragObjsInitialMap && dragObjsInitialMap.size > 0) {
+      if (dragMode === 'object' && dragIds.length > 0) {
         const dx = snapPt.x - dragStartWorldPt.x;
         const dy = snapPt.y - dragStartWorldPt.y;
-
-        dragObjsInitialMap.forEach((initObj, id) => {
-          const shiftedPartial = shiftCADObject(initObj, dx, dy);
-          updateObject(id, shiftedPartial, false);
-        });
+        setLiveDrag({ mode: 'translate', dx, dy, ids: dragIds });
       } else if (selectedObjectId && dragObjInitial) {
         if (dragMode === 'line_start') {
-          updateObject(selectedObjectId, { startX: snapPt.x, startY: snapPt.y }, false);
+          setLiveDrag({ mode: 'edit', id: selectedObjectId, patch: { startX: snapPt.x, startY: snapPt.y } });
         } else if (dragMode === 'line_end') {
-          updateObject(selectedObjectId, { endX: snapPt.x, endY: snapPt.y }, false);
-        } else if (dragMode === 'arc_start') {
-          const curArc = objects.find((o) => o.id === selectedObjectId) as any;
-          if (curArc) {
-            const r = Math.hypot(snapPt.x - curArc.centerX, snapPt.y - curArc.centerY);
-            updateObject(selectedObjectId, { startX: snapPt.x, startY: snapPt.y, radius: r }, false);
+          setLiveDrag({ mode: 'edit', id: selectedObjectId, patch: { endX: snapPt.x, endY: snapPt.y } });
+        } else if (dragObjInitial.type === 'arc') {
+          const base = dragObjInitial;
+          if (dragMode === 'arc_start') {
+            const r = Math.hypot(snapPt.x - base.centerX, snapPt.y - base.centerY);
+            setLiveDrag({ mode: 'edit', id: selectedObjectId, patch: { startX: snapPt.x, startY: snapPt.y, radius: r } });
+          } else if (dragMode === 'arc_end') {
+            const r = Math.hypot(snapPt.x - base.centerX, snapPt.y - base.centerY);
+            setLiveDrag({ mode: 'edit', id: selectedObjectId, patch: { endX: snapPt.x, endY: snapPt.y, radius: r } });
+          } else if (dragMode === 'arc_center') {
+            const dx = snapPt.x - base.centerX;
+            const dy = snapPt.y - base.centerY;
+            setLiveDrag({
+              mode: 'edit',
+              id: selectedObjectId,
+              patch: {
+                centerX: snapPt.x,
+                centerY: snapPt.y,
+                startX: base.startX + dx,
+                startY: base.startY + dy,
+                endX: base.endX + dx,
+                endY: base.endY + dy,
+              },
+            });
           }
-        } else if (dragMode === 'arc_end') {
-          const curArc = objects.find((o) => o.id === selectedObjectId) as any;
-          if (curArc) {
-            const r = Math.hypot(snapPt.x - curArc.centerX, snapPt.y - curArc.centerY);
-            updateObject(selectedObjectId, { endX: snapPt.x, endY: snapPt.y, radius: r }, false);
-          }
-        } else if (dragMode === 'arc_center') {
-          const dx = snapPt.x - dragObjInitial.centerX;
-          const dy = snapPt.y - dragObjInitial.centerY;
-          updateObject(selectedObjectId, {
-            centerX: snapPt.x,
-            centerY: snapPt.y,
-            startX: dragObjInitial.startX + dx,
-            startY: dragObjInitial.startY + dy,
-            endX: dragObjInitial.endX + dx,
-            endY: dragObjInitial.endY + dy,
-          }, false);
         }
       }
       return;
@@ -621,7 +667,7 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
     if (activeTool === 'select') {
       const handleHit = findHandleHit(objects, selectedObjectId, mousePx, pan, zoom);
       if (handleHit) {
-        setHoveredHandle({ objectId: handleHit.objectId, type: handleHit.type as any });
+        setHoveredHandle({ objectId: handleHit.objectId, type: handleHit.type });
       } else {
         const bodyHitId = findObjectBodyHit(objects, rawWorldPt, zoom);
         if (bodyHitId) {
@@ -661,13 +707,25 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
       }
       setSelectionBoxStart(null);
       setSelectionBoxCurrent(null);
-    } else if (dragMode === 'object' || dragMode !== 'none') {
-      recordHistory();
+    } else if (liveDrag.mode === 'translate') {
+      // Commit the whole group translation in ONE store mutation (one history push + one
+      // G-code regen), instead of one per selected object per mousemove. `objects` still
+      // holds the pre-drag originals, so applying the full delta here is correct.
+      const idset = new Set(liveDrag.ids);
+      const updates = objects
+        .filter((o) => idset.has(o.id))
+        .map((o) => ({ id: o.id, patch: shiftCADObject(o, liveDrag.dx, liveDrag.dy) }));
+      if (updates.length > 0) updateObjectsBulk(updates, true);
+    } else if (liveDrag.mode === 'edit') {
+      // Commit a single handle edit once (pushes one history entry).
+      updateObject(liveDrag.id, liveDrag.patch, true);
     }
+    // pan / plain click (liveDrag.mode === 'none'): no store write, no history entry.
 
     setDragMode('none');
     setDragObjInitial(null);
-    setDragObjsInitialMap(null);
+    setDragIds([]);
+    setLiveDrag({ mode: 'none' });
   };
 
   const handleMouseLeave = () => {
@@ -693,7 +751,7 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
     setPan({ x: newPanX, y: newPanY });
   };
 
-  const selectedObj = objects.find((o) => o.id === selectedObjectId);
+  const selectedObj = displayObjects.find((o) => o.id === selectedObjectId);
 
   return (
     <div ref={containerRef} className="relative w-full h-full bg-[#f1f5f9] overflow-hidden select-none">
@@ -717,7 +775,6 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
         dragMode={dragMode}
         dragTargetObj={selectedObj}
         currentMouseProgPt={currentMouseProgPt}
-        selectedObject={selectedObj}
         onCancelDraw={cancelDrawing}
       />
 

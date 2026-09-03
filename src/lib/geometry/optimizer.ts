@@ -51,43 +51,41 @@ export function getObjectEndpoints(obj: CADObject): {
   end: Point2D;
   flippable: boolean;
 } {
-  const o = obj as any;
-  // Делегируем конкретную логику обработчикам, чтобы не раздувать switch
-  const handlers: Record<string, () => ReturnType<typeof getObjectEndpoints>> = {
-    point: () => {
-      const pt = { x: o.x, y: o.y };
+  switch (obj.type) {
+    case 'point': {
+      const pt = { x: obj.x, y: obj.y };
       return { start: pt, end: pt, flippable: false };
-    },
-    line: () => ({
-      start: { x: o.startX, y: o.startY },
-      end: { x: o.endX, y: o.endY },
-      flippable: true,
-    }),
-    polyline: () => {
-      if (!o.points || o.points.length === 0) {
+    }
+    case 'line':
+      return {
+        start: { x: obj.startX, y: obj.startY },
+        end: { x: obj.endX, y: obj.endY },
+        flippable: true,
+      };
+    case 'polyline': {
+      if (!obj.points || obj.points.length === 0) {
         const zero = { x: 0, y: 0 };
         return { start: zero, end: zero, flippable: false };
       }
-      const first = o.points[0];
-      const last = o.closed ? first : o.points[o.points.length - 1];
-      return { start: first, end: last, flippable: !o.closed };
-    },
-    rectangle: () => {
-      const pt = { x: o.x, y: o.y };
+      const first = obj.points[0];
+      const last = obj.closed ? first : obj.points[obj.points.length - 1];
+      return { start: first, end: last, flippable: !obj.closed };
+    }
+    case 'rectangle': {
+      const pt = { x: obj.x, y: obj.y };
       return { start: pt, end: pt, flippable: false };
-    },
-    circle: () => {
-      const pt = { x: o.centerX - o.radius, y: o.centerY };
+    }
+    case 'circle': {
+      const pt = { x: obj.centerX - obj.radius, y: obj.centerY };
       return { start: pt, end: pt, flippable: false };
-    },
-    arc: () => ({
-      start: { x: o.startX, y: o.startY },
-      end: { x: o.endX, y: o.endY },
-      flippable: true,
-    }),
-  };
-
-  return (handlers[o.type] || handlers.point)();
+    }
+    case 'arc':
+      return {
+        start: { x: obj.startX, y: obj.startY },
+        end: { x: obj.endX, y: obj.endY },
+        flippable: true,
+      };
+  }
 }
 
 // ===== ПЕРЕВОРОТ ОБЪЕКТА =====
@@ -142,7 +140,6 @@ export function optimizeCADObjects(
 
   // Сохраняем "эталонные" данные для статистики ДО оптимизации
   const originalIds = visibleObjects.map((o) => o.id);
-  const originalFlippableCount = visibleObjects.filter((o) => getObjectEndpoints(o).flippable).length;
 
   // ===== ШАГ 1: Жадный ближайший сосед =====
   // Используем Set вместо splice — O(1) удаление против O(n)

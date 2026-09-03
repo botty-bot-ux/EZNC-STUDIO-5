@@ -1,11 +1,20 @@
 import React from 'react';
 import { ChevronRight, Code, Compass, Sliders } from 'lucide-react';
+import { useShallow } from 'zustand/react/shallow';
 import { useProjectStore } from '../../store/useProjectStore';
 import { MachineSettingsPanel } from './MachineSettingsPanel';
 import { GcodeEditor } from '../editor/GcodeEditor';
 
 export const RightSidebar: React.FC = () => {
-  const { activeTab, setActiveTab, warnings, rightPanelOpen, toggleRightPanel } = useProjectStore();
+  const { activeTab, setActiveTab, warnings, rightPanelOpen, toggleRightPanel } = useProjectStore(
+    useShallow((s) => ({
+      activeTab: s.activeTab,
+      setActiveTab: s.setActiveTab,
+      warnings: s.warnings,
+      rightPanelOpen: s.rightPanelOpen,
+      toggleRightPanel: s.toggleRightPanel,
+    }))
+  );
 
   const errorCount = warnings.filter((w) => w.level === 'error').length;
 

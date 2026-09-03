@@ -1,6 +1,6 @@
 import { ActiveTool, CADObject, MachineSettings, Point2D, ToolpathSegment, ViewMode } from '../../types';
 import { DragMode } from './canvasHitTest';
-import { HoveredHandle, SnapPointInfo, canvasToWorld, getArcFrom3Points, worldToCanvas } from './canvasUtils';
+import { HoveredHandle, SnapPointInfo, getArcFrom3Points, worldToCanvas } from './canvasUtils';
 
 export interface DrawOptions {
   ctx: CanvasRenderingContext2D;

@@ -96,7 +96,7 @@ export function parseGcodeToCadObjects(
     if (match) {
       const id = match[1].trim();
       const name = (match[2] || match[3] || '').trim();
-      const type = match[4].toLowerCase() as any;
+      const type = match[4].toLowerCase() as CADObject['type'];
       return { id, name, type };
     }
 
@@ -105,7 +105,7 @@ export function parseGcodeToCadObjects(
     match = line.match(legacyRegex);
     if (match) {
       const name = match[1].trim();
-      const type = match[2].toLowerCase() as any;
+      const type = match[2].toLowerCase() as CADObject['type'];
       const id = match[3]?.trim();
       return { id, name, type };
     }

@@ -1,4 +1,5 @@
 import React from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { Header } from './components/layout/Header';
 import { LeftToolbar } from './components/panels/LeftToolbar';
 import { RightSidebar } from './components/panels/RightSidebar';
@@ -15,7 +16,18 @@ export default function App() {
     setActiveTool,
     setSelectedObjectId,
     setSelectedObjectIds,
-  } = useProjectStore();
+  } = useProjectStore(
+    useShallow((s) => ({
+      selectedObjectId: s.selectedObjectId,
+      selectedObjectIds: s.selectedObjectIds,
+      deleteSelectedObjects: s.deleteSelectedObjects,
+      undo: s.undo,
+      redo: s.redo,
+      setActiveTool: s.setActiveTool,
+      setSelectedObjectId: s.setSelectedObjectId,
+      setSelectedObjectIds: s.setSelectedObjectIds,
+    }))
+  );
 
   // Global Keyboard Shortcuts
   React.useEffect(() => {

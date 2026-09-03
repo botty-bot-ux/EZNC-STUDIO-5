@@ -4,11 +4,9 @@ import { RefreshCw } from 'lucide-react';
 import { useProjectStore } from '../../store/useProjectStore';
 
 export const GcodeEditor: React.FC = () => {
-  const {
-    manualGcode,
-    updateManualGcode,
-    parseManualGcode,
-  } = useProjectStore();
+  const manualGcode = useProjectStore((s) => s.manualGcode);
+  const updateManualGcode = useProjectStore((s) => s.updateManualGcode);
+  const parseManualGcode = useProjectStore((s) => s.parseManualGcode);
 
   const handleEditorDidMount: OnMount = (editor) => {
     editor.onDidChangeCursorPosition((e) => {

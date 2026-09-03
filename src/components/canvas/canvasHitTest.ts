@@ -1,10 +1,5 @@
 import { CADObject, MachineSettings, Point2D } from '../../types';
-import {
-  HoveredHandle,
-  SnapPointInfo,
-  applyGridSnap,
-  worldToCanvas,
-} from './canvasUtils';
+import { SnapPointInfo, applyGridSnap, worldToCanvas } from './canvasUtils';
 
 export type DragMode =
   | 'none'
@@ -18,6 +13,12 @@ export type DragMode =
   | 'arc_end'
   | 'arc_center';
 
+// Subset of DragMode that represents a specific draggable geometry handle.
+export type HandleType = Extract<
+  DragMode,
+  'line_start' | 'line_end' | 'polyline_point' | 'arc_start' | 'arc_end' | 'arc_center'
+>;
+
 /**
  * Finds handle hit (line start/end, arc start/end/center) near mouse point.
  */
@@ -28,7 +29,7 @@ export function findHandleHit(
   pan: Point2D,
   zoom: number,
   handleHitRadiusPx: number = 14
-): { objectId: string; type: DragMode } | null {
+): { objectId: string; type: HandleType } | null {
   const wToC = (x: number, y: number) => worldToCanvas(x, y, pan, zoom);
 
   // 1. Prioritize selected object

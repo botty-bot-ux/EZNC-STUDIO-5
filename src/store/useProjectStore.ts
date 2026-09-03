@@ -49,6 +49,9 @@ interface ProjectStore {
 
   generatedGcode: string;
   manualGcode: string;
+  // True once the user hand-edits G-code in the editor; normal object edits then
+  // stop overwriting `manualGcode` until an explicit regenerate/parse/load happens.
+  manualGcodeDirty: boolean;
   toolpathSegments: ToolpathSegment[];
   warnings: WarningItem[];
 
@@ -80,6 +83,7 @@ interface ProjectStore {
   addObject: (obj: NewCADObjectInput) => void;
   updateObject: (id: string, partial: Partial<CADObject>, saveHistory?: boolean) => void;
   updateSelectedObjects: (partial: Partial<CADObject>, saveHistory?: boolean) => void;
+  updateObjectsBulk: (updates: Array<{ id: string; patch: Partial<CADObject> }>, saveHistory?: boolean) => void;
   recordHistory: () => void;
   deleteObject: (id: string) => void;
   deleteSelectedObjects: () => void;
@@ -106,18 +110,20 @@ interface ProjectStore {
 }
 
 export const useProjectStore = create<ProjectStore>((set, get) => {
-  // Helper to record history step
-  const pushHistory = (state: { objects: CADObject[]; operations: OperationItem[]; machine: MachineSettings }) => {
-    const curUndo = get().historyUndo;
+  const HISTORY_LIMIT = 20;
+
+  // Helper to record history step. Snapshots the current (pre-change) state so that
+  // an undo restores what was there before the action. Call BEFORE mutating state.
+  const pushHistory = () => {
+    const cur = get();
+    const snapshot: HistoryState = {
+      objects: structuredClone(cur.objects),
+      operations: structuredClone(cur.operations),
+      machine: structuredClone(cur.machine),
+    };
     set({
-      historyUndo: [
-        ...curUndo.slice(-20), // keep max 20 states
-        {
-          objects: JSON.parse(JSON.stringify(get().objects)),
-          operations: JSON.parse(JSON.stringify(get().operations)),
-          machine: JSON.parse(JSON.stringify(get().machine)),
-        },
-      ],
+      // keep at most HISTORY_LIMIT states (slice off (LIMIT-1) then append one)
+      historyUndo: [...cur.historyUndo.slice(-(HISTORY_LIMIT - 1)), snapshot],
       historyRedo: [],
     });
   };
@@ -130,9 +136,13 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
     const genRes = generateGcode(objects, operations, machine, templates);
     const warnList = analyzeProjectWarnings(objects, operations, machine);
 
+    // Respect manual edits: once the user hand-types G-code (manualGcodeDirty), stop
+    // clobbering it with regenerated output. An explicit regenerate/parse/load clears the
+    // flag and re-syncs. generatedGcode/segments/warnings always refresh.
+    const manualDirty = get().manualGcodeDirty;
     set({
       generatedGcode: genRes.gcode,
-      manualGcode: genRes.gcode,
+      ...(manualDirty ? {} : { manualGcode: genRes.gcode }),
       toolpathSegments: genRes.segments,
       warnings: warnList,
     });
@@ -211,6 +221,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
 
     generatedGcode: initialGen.gcode,
     manualGcode: initialGen.gcode,
+    manualGcodeDirty: false,
     toolpathSegments: initialGen.segments,
     warnings: initialWarns,
 
@@ -275,14 +286,14 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
       }),
 
     updateMachine: (partial: Partial<MachineSettings>) => {
-      pushHistory(get());
+      pushHistory();
       syncAndSave({
         machine: { ...get().machine, ...partial },
       });
     },
 
     reorderObjects: (newObjects: CADObject[]) => {
-      pushHistory(get());
+      pushHistory();
       syncAndSave({ objects: newObjects });
     },
 
@@ -290,7 +301,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
       const currentObjs = get().objects;
       if (!currentObjs || currentObjs.length === 0) return null;
 
-      pushHistory(get());
+      pushHistory();
       const res = optimizeCADObjects(currentObjs, { x: 0, y: 0 });
 
       // Sync operations linkedObjectIds order with new object order
@@ -317,7 +328,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
     },
 
     addObject: (rawObj: NewCADObjectInput) => {
-      pushHistory(get());
+      pushHistory();
       const newObj: CADObject = {
         ...rawObj,
         id: rawObj.id || `obj_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
@@ -358,12 +369,12 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
     },
 
     recordHistory: () => {
-      pushHistory(get());
+      pushHistory();
     },
 
     updateObject: (id: string, partial: Partial<CADObject>, saveHistory = true) => {
       if (saveHistory) {
-        pushHistory(get());
+        pushHistory();
       }
       const newObjs = get().objects.map((o) => (o.id === id ? ({ ...o, ...partial } as CADObject) : o));
       syncAndSave({ objects: newObjs });
@@ -373,10 +384,22 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
       const selectedSet = new Set(get().selectedObjectIds);
       if (selectedSet.size === 0) return;
       if (saveHistory) {
-        pushHistory(get());
+        pushHistory();
       }
       const newObjs = get().objects.map((o) =>
         selectedSet.has(o.id) ? ({ ...o, ...partial } as CADObject) : o
+      );
+      syncAndSave({ objects: newObjs });
+    },
+
+    updateObjectsBulk: (updates, saveHistory = true) => {
+      if (updates.length === 0) return;
+      if (saveHistory) {
+        pushHistory();
+      }
+      const patchMap = new Map(updates.map((u) => [u.id, u.patch]));
+      const newObjs = get().objects.map((o) =>
+        patchMap.has(o.id) ? ({ ...o, ...patchMap.get(o.id) } as CADObject) : o
       );
       syncAndSave({ objects: newObjs });
     },
@@ -388,7 +411,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
         return;
       }
 
-      pushHistory(get());
+      pushHistory();
       const newObjs = get().objects.filter((o) => o.id !== id);
       const newOps = get().operations.map((op) => ({
         ...op,
@@ -407,7 +430,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
       const ids = get().selectedObjectIds;
       if (ids.length === 0) return;
 
-      pushHistory(get());
+      pushHistory();
       const idSet = new Set(ids);
       const newObjs = get().objects.filter((o) => !idSet.has(o.id));
       const newOps = get().operations.map((op) => ({
@@ -427,7 +450,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
       const target = get().objects.find((o) => o.id === id);
       if (!target) return;
 
-      pushHistory(get());
+      pushHistory();
       const copy: CADObject = JSON.parse(JSON.stringify(target));
       copy.id = `obj_${Date.now()}`;
       copy.name = `${target.name} (копия)`;
@@ -474,7 +497,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
     },
 
     addOperation: (op: OperationItem) => {
-      pushHistory(get());
+      pushHistory();
       syncAndSave({
         operations: [...get().operations, op],
         selectedOperationId: op.id,
@@ -482,13 +505,13 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
     },
 
     updateOperation: (id: string, partial: Partial<OperationItem>) => {
-      pushHistory(get());
+      pushHistory();
       const newOps = get().operations.map((op) => (op.id === id ? { ...op, ...partial } : op));
       syncAndSave({ operations: newOps });
     },
 
     deleteOperation: (id: string) => {
-      pushHistory(get());
+      pushHistory();
       const newOps = get().operations.filter((op) => op.id !== id);
       syncAndSave({
         operations: newOps,
@@ -497,18 +520,18 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
     },
 
     reorderOperations: (newOps: OperationItem[]) => {
-      pushHistory(get());
+      pushHistory();
       syncAndSave({ operations: newOps });
     },
 
     toggleOperationEnabled: (id: string) => {
-      pushHistory(get());
+      pushHistory();
       const newOps = get().operations.map((op) => (op.id === id ? { ...op, enabled: !op.enabled } : op));
       syncAndSave({ operations: newOps });
     },
 
     updateManualGcode: (code: string) => {
-      set({ manualGcode: code });
+      set({ manualGcode: code, manualGcodeDirty: true });
     },
 
     parseManualGcode: () => {
@@ -517,7 +540,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
 
       const extracted = extractProjectDataFromNC(gcode);
       if (extracted && Array.isArray(extracted.objects) && extracted.objects.length > 0) {
-        pushHistory(get());
+        pushHistory();
         syncAndSave({
           objects: extracted.objects,
           operations: extracted.operations || get().operations,
@@ -530,7 +553,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
       const updatedCadObjects = parseGcodeToCadObjects(gcode, existingObjs);
 
       if (updatedCadObjects.length > 0) {
-        pushHistory(get());
+        pushHistory();
 
         const existingOps = get().operations;
         const updatedObjIds = new Set(updatedCadObjects.map((o) => o.id));
@@ -590,16 +613,18 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
       set({
         generatedGcode: res.gcode,
         manualGcode: res.gcode,
+        manualGcodeDirty: false,
         toolpathSegments: res.segments,
       });
     },
 
     newProject: () => {
-      pushHistory(get());
+      pushHistory();
       syncAndSave({
         projectName: 'Новый_Проект_ЧПУ',
         objects: [],
         operations: [],
+        manualGcodeDirty: false,
         selectedObjectId: null,
         selectedOperationId: null,
       });
@@ -609,13 +634,14 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
       try {
         const parsed = JSON.parse(jsonStr) as ProjectData;
         if (parsed && Array.isArray(parsed.objects)) {
-          pushHistory(get());
+          pushHistory();
           syncAndSave({
             projectName: parsed.name || 'Загруженный_Проект',
             machine: { ...INITIAL_MACHINE, ...parsed.machine, controllerProfile: 'ncstudio' },
             objects: parsed.objects,
             operations: parsed.operations || [],
             templates: parsed.postprocessorTemplates || DEFAULT_TEMPLATES,
+            manualGcodeDirty: false,
             selectedObjectId: null,
             selectedOperationId: null,
           });
@@ -633,13 +659,14 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
       // 1. Try extracting embedded project JSON or raw JSON
       const extracted = extractProjectDataFromNC(fileContent);
       if (extracted && Array.isArray(extracted.objects)) {
-        pushHistory(get());
+        pushHistory();
         syncAndSave({
           projectName: extracted.name || fileName?.replace(/\.[^/.]+$/, '') || 'Проект_NcStudio',
           machine: { ...INITIAL_MACHINE, ...extracted.machine, controllerProfile: 'ncstudio' },
           objects: extracted.objects,
           operations: extracted.operations || [],
           templates: extracted.postprocessorTemplates || DEFAULT_TEMPLATES,
+          manualGcodeDirty: false,
           selectedObjectId: null,
           selectedOperationId: null,
         });
@@ -649,7 +676,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
       // 2. Process as raw NC Studio G-code file
       const parsedSegments = parseGcodeToSegments(fileContent);
       if (parsedSegments.length > 0) {
-        pushHistory(get());
+        pushHistory();
         const importedCadObjects = parseGcodeToCadObjects(fileContent);
         const cleanName = fileName?.replace(/\.[^/.]+$/, '') || 'Импортированная_Программа_NC';
 
@@ -664,8 +691,8 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
           finalDepth: obj.depth || 5,
           passDepth: obj.depth || 5,
           spindleSpeed: get().machine.spindleSpeed,
-          feedCut: (obj as any).importedFeedCut || get().machine.feedCut || 1200,
-          feedPlunge: (obj as any).importedFeedPlunge || get().machine.feedPlunge || 300,
+          feedCut: obj.importedFeedCut || get().machine.feedCut || 1200,
+          feedPlunge: obj.importedFeedPlunge || get().machine.feedPlunge || 300,
           feedDrill: get().machine.feedDrill || 500,
           direction: 'cw',
         }));
@@ -673,6 +700,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
         syncAndSave({
           projectName: cleanName,
           manualGcode: fileContent,
+          manualGcodeDirty: true,
           objects: importedCadObjects.length > 0 ? importedCadObjects : get().objects,
           operations: newOps.length > 0 ? newOps : get().operations,
           selectedObjectId: null,
@@ -719,9 +747,9 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
       const newUndo = undoStack.slice(0, undoStack.length - 1);
 
       const currentSnapshot: HistoryState = {
-        objects: JSON.parse(JSON.stringify(get().objects)),
-        operations: JSON.parse(JSON.stringify(get().operations)),
-        machine: JSON.parse(JSON.stringify(get().machine)),
+        objects: structuredClone(get().objects),
+        operations: structuredClone(get().operations),
+        machine: structuredClone(get().machine),
       };
 
       syncAndSave({
@@ -729,7 +757,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
         operations: previous.operations,
         machine: previous.machine,
         historyUndo: newUndo,
-        historyRedo: [currentSnapshot, ...get().historyRedo],
+        historyRedo: [currentSnapshot, ...get().historyRedo.slice(0, HISTORY_LIMIT - 1)],
       });
     },
 
@@ -741,16 +769,16 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
       const newRedo = redoStack.slice(1);
 
       const currentSnapshot: HistoryState = {
-        objects: JSON.parse(JSON.stringify(get().objects)),
-        operations: JSON.parse(JSON.stringify(get().operations)),
-        machine: JSON.parse(JSON.stringify(get().machine)),
+        objects: structuredClone(get().objects),
+        operations: structuredClone(get().operations),
+        machine: structuredClone(get().machine),
       };
 
       syncAndSave({
         objects: next.objects,
         operations: next.operations,
         machine: next.machine,
-        historyUndo: [...get().historyUndo, currentSnapshot],
+        historyUndo: [...get().historyUndo, currentSnapshot].slice(-HISTORY_LIMIT),
         historyRedo: newRedo,
       });
     },

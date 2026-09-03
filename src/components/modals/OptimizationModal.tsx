@@ -23,7 +23,7 @@ export const OptimizationModal: React.FC<OptimizationModalProps> = ({
   onClose,
   result,
 }) => {
-  const { undo } = useProjectStore();
+  const undo = useProjectStore((s) => s.undo);
 
   if (!isOpen || !result) return null;
 

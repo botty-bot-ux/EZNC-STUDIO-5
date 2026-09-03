@@ -1,5 +1,5 @@
 import React from 'react';
-import { ActiveTool, Point2D } from '../../types';
+import { ActiveTool, CADObject, Point2D } from '../../types';
 import { DragMode } from './canvasHitTest';
 
 interface CanvasHudProps {
@@ -10,9 +10,8 @@ interface CanvasHudProps {
   measureStartPt?: Point2D | null;
   measureEndPt?: Point2D | null;
   dragMode: DragMode;
-  dragTargetObj: any;
+  dragTargetObj: CADObject | null | undefined;
   currentMouseProgPt: Point2D | null;
-  selectedObject: any;
   onCancelDraw: () => void;
 }
 
@@ -26,7 +25,6 @@ export const CanvasHud: React.FC<CanvasHudProps> = ({
   dragMode,
   dragTargetObj,
   currentMouseProgPt,
-  selectedObject,
   onCancelDraw,
 }) => {
   // HUD banner for active tool instruction

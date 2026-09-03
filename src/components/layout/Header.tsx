@@ -13,6 +13,7 @@ import {
   Undo,
   Zap,
 } from 'lucide-react';
+import { useShallow } from 'zustand/react/shallow';
 import { useProjectStore } from '../../store/useProjectStore';
 import { saveAs } from 'file-saver';
 import { OptimizationModal } from '../modals/OptimizationModal';
@@ -27,13 +28,29 @@ export const Header: React.FC = () => {
     exportProjectNC,
     undo,
     redo,
-    historyUndo,
-    historyRedo,
+    undoCount,
+    redoCount,
     warnings,
     setActiveTab,
     activeTool,
     setActiveTool,
-  } = useProjectStore();
+  } = useProjectStore(
+    useShallow((s) => ({
+      projectName: s.projectName,
+      setProjectName: s.setProjectName,
+      newProject: s.newProject,
+      loadProjectNC: s.loadProjectNC,
+      exportProjectNC: s.exportProjectNC,
+      undo: s.undo,
+      redo: s.redo,
+      undoCount: s.historyUndo.length,
+      redoCount: s.historyRedo.length,
+      warnings: s.warnings,
+      setActiveTab: s.setActiveTab,
+      activeTool: s.activeTool,
+      setActiveTool: s.setActiveTool,
+    }))
+  );
 
   const { optResult, isOptModalOpen, handleOptimizeClick, closeOptModal } = useOptimization();
 
@@ -43,10 +60,27 @@ export const Header: React.FC = () => {
     const ncStr = exportProjectNC();
     const cleanName = projectName.trim().replace(/\s+/g, '_') || 'cnc_project';
 
+    // File System Access API is not in the default DOM lib — type it minimally here.
+    interface WritableLike {
+      write: (data: string) => Promise<void>;
+      close: () => Promise<void>;
+    }
+    interface FileHandleLike {
+      name: string;
+      createWritable: () => Promise<WritableLike>;
+    }
+    type PickerWindow = Window & {
+      showSaveFilePicker?: (opts: {
+        suggestedName: string;
+        types: { description: string; accept: Record<string, string[]> }[];
+      }) => Promise<FileHandleLike>;
+    };
+
     // Try modern native browser File System Access API (opens standard Windows "Save As" file dialog)
-    if ('showSaveFilePicker' in window) {
+    const pickerWindow = window as PickerWindow;
+    if (typeof pickerWindow.showSaveFilePicker === 'function') {
       try {
-        const handle = await (window as any).showSaveFilePicker({
+        const handle = await pickerWindow.showSaveFilePicker({
           suggestedName: `${cleanName}.nc`,
           types: [
             {
@@ -67,9 +101,9 @@ export const Header: React.FC = () => {
           setProjectName(savedName);
         }
         return;
-      } catch (err: any) {
+      } catch (err) {
         // If user clicked 'Cancel' in Windows dialog, do nothing
-        if (err.name === 'AbortError') {
+        if (err instanceof DOMException && err.name === 'AbortError') {
           return;
         }
         // Otherwise fall through to fallback
@@ -173,7 +207,7 @@ export const Header: React.FC = () => {
         <div className="flex items-center gap-0.5 bg-slate-100/90 p-1 rounded-xl border border-slate-200/90 shadow-inner">
           <button
             onClick={undo}
-            disabled={historyUndo.length === 0}
+            disabled={undoCount === 0}
             title="Отменить (Ctrl+Z)"
             className="p-2 rounded-lg text-slate-600 hover:text-slate-900 disabled:opacity-30 disabled:hover:text-slate-600 hover:bg-white transition-all"
           >
@@ -181,7 +215,7 @@ export const Header: React.FC = () => {
           </button>
           <button
             onClick={redo}
-            disabled={historyRedo.length === 0}
+            disabled={redoCount === 0}
             title="Повторить (Ctrl+Y)"
             className="p-2 rounded-lg text-slate-600 hover:text-slate-900 disabled:opacity-30 disabled:hover:text-slate-600 hover:bg-white transition-all"
           >

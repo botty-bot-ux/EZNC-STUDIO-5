@@ -8,13 +8,21 @@ import {
   CheckCircle2,
   Info,
 } from 'lucide-react';
+import { useShallow } from 'zustand/react/shallow';
 import { useProjectStore } from '../../store/useProjectStore';
 
 const WIDTH_OPTIONS = [884, 984, 1284, 1484, 1684, 1884, 2084];
 const HEIGHT_OPTIONS = [250, 370, 1084, 1124, 1204];
 
 export const MachineSettingsPanel: React.FC = () => {
-  const { machine, updateMachine, warnings, setSelectedObjectId } = useProjectStore();
+  const { machine, updateMachine, warnings, setSelectedObjectId } = useProjectStore(
+    useShallow((s) => ({
+      machine: s.machine,
+      updateMachine: s.updateMachine,
+      warnings: s.warnings,
+      setSelectedObjectId: s.setSelectedObjectId,
+    }))
+  );
 
   const stockSheet = machine.stockSheet || {
     enabled: true,
