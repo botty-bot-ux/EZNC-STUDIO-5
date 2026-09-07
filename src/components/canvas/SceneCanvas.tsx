@@ -775,14 +775,29 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
     // 3. Handle Dragging — update the live overlay only (no store writes per frame)
     if (dragMode !== 'none') {
       if (dragMode === 'object' && dragIds.length > 0) {
-        const dx = snapPt.x - dragStartWorldPt.x;
-        const dy = snapPt.y - dragStartWorldPt.y;
+        // Shift = вести перемещение строго по 90° (без 45°) относительно точки захвата.
+        const anchorPt = e.shiftKey
+          ? constrainAngle(dragStartWorldPt, snapPt, 90)
+          : snapPt;
+        const dx = anchorPt.x - dragStartWorldPt.x;
+        const dy = anchorPt.y - dragStartWorldPt.y;
         setLiveDrag({ mode: 'translate', dx, dy, ids: dragIds });
       } else if (selectedObjectId && dragObjInitial) {
-        if (dragMode === 'line_start') {
-          setLiveDrag({ mode: 'edit', id: selectedObjectId, patch: { startX: snapPt.x, startY: snapPt.y } });
-        } else if (dragMode === 'line_end') {
-          setLiveDrag({ mode: 'edit', id: selectedObjectId, patch: { endX: snapPt.x, endY: snapPt.y } });
+        if (dragMode === 'line_start' || dragMode === 'line_end') {
+          // Shift = 45°/90°, Ctrl = только 90° — относительно неподвижной второй точки линии.
+          let pt = snapPt;
+          if (dragObjInitial.type === 'line' && (e.shiftKey || e.ctrlKey)) {
+            const anchor =
+              dragMode === 'line_start'
+                ? { x: dragObjInitial.endX, y: dragObjInitial.endY }
+                : { x: dragObjInitial.startX, y: dragObjInitial.startY };
+            pt = constrainAngle(anchor, snapPt, e.shiftKey ? 45 : 90);
+          }
+          setLiveDrag(
+            dragMode === 'line_start'
+              ? { mode: 'edit', id: selectedObjectId, patch: { startX: pt.x, startY: pt.y } }
+              : { mode: 'edit', id: selectedObjectId, patch: { endX: pt.x, endY: pt.y } }
+          );
         } else if (dragObjInitial.type === 'arc') {
           const base = dragObjInitial;
           if (dragMode === 'arc_start') {
