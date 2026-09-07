@@ -46,3 +46,29 @@ export function formatNum(val: number, decimals: number = 3): string {
   return val.toFixed(decimals);
 }
 
+/**
+ * Constrains the segment from -> to so its direction snaps to the nearest multiple
+ * of stepDeg (default 45° => orthogonal 0/90° plus diagonals). The length (radius) is
+ * preserved, so it behaves like Shift in AutoCAD ORTHO / SolidWorks sketch polars.
+ * Returns the original point when it coincides with the anchor (nothing to snap).
+ */
+export function constrainAngle(
+  from: Point2D,
+  to: Point2D,
+  stepDeg: number = 45
+): Point2D {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const radius = Math.hypot(dx, dy);
+  if (radius < 1e-6) return to;
+
+  const step = (stepDeg * Math.PI) / 180;
+  const angle = Math.atan2(dy, dx);
+  const snapped = Math.round(angle / step) * step;
+
+  return {
+    x: from.x + radius * Math.cos(snapped),
+    y: from.y + radius * Math.sin(snapped),
+  };
+}
+

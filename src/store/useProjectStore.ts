@@ -40,6 +40,8 @@ interface ProjectStore {
   selectedObjectId: string | null;
   selectedObjectIds: string[];
   selectedOperationId: string | null;
+  // Which kind of entity the right-side Свойства inspector should render.
+  inspectorTarget: 'object' | 'operation' | 'tool';
   activeTool: ActiveTool;
   activeTab: ActiveTab;
   viewMode: ViewMode;
@@ -75,6 +77,7 @@ interface ProjectStore {
   toggleObjectSelection: (id: string) => void;
   selectAllObjects: () => void;
   setSelectedOperationId: (id: string | null) => void;
+  setInspectorTarget: (target: 'object' | 'operation' | 'tool') => void;
 
   updateMachine: (partial: Partial<MachineSettings>) => void;
 
@@ -212,6 +215,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
     selectedObjectId: null,
     selectedObjectIds: [],
     selectedOperationId: null,
+    inspectorTarget: 'object',
     activeTool: 'select',
     activeTab: 'gcode',
     viewMode: 'edit',
@@ -239,6 +243,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
     setActiveTab: (tab: ActiveTab) =>
       set((state) => ({
         activeTab: tab,
+        rightPanelOpen: tab === 'properties' ? true : state.rightPanelOpen,
         viewMode: tab === 'gcode' ? 'gcode' : state.viewMode === 'gcode' ? 'edit' : state.viewMode,
       })),
     setViewMode: (mode: ViewMode) =>
@@ -254,12 +259,14 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
       set({
         selectedObjectId: id,
         selectedObjectIds: id ? [id] : [],
+        inspectorTarget: 'object',
       }),
 
     setSelectedObjectIds: (ids: string[]) =>
       set({
         selectedObjectIds: ids,
         selectedObjectId: ids.length > 0 ? ids[ids.length - 1] : null,
+        inspectorTarget: 'object',
       }),
 
     toggleObjectSelection: (id: string) => {
@@ -269,6 +276,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
       set({
         selectedObjectIds: newIds,
         selectedObjectId: newIds.length > 0 ? newIds[newIds.length - 1] : null,
+        inspectorTarget: 'object',
       });
     },
 
@@ -277,13 +285,23 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
       set({
         selectedObjectIds: visibleIds,
         selectedObjectId: visibleIds.length > 0 ? visibleIds[visibleIds.length - 1] : null,
+        inspectorTarget: 'object',
       });
     },
 
     setSelectedOperationId: (id: string | null) =>
       set({
         selectedOperationId: id,
+        inspectorTarget: 'operation',
       }),
+
+    setInspectorTarget: (target: 'object' | 'operation' | 'tool') =>
+      set((state) => ({
+        inspectorTarget: target,
+        activeTab: 'properties',
+        rightPanelOpen: true,
+        viewMode: state.viewMode === 'gcode' ? 'edit' : state.viewMode,
+      })),
 
     updateMachine: (partial: Partial<MachineSettings>) => {
       pushHistory();
@@ -501,13 +519,26 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
       syncAndSave({
         operations: [...get().operations, op],
         selectedOperationId: op.id,
+        inspectorTarget: 'operation',
       });
     },
 
     updateOperation: (id: string, partial: Partial<OperationItem>) => {
       pushHistory();
       const newOps = get().operations.map((op) => (op.id === id ? { ...op, ...partial } : op));
-      syncAndSave({ operations: newOps });
+
+      // Keep hole depth in sync: the generator reads a point's own `depth` for drilling.
+      // Editing depth at the operation level must flow into the linked holes.
+      const merged = newOps.find((op) => op.id === id);
+      let payload: Partial<ProjectStore> = { operations: newOps };
+      if (merged && typeof partial.finalDepth === 'number' && merged.linkedObjectIds.length > 0) {
+        const linked = new Set(merged.linkedObjectIds);
+        const newObjs = get().objects.map((o) =>
+          linked.has(o.id) && o.type === 'point' ? ({ ...o, depth: partial.finalDepth } as CADObject) : o
+        );
+        payload = { operations: newOps, objects: newObjs };
+      }
+      syncAndSave(payload);
     },
 
     deleteOperation: (id: string) => {

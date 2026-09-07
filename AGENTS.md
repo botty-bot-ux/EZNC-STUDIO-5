@@ -1,6 +1,6 @@
 # AGENTS.md
 
-React 19 + Vite + TypeScript SPA ("ЧПУ CAD/CAM Редактор G-code") built as a Google AI Studio applet. Single page, no router.
+React 19 + Vite + TypeScript SPA ("ЧПУ CAD/CAM Редактор G-code для проостого раскроя дсп 16 и 32мм") .
 
 ## Commands
 - `npm run dev` — Vite dev server on port **3000**, host `0.0.0.0`.

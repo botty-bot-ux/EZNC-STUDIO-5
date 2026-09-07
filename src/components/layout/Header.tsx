@@ -34,6 +34,8 @@ export const Header: React.FC = () => {
     setActiveTab,
     activeTool,
     setActiveTool,
+    machine,
+    updateMachine,
   } = useProjectStore(
     useShallow((s) => ({
       projectName: s.projectName,
@@ -49,6 +51,8 @@ export const Header: React.FC = () => {
       setActiveTab: s.setActiveTab,
       activeTool: s.activeTool,
       setActiveTool: s.setActiveTool,
+      machine: s.machine,
+      updateMachine: s.updateMachine,
     }))
   );
 
@@ -136,10 +140,58 @@ export const Header: React.FC = () => {
   const errorCount = warnings.filter((w) => w.level === 'error').length;
   const warningCount = warnings.filter((w) => w.level === 'warning').length;
 
+  // Тип листа = выбор фрезы (один инструмент на лист).
+  const HEAD_PRESET = {
+    cutDepth: 17.5,
+    spindleSpeed: 18000,
+    feedCut: 2000,
+    feedPlunge: 700,
+    feedDrill: 700,
+    toolDiameter: 3.0,
+    stockSheet: { enabled: true, preset: 'custom', widthY: 1684, widthX: 1084, color: '#22c55e' },
+  };
+  const RAIL_PRESET = {
+    cutDepth: 33,
+    spindleSpeed: 15000,
+    feedCut: 700,
+    feedPlunge: 700,
+    feedDrill: 700,
+    toolDiameter: 8.0,
+    stockSheet: { enabled: true, preset: 'custom', widthY: 2084, widthX: 370, color: '#22c55e' },
+  };
+  const isRail = (machine.toolDiameter ?? 0) >= 5;
+  const applySheet = (rail: boolean) => {
+    updateMachine(rail ? RAIL_PRESET : HEAD_PRESET);
+    setActiveTool('select');
+    setActiveTab('machine');
+  };
+
   return (
     <header className="h-16 bg-gradient-to-b from-[#f8fafc] via-[#f8fafc]/95 via-70% to-transparent text-slate-800 flex items-center justify-between px-4 select-none shrink-0 z-20 gap-2">
       {/* Left section: Drawing Tools & Undo/Redo */}
       <div className="flex items-center gap-2">
+        {/* Тип листа = выбор фрезы (один инструмент на лист) */}
+        <div className="grid grid-cols-2 gap-1 bg-slate-100/90 p-1 rounded-xl border border-slate-200/90 shadow-inner">
+          <button
+            onClick={() => applySheet(false)}
+            title="Изголовье — фреза 3 мм (узор)"
+            className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
+              !isRail ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25' : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+            }`}
+          >
+            Изголовье Ø3
+          </button>
+          <button
+            onClick={() => applySheet(true)}
+            title="Царга боковая — фреза 8 мм"
+            className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
+              isRail ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25' : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+            }`}
+          >
+            Царга Ø8
+          </button>
+        </div>
+
         {/* Drawing Tools Toolbar */}
         <div className="flex items-center gap-1 bg-slate-100/90 p-1 rounded-xl border border-slate-200/90 shadow-inner">
           <button
@@ -154,21 +206,23 @@ export const Header: React.FC = () => {
             <MousePointer className="w-4 h-4" />
           </button>
 
-          <button
-            onClick={() => setActiveTool('point')}
-            title="Отверстие / Точка (H)"
-            className={`p-2 rounded-lg transition-all ${
-              activeTool === 'point'
-                ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
-            }`}
-          >
-            <CircleDot className={`w-4 h-4 ${activeTool === 'point' ? 'text-white' : 'text-purple-600'}`} />
-          </button>
+          {isRail && (
+            <button
+              onClick={() => setActiveTool('point')}
+              title="Отверстие / Точка (H)"
+              className={`p-2 rounded-lg transition-all ${
+                activeTool === 'point'
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+              }`}
+            >
+              <CircleDot className={`w-4 h-4 ${activeTool === 'point' ? 'text-white' : 'text-purple-600'}`} />
+            </button>
+          )}
 
           <button
             onClick={() => setActiveTool('line')}
-            title="Линия / Отрезок (L)"
+            title="Линия / Отрезок (L) · Shift = углы 90°/45°"
             className={`p-2 rounded-lg transition-all ${
               activeTool === 'line'
                 ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25'
@@ -178,17 +232,19 @@ export const Header: React.FC = () => {
             <TrendingUp className={`w-4 h-4 ${activeTool === 'line' ? 'text-white' : 'text-blue-600'}`} />
           </button>
 
-          <button
-            onClick={() => setActiveTool('arc')}
-            title="Дуга окружности (A)"
-            className={`p-2 rounded-lg transition-all ${
-              activeTool === 'arc'
-                ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
-            }`}
-          >
-            <Compass className={`w-4 h-4 ${activeTool === 'arc' ? 'text-white' : 'text-cyan-600'}`} />
-          </button>
+          {!isRail && (
+            <button
+              onClick={() => setActiveTool('arc')}
+              title="Дуга окружности (A) · Shift = хорда 90°/45°"
+              className={`p-2 rounded-lg transition-all ${
+                activeTool === 'arc'
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+              }`}
+            >
+              <Compass className={`w-4 h-4 ${activeTool === 'arc' ? 'text-white' : 'text-cyan-600'}`} />
+            </button>
+          )}
 
           <button
             onClick={() => setActiveTool('measure')}

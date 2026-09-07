@@ -1,9 +1,10 @@
 import React from 'react';
-import { ChevronRight, Code, Compass, Sliders } from 'lucide-react';
+import { ChevronRight, Code, Compass, Sliders, SlidersHorizontal } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useProjectStore } from '../../store/useProjectStore';
 import { MachineSettingsPanel } from './MachineSettingsPanel';
 import { GcodeEditor } from '../editor/GcodeEditor';
+import { PropertiesPanel } from './PropertiesPanel';
 
 export const RightSidebar: React.FC = () => {
   const { activeTab, setActiveTab, warnings, rightPanelOpen, toggleRightPanel } = useProjectStore(
@@ -45,12 +46,29 @@ export const RightSidebar: React.FC = () => {
           <ChevronRight className="w-4 h-4" />
         </button>
         <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-          {activeTab === 'gcode' ? 'Редактор G-кода' : 'Параметры станка'}
+          {activeTab === 'gcode'
+            ? 'Редактор G-кода'
+            : activeTab === 'properties'
+            ? 'Свойства'
+            : 'Параметры станка'}
         </span>
       </div>
 
       {/* Tabs bar */}
-      <div className="grid grid-cols-2 bg-slate-100/80 border-b border-slate-200/80 p-1 gap-1 text-[11px] font-semibold shrink-0">
+      <div className="grid grid-cols-3 bg-slate-100/80 border-b border-slate-200/80 p-1 gap-1 text-[11px] font-semibold shrink-0">
+        <button
+          onClick={() => setActiveTab('properties')}
+          title="Свойства выбранной фигуры"
+          className={`py-2 rounded-xl flex flex-col items-center justify-center gap-1 transition-all ${
+            activeTab === 'properties'
+              ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+          }`}
+        >
+          <SlidersHorizontal className="w-3.5 h-3.5" />
+          <span>Свойства</span>
+        </button>
+
         <button
           onClick={() => setActiveTab('gcode')}
           title="Редактор G-кода"
@@ -84,6 +102,7 @@ export const RightSidebar: React.FC = () => {
 
       {/* Tab content area */}
       <div className="flex-1 overflow-hidden bg-slate-50/40 min-h-0 flex flex-col">
+        {activeTab === 'properties' && <PropertiesPanel />}
         {activeTab === 'gcode' && <GcodeEditor />}
         {activeTab === 'machine' && <MachineSettingsPanel />}
       </div>

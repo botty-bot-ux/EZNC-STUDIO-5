@@ -28,6 +28,12 @@ import {
   canvasToWorld,
   getArcFrom3Points,
 } from './canvasUtils';
+import { constrainAngle } from '../../lib/geometry/transform';
+
+/** Point at distance `len` from `origin` along angle `ang` (radians). */
+function pointFromPolar(origin: Point2D, ang: number, len: number): Point2D {
+  return { x: origin.x + len * Math.cos(ang), y: origin.y + len * Math.sin(ang) };
+}
 
 interface SceneCanvasProps {
   onCursorMove?: (pt: Point2D | null) => void;
@@ -159,6 +165,45 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
   const [measureStartPt, setMeasureStartPt] = useState<Point2D | null>(null);
   const [measureEndPt, setMeasureEndPt] = useState<Point2D | null>(null);
 
+  // Dynamic distance input (DYN) shared by the line tool and the arc's start→end
+  // chord: type a distance, press Enter to place the point at that length.
+  const [lineLengthInput, setLineLengthInput] = useState<string>('');
+  const [lineDirAngle, setLineDirAngle] = useState<number>(0);
+
+  // Latest drawing state/functions for the window keydown handler (avoids stale closures)
+  const drawStateRef = useRef({
+    activeTool,
+    drawStartPt,
+    drawArcStartPt,
+    drawArcEndPt,
+    lineLengthInput,
+    lineDirAngle,
+  });
+  drawStateRef.current = {
+    activeTool,
+    drawStartPt,
+    drawArcStartPt,
+    drawArcEndPt,
+    lineLengthInput,
+    lineDirAngle,
+  };
+  const finishLineRef = useRef<(end: Point2D) => void>(() => {});
+  finishLineRef.current = (end: Point2D) => {
+    if (!drawStartPt) return;
+    addObject({
+      name: `Отрезок ${objects.length + 1}`,
+      type: 'line',
+      startX: drawStartPt.x,
+      startY: drawStartPt.y,
+      endX: end.x,
+      endY: end.y,
+      depth: 5,
+      operationType: 'cut',
+    });
+    setDrawStartPt(null);
+    setLineLengthInput('');
+  };
+
   useEffect(() => {
     if (activeTool !== 'measure') {
       setMeasureStartPt(null);
@@ -237,6 +282,48 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
       const key = e.key.toLowerCase();
       const code = e.code;
 
+      // ---- Dynamic distance input while a line / arc chord's first point is placed ----
+      const ds = drawStateRef.current;
+      const dynAnchor =
+        ds.activeTool === 'line'
+          ? ds.drawStartPt
+          : ds.activeTool === 'arc' && !ds.drawArcEndPt
+          ? ds.drawArcStartPt
+          : null;
+      if (dynAnchor) {
+        const isDigit = e.key >= '0' && e.key <= '9';
+        const isDecimal = e.key === '.' || e.key === ',';
+        if (isDigit || (isDecimal && !ds.lineLengthInput.includes('.'))) {
+          e.preventDefault();
+          setLineLengthInput((prev) => (prev + (isDecimal ? '.' : e.key)).slice(0, 12));
+          return;
+        }
+        if (e.key === 'Backspace' && ds.lineLengthInput.length > 0) {
+          e.preventDefault();
+          setLineLengthInput((prev) => prev.slice(0, -1));
+          return;
+        }
+        if (e.key === 'Enter') {
+          const L = parseFloat(ds.lineLengthInput);
+          if (L > 0) {
+            e.preventDefault();
+            const end = pointFromPolar(dynAnchor, ds.lineDirAngle, L);
+            if (ds.activeTool === 'arc') {
+              setDrawArcEndPt(end);
+              setLineLengthInput('');
+            } else {
+              finishLineRef.current(end);
+            }
+            return;
+          }
+        }
+        if (e.key === 'Escape' && ds.lineLengthInput.length > 0) {
+          e.preventDefault();
+          setLineLengthInput('');
+          return;
+        }
+      }
+
       if (e.key === 'Escape') {
         cancelDrawing();
         setActiveTool('select');
@@ -273,6 +360,7 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
     setDrawStartPt(null);
     setDrawArcStartPt(null);
     setDrawArcEndPt(null);
+    setLineLengthInput('');
     setMeasureStartPt(null);
     setMeasureEndPt(null);
     setSelectionBoxStart(null);
@@ -424,18 +512,20 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
     if (activeTool === 'line') {
       if (!drawStartPt) {
         setDrawStartPt(snapPt);
+        setLineLengthInput('');
+        setLineDirAngle(0);
       } else {
-        addObject({
-          name: `Отрезок ${objects.length + 1}`,
-          type: 'line',
-          startX: drawStartPt.x,
-          startY: drawStartPt.y,
-          endX: snapPt.x,
-          endY: snapPt.y,
-          depth: 5,
-          operationType: 'cut',
-        });
-        setDrawStartPt(null);
+        // Priority: typed length > Shift-ortho/45° > free magnetic point.
+        const L = parseFloat(lineLengthInput);
+        let end: Point2D;
+        if (L > 0) {
+          end = pointFromPolar(drawStartPt, lineDirAngle, L);
+        } else if (e.shiftKey) {
+          end = constrainAngle(drawStartPt, snapPt, 45);
+        } else {
+          end = snapPt;
+        }
+        finishLineRef.current(end);
       }
       return;
     }
@@ -490,8 +580,21 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
     if (activeTool === 'arc') {
       if (!drawArcStartPt) {
         setDrawArcStartPt(snapPt);
+        setLineLengthInput('');
+        setLineDirAngle(0);
       } else if (!drawArcEndPt) {
-        setDrawArcEndPt(snapPt);
+        // End of chord: priority typed length > Shift-ortho/45° > free magnetic point.
+        const L = parseFloat(lineLengthInput);
+        let end: Point2D;
+        if (L > 0) {
+          end = pointFromPolar(drawArcStartPt, lineDirAngle, L);
+        } else if (e.shiftKey) {
+          end = constrainAngle(drawArcStartPt, snapPt, 45);
+        } else {
+          end = snapPt;
+        }
+        setDrawArcEndPt(end);
+        setLineLengthInput('');
       } else {
         const arcData = getArcFrom3Points(drawArcStartPt, drawArcEndPt, snapPt);
         addObject({
@@ -620,8 +723,31 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
       machine
     );
     setActiveSnapInfo(snapInfo);
-    setCurrentMouseProgPt(snapPt);
-    onCursorMove?.(snapPt);
+
+    // Rubber-band for the line and the arc's start→end chord: track direction,
+    // honour Shift 45°-polars, and reflect a typed distance live in the preview.
+    let previewPt = snapPt;
+    const dynAnchor =
+      activeTool === 'line'
+        ? drawStartPt
+        : activeTool === 'arc' && drawArcStartPt && !drawArcEndPt
+        ? drawArcStartPt
+        : null;
+    if (dynAnchor) {
+      let ang = Math.atan2(snapPt.y - dynAnchor.y, snapPt.x - dynAnchor.x);
+      if (e.shiftKey) {
+        const constrained = constrainAngle(dynAnchor, snapPt, 45);
+        ang = Math.atan2(constrained.y - dynAnchor.y, constrained.x - dynAnchor.x);
+        previewPt = constrained;
+      }
+      setLineDirAngle(ang);
+      const L = parseFloat(lineLengthInput);
+      if (L > 0) {
+        previewPt = pointFromPolar(dynAnchor, ang, L);
+      }
+    }
+    setCurrentMouseProgPt(previewPt);
+    onCursorMove?.(previewPt);
 
     // 3. Handle Dragging — update the live overlay only (no store writes per frame)
     if (dragMode !== 'none') {
@@ -772,6 +898,7 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
         drawArcEndPt={drawArcEndPt}
         measureStartPt={measureStartPt}
         measureEndPt={measureEndPt}
+        lineLengthInput={lineLengthInput}
         dragMode={dragMode}
         dragTargetObj={selectedObj}
         currentMouseProgPt={currentMouseProgPt}

@@ -43,60 +43,6 @@ export const MachineSettingsPanel: React.FC = () => {
     ? HEIGHT_OPTIONS
     : [heightVal, ...HEIGHT_OPTIONS].sort((a, b) => a - b);
 
-  const isPreset3 =
-    machine.cutDepth === 17.5 &&
-    stockSheet.widthY === 1684 &&
-    stockSheet.widthX === 1084 &&
-    machine.spindleSpeed === 18000 &&
-    machine.feedCut === 2000 &&
-    machine.feedPlunge === 700 &&
-    machine.feedDrill === 700;
-
-  const isPreset8 =
-    machine.cutDepth === 33 &&
-    stockSheet.widthY === 2084 &&
-    stockSheet.widthX === 370 &&
-    machine.spindleSpeed === 15000 &&
-    machine.feedCut === 700 &&
-    machine.feedPlunge === 700 &&
-    machine.feedDrill === 700;
-
-  const applyPreset3 = () => {
-    updateMachine({
-      cutDepth: 17.5,
-      spindleSpeed: 18000,
-      feedCut: 2000,
-      feedPlunge: 700,
-      feedDrill: 700,
-      toolDiameter: 3.0,
-      stockSheet: {
-        enabled: true,
-        preset: 'custom',
-        widthY: 1684,
-        widthX: 1084,
-        color: '#22c55e',
-      },
-    });
-  };
-
-  const applyPreset8 = () => {
-    updateMachine({
-      cutDepth: 33,
-      spindleSpeed: 15000,
-      feedCut: 700,
-      feedPlunge: 700,
-      feedDrill: 700,
-      toolDiameter: 8.0,
-      stockSheet: {
-        enabled: true,
-        preset: 'custom',
-        widthY: 2084,
-        widthX: 370,
-        color: '#22c55e',
-      },
-    });
-  };
-
   const errors = warnings.filter((w) => w.level === 'error');
   const warnList = warnings.filter((w) => w.level === 'warning');
   const infos = warnings.filter((w) => w.level === 'info');
@@ -198,32 +144,6 @@ export const MachineSettingsPanel: React.FC = () => {
           <Wrench className="w-3.5 h-3.5 text-amber-600" />
           Инструмент и режимы
         </span>
-
-        {/* Быстрые шаблоны */}
-        <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-100/80 rounded-lg">
-          <button
-            type="button"
-            onClick={applyPreset3}
-            className={`py-1.5 px-2 rounded-md font-bold text-xs transition-all cursor-pointer ${
-              isPreset3
-                ? 'bg-emerald-600 text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
-            }`}
-          >
-            Фреза 3 мм
-          </button>
-          <button
-            type="button"
-            onClick={applyPreset8}
-            className={`py-1.5 px-2 rounded-md font-bold text-xs transition-all cursor-pointer ${
-              isPreset8
-                ? 'bg-emerald-600 text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
-            }`}
-          >
-            Фреза 8 мм
-          </button>
-        </div>
 
         {/* Диаметр фрезы */}
         <div className="pt-1">
