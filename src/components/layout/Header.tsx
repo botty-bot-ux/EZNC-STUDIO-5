@@ -151,7 +151,7 @@ export const Header: React.FC = () => {
     stockSheet: { enabled: true, preset: 'custom', widthY: 1681, widthX: 1081, color: '#22c55e' },
   };
   const RAIL_PRESET = {
-    cutDepth: 33,
+    cutDepth: 33.5,
     spindleSpeed: 15000,
     feedCut: 700,
     feedPlunge: 700,

@@ -169,10 +169,12 @@ export function generateGcode(
 
     const linkedOp = operations.find((op) => op.enabled && op.linkedObjectIds.includes(obj.id));
 
-    const opFeedCut = linkedOp?.feedCut || machine.feedCut || 1000;
-    const opFeedPlunge = linkedOp?.feedPlunge || machine.feedPlunge || 300;
-    const opFeedDrill = linkedOp?.feedDrill || machine.feedDrill || 500;
-    const totalDepth = Math.abs(linkedOp?.finalDepth ?? machine.cutDepth ?? obj.depth ?? 5);
+    const opFeedCut = machine.feedCut || linkedOp?.feedCut || 1000;
+    const opFeedPlunge = machine.feedPlunge || linkedOp?.feedPlunge || 300;
+    const opFeedDrill = machine.feedDrill || linkedOp?.feedDrill || 500;
+    // Глубина реза = пресет листа (cutDepth), затем своя глубина фигуры, затем 5.
+    // finalDepth устаревших операций НЕ перекрывает выбор листа (иначе Z не меняется при смене режима).
+    const totalDepth = Math.abs(machine.cutDepth ?? obj.depth ?? 5);
 
     // Single pass directly to total depth (1 проход)
     const zPasses: number[] = [-totalDepth];
