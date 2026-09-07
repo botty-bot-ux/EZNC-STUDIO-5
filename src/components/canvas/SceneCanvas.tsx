@@ -110,6 +110,8 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
     snapToGrid,
     setSnapToGrid,
     gridStep,
+    setLiveEdit,
+    setLiveMeasure,
   } = useProjectStore(
     useShallow((s) => ({
       objects: s.objects,
@@ -131,6 +133,8 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
       snapToGrid: s.snapToGrid,
       setSnapToGrid: s.setSnapToGrid,
       gridStep: s.gridStep,
+      setLiveEdit: s.setLiveEdit,
+      setLiveMeasure: s.setLiveMeasure,
     }))
   );
 
@@ -210,6 +214,23 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
       setMeasureEndPt(null);
     }
   }, [activeTool]);
+
+  // Mirror the transient vertex-edit drag into the store so the Свойства panel shows the
+  // live coordinates while a handle is dragged (store objects stay untouched until mouseup).
+  useEffect(() => {
+    setLiveEdit(liveDrag.mode === 'edit' ? { id: liveDrag.id, patch: liveDrag.patch } : null);
+  }, [liveDrag, setLiveEdit]);
+
+  // Mirror the ruler into the store so the Свойства panel shows a live readout instead of
+  // a floating window.
+  useEffect(() => {
+    if (activeTool === 'measure' && measureStartPt) {
+      const end = measureEndPt ?? currentMouseProgPt;
+      setLiveMeasure(end ? { start: measureStartPt, end } : null);
+    } else {
+      setLiveMeasure(null);
+    }
+  }, [activeTool, measureStartPt, measureEndPt, currentMouseProgPt, setLiveMeasure]);
 
   // Geometry actually drawn on the canvas: store objects with the uncommitted drag
   // overlaid. This keeps the store untouched during pointer-move (no per-frame G-code
@@ -370,6 +391,8 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
     setDragIds([]);
     setDragObjInitial(null);
     setActiveSnapInfo(null);
+    setLiveEdit(null);
+    setLiveMeasure(null);
   };
 
   // Main canvas render loop
@@ -877,8 +900,6 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
     setPan({ x: newPanX, y: newPanY });
   };
 
-  const selectedObj = displayObjects.find((o) => o.id === selectedObjectId);
-
   return (
     <div ref={containerRef} className="relative w-full h-full bg-[#f1f5f9] overflow-hidden select-none">
       <canvas
@@ -899,9 +920,6 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
         measureStartPt={measureStartPt}
         measureEndPt={measureEndPt}
         lineLengthInput={lineLengthInput}
-        dragMode={dragMode}
-        dragTargetObj={selectedObj}
-        currentMouseProgPt={currentMouseProgPt}
         onCancelDraw={cancelDrawing}
       />
 

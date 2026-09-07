@@ -148,7 +148,7 @@ export const Header: React.FC = () => {
     feedPlunge: 700,
     feedDrill: 700,
     toolDiameter: 3.0,
-    stockSheet: { enabled: true, preset: 'custom', widthY: 1684, widthX: 1084, color: '#22c55e' },
+    stockSheet: { enabled: true, preset: 'custom', widthY: 1681, widthX: 1081, color: '#22c55e' },
   };
   const RAIL_PRESET = {
     cutDepth: 33,
@@ -157,7 +157,7 @@ export const Header: React.FC = () => {
     feedPlunge: 700,
     feedDrill: 700,
     toolDiameter: 8.0,
-    stockSheet: { enabled: true, preset: 'custom', widthY: 2084, widthX: 370, color: '#22c55e' },
+    stockSheet: { enabled: true, preset: 'custom', widthY: 2080, widthX: 360, color: '#22c55e' },
   };
   const isRail = (machine.toolDiameter ?? 0) >= 5;
   const applySheet = (rail: boolean) => {

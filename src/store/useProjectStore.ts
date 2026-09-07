@@ -6,6 +6,7 @@ import {
   MachineSettings,
   NewCADObjectInput,
   OperationItem,
+  Point2D,
   PostprocessorTemplates,
   ProjectData,
   ToolpathSegment,
@@ -42,6 +43,10 @@ interface ProjectStore {
   selectedOperationId: string | null;
   // Which kind of entity the right-side Свойства inspector should render.
   inspectorTarget: 'object' | 'operation' | 'tool';
+  // Transient interaction state surfaced to the Свойства panel during a drag / measure.
+  // Kept out of `objects` so it never triggers history, autosave or G-code regen.
+  liveEdit: { id: string; patch: Partial<CADObject> } | null;
+  liveMeasure: { start: Point2D; end: Point2D } | null;
   activeTool: ActiveTool;
   activeTab: ActiveTab;
   viewMode: ViewMode;
@@ -78,6 +83,8 @@ interface ProjectStore {
   selectAllObjects: () => void;
   setSelectedOperationId: (id: string | null) => void;
   setInspectorTarget: (target: 'object' | 'operation' | 'tool') => void;
+  setLiveEdit: (v: { id: string; patch: Partial<CADObject> } | null) => void;
+  setLiveMeasure: (v: { start: Point2D; end: Point2D } | null) => void;
 
   updateMachine: (partial: Partial<MachineSettings>) => void;
 
@@ -216,6 +223,8 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
     selectedObjectIds: [],
     selectedOperationId: null,
     inspectorTarget: 'object',
+    liveEdit: null,
+    liveMeasure: null,
     activeTool: 'select',
     activeTab: 'gcode',
     viewMode: 'edit',
@@ -239,7 +248,13 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
 
     setProjectName: (name: string) => syncAndSave({ projectName: name }),
 
-    setActiveTool: (tool: ActiveTool) => set({ activeTool: tool }),
+    setActiveTool: (tool: ActiveTool) =>
+      set((state) => ({
+        activeTool: tool,
+        ...(tool === 'measure'
+          ? { activeTab: 'properties' as ActiveTab, rightPanelOpen: true, viewMode: state.viewMode === 'gcode' ? 'edit' : state.viewMode }
+          : {}),
+      })),
     setActiveTab: (tab: ActiveTab) =>
       set((state) => ({
         activeTab: tab,
@@ -256,18 +271,24 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
     setGridStep: (step: number) => set({ gridStep: step }),
 
     setSelectedObjectId: (id: string | null) =>
-      set({
+      set((state) => ({
         selectedObjectId: id,
         selectedObjectIds: id ? [id] : [],
         inspectorTarget: 'object',
-      }),
+        ...(id
+          ? { activeTab: 'properties' as ActiveTab, rightPanelOpen: true, viewMode: state.viewMode === 'gcode' ? 'edit' : state.viewMode }
+          : {}),
+      })),
 
     setSelectedObjectIds: (ids: string[]) =>
-      set({
+      set((state) => ({
         selectedObjectIds: ids,
         selectedObjectId: ids.length > 0 ? ids[ids.length - 1] : null,
         inspectorTarget: 'object',
-      }),
+        ...(ids.length > 0
+          ? { activeTab: 'properties' as ActiveTab, rightPanelOpen: true, viewMode: state.viewMode === 'gcode' ? 'edit' : state.viewMode }
+          : {}),
+      })),
 
     toggleObjectSelection: (id: string) => {
       const cur = get().selectedObjectIds;
@@ -277,6 +298,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
         selectedObjectIds: newIds,
         selectedObjectId: newIds.length > 0 ? newIds[newIds.length - 1] : null,
         inspectorTarget: 'object',
+        ...(newIds.length > 0 ? { activeTab: 'properties' as ActiveTab, rightPanelOpen: true } : {}),
       });
     },
 
@@ -302,6 +324,9 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
         rightPanelOpen: true,
         viewMode: state.viewMode === 'gcode' ? 'edit' : state.viewMode,
       })),
+
+    setLiveEdit: (v) => set({ liveEdit: v }),
+    setLiveMeasure: (v) => set({ liveMeasure: v }),
 
     updateMachine: (partial: Partial<MachineSettings>) => {
       pushHistory();

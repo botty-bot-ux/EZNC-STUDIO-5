@@ -13,9 +13,9 @@ export const INITIAL_MACHINE: MachineSettings = {
   },
   stockSheet: {
     enabled: true,
-    preset: '1000x1000',
-    widthX: 1000,
-    widthY: 1000,
+    preset: 'custom',
+    widthX: 1081,
+    widthY: 1681,
     color: '#f59e0b',
   },
   workOffset: {

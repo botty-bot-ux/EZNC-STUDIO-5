@@ -11,8 +11,9 @@ import {
 import { useShallow } from 'zustand/react/shallow';
 import { useProjectStore } from '../../store/useProjectStore';
 
-const WIDTH_OPTIONS = [884, 984, 1284, 1484, 1684, 1884, 2084];
-const HEIGHT_OPTIONS = [250, 370, 1084, 1124, 1204];
+const WIDTH_OPTIONS = [881, 981, 1281, 1481, 1681, 1881, 2081];
+const HEIGHT_OPTIONS = [250, 360, 1081, 1121, 1201];
+const HEIGHT_LABELS: Record<number, string> = { 250: 'парящая', 360: 'царга' };
 
 export const MachineSettingsPanel: React.FC = () => {
   const { machine, updateMachine, warnings, setSelectedObjectId } = useProjectStore(
@@ -26,9 +27,9 @@ export const MachineSettingsPanel: React.FC = () => {
 
   const stockSheet = machine.stockSheet || {
     enabled: true,
-    preset: '1000x1000',
-    widthX: 1000,
-    widthY: 1000,
+    preset: 'custom',
+    widthX: 1081,
+    widthY: 1681,
     color: '#22c55e',
   };
 
@@ -129,7 +130,7 @@ export const MachineSettingsPanel: React.FC = () => {
               >
                 {heightOptions.map((h) => (
                   <option key={h} value={h}>
-                    {h} мм
+                    {h} мм{HEIGHT_LABELS[h] ? ` (${HEIGHT_LABELS[h]})` : ''}
                   </option>
                 ))}
               </select>

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Circle, CircleDot, Compass, Layers, Sliders, Square, Trash2, TrendingUp } from 'lucide-react';
+import { Circle, CircleDot, Compass, Layers, Ruler, Sliders, Square, Trash2, TrendingUp } from 'lucide-react';
 import { useProjectStore } from '../../store/useProjectStore';
 import { ArcObject, CircleObject, LineObject, PointHoleObject, RectangleObject } from '../../types';
 import { ArcProperties } from './properties/ArcProperties';
@@ -17,7 +17,62 @@ export const PropertiesPanel: React.FC = () => {
     updateSelectedObjects,
     deleteObject,
     deleteSelectedObjects,
+    activeTool,
+    liveEdit,
+    liveMeasure,
   } = useProjectStore();
+
+  // ── Линейка / штангенциркуль: живой замер вместо плавающего окна ──
+  if (activeTool === 'measure') {
+    let body: React.ReactNode;
+    if (liveMeasure) {
+      const dx = liveMeasure.end.x - liveMeasure.start.x;
+      const dy = liveMeasure.end.y - liveMeasure.start.y;
+      const len = Math.hypot(dx, dy);
+      const angleDeg = ((Math.atan2(dy, dx) * 180) / Math.PI + 360) % 360;
+      body = (
+        <div className="space-y-3">
+          <div>
+            <span className="text-[10px] uppercase tracking-wide font-bold text-slate-400">Расстояние</span>
+            <div className="font-mono text-3xl font-bold text-slate-800">
+              {len.toFixed(3)} <span className="text-sm font-normal text-slate-400">мм</span>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="bg-slate-100/70 border border-slate-200/80 rounded-lg px-2.5 py-1.5">
+              <span className="text-[10px] uppercase tracking-wide text-slate-400 block">dX</span>
+              <span className="font-mono text-sm font-bold text-slate-700">{dx >= 0 ? '+' : ''}{dx.toFixed(2)}</span>
+            </div>
+            <div className="bg-slate-100/70 border border-slate-200/80 rounded-lg px-2.5 py-1.5">
+              <span className="text-[10px] uppercase tracking-wide text-slate-400 block">dY</span>
+              <span className="font-mono text-sm font-bold text-slate-700">{dy >= 0 ? '+' : ''}{dy.toFixed(2)}</span>
+            </div>
+          </div>
+          <div className="flex items-center justify-between bg-slate-100/70 border border-slate-200/80 rounded-lg px-2.5 py-1.5">
+            <span className="text-[10px] uppercase tracking-wide text-slate-400">Угол</span>
+            <span className="font-mono text-sm font-bold text-slate-700">{angleDeg.toFixed(1)}°</span>
+          </div>
+          <p className="text-[11px] text-slate-400">
+            {liveMeasure.end.x === liveMeasure.start.x && liveMeasure.end.y === liveMeasure.start.y
+              ? 'Укажите вторую точку на холсте.'
+              : 'Значения обновляются на лету.'}
+          </p>
+        </div>
+      );
+    } else {
+      body = <p className="text-[11px] text-slate-400">Укажите первую точку линейки на холсте.</p>;
+    }
+
+    return (
+      <div className="p-4 space-y-3 text-xs text-slate-800 overflow-y-auto h-full select-none">
+        <div className="flex items-center gap-2 pb-2 border-b border-slate-200/80">
+          <Ruler className="w-4 h-4 text-blue-600" />
+          <span className="font-bold text-sm text-slate-800">Линейка</span>
+        </div>
+        {body}
+      </div>
+    );
+  }
 
   const selectedObjs = objects.filter((o) => selectedObjectIds.includes(o.id));
 
@@ -79,9 +134,9 @@ export const PropertiesPanel: React.FC = () => {
     );
   }
 
-  const selectedObj = objects.find((o) => o.id === selectedObjectId);
+  const committedObj = objects.find((o) => o.id === selectedObjectId);
 
-  if (!selectedObj) {
+  if (!committedObj) {
     return (
       <div className="p-6 text-center text-slate-500 text-xs flex flex-col items-center justify-center h-full gap-2 select-none">
         <Sliders className="w-8 h-8 opacity-40 text-slate-400" />
@@ -89,6 +144,23 @@ export const PropertiesPanel: React.FC = () => {
       </div>
     );
   }
+
+  // Overlay the live drag patch so the coordinate fields track the cursor while a
+  // vertex handle is being dragged (the store commits only on mouseup).
+  const selectedObj =
+    liveEdit && liveEdit.id === committedObj.id
+      ? ({ ...committedObj, ...liveEdit.patch } as typeof committedObj)
+      : committedObj;
+
+  const lineInfo =
+    selectedObj.type === 'line'
+      ? (() => {
+          const l = selectedObj as LineObject;
+          const len = Math.hypot(l.endX - l.startX, l.endY - l.startY);
+          const angleDeg = ((Math.atan2(l.endY - l.startY, l.endX - l.startX) * 180) / Math.PI + 360) % 360;
+          return { len, angleDeg };
+        })()
+      : null;
 
   return (
     <div className="p-4 space-y-4 text-xs text-slate-800 overflow-y-auto h-full select-none">
@@ -133,6 +205,17 @@ export const PropertiesPanel: React.FC = () => {
             className="rounded border-slate-300 bg-white text-blue-600 focus:ring-0 cursor-pointer w-4 h-4"
           />
         </div>
+
+        {/* Live length / angle readout for a segment */}
+        {lineInfo && (
+          <div className="flex items-center justify-between p-2.5 rounded-xl bg-amber-50/70 border border-amber-200/80 font-mono text-xs">
+            <span className="text-slate-500">Длина</span>
+            <span className="font-bold text-amber-700">{lineInfo.len.toFixed(2)} мм</span>
+            <span className="text-slate-300">|</span>
+            <span className="text-slate-500">Угол</span>
+            <span className="font-bold text-sky-700">{lineInfo.angleDeg.toFixed(1)}°</span>
+          </div>
+        )}
 
         {/* Specialized properties by shape type */}
         {selectedObj.type === 'point' && (
