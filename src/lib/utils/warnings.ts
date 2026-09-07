@@ -4,7 +4,7 @@ import { isPointWithinBounds, transformProgramToMachine } from '../geometry/tran
 
 export function analyzeProjectWarnings(
   objects: CADObject[],
-  operations: OperationItem[],
+  _operations: OperationItem[],
   machine: MachineSettings
 ): WarningItem[] {
   const warnings: WarningItem[] = [];
@@ -101,27 +101,9 @@ export function analyzeProjectWarnings(
     }
   }
 
-  // 3. Operations checks
-  const activeOps = operations.filter((op) => op.enabled);
-  for (const op of activeOps) {
-    if (op.linkedObjectIds.length === 0) {
-      warnings.push({
-        id: `warn_op_empty_${op.id}`,
-        level: 'warning',
-        title: `Пустая операция: ${op.name}`,
-        message: `Операция "${op.name}" включена, но к ней не привязан ни один объект.`,
-      });
-    }
-
-    if (op.finalDepth === 0) {
-      warnings.push({
-        id: `warn_op_depth_${op.id}`,
-        level: 'warning',
-        title: `Нулевая глубина: ${op.name}`,
-        message: `Операция "${op.name}" имеет глубину 0 мм. Резка не будет заглубляться.`,
-      });
-    }
-  }
+  // Операции больше не редактируются в UI (G-код строится по объектам, лист-пресет
+  // задаёт инструмент) — проверки операций убраны, чтобы не показывать неустраняемые
+  // предупреждения вроде «Пустая операция».
 
   return warnings;
 }
