@@ -345,7 +345,8 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
       if (!currentObjs || currentObjs.length === 0) return null;
 
       pushHistory();
-      const res = optimizeCADObjects(currentObjs, { x: 0, y: 0 });
+      const off = get().machine.workOffset;
+      const res = optimizeCADObjects(currentObjs, { x: -off.x, y: -off.y });
 
       // Sync operations linkedObjectIds order with new object order
       const newObjOrderMap = new Map<string, number>();

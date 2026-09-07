@@ -140,13 +140,16 @@ export function optimizeCADObjects(
 
   // Сохраняем "эталонные" данные для статистики ДО оптимизации
   const originalIds = visibleObjects.map((o) => o.id);
+  const originalStartById = new Map<string, Point2D>();
+  for (const o of visibleObjects) {
+    originalStartById.set(o.id, getObjectEndpoints(o).start);
+  }
 
   // ===== ШАГ 1: Жадный ближайший сосед =====
   // Используем Set вместо splice — O(1) удаление против O(n)
   const pool = new Set(cloneObjects(visibleObjects));
   const resultList: CADObject[] = [];
   let currentPos = { ...startPos };
-  let greedyFlipped = 0;
 
   let lastProgressUpdate = 0;
   const totalObjects = pool.size;
@@ -180,7 +183,6 @@ export function optimizeCADObjects(
       pool.delete(bestObj);
       if (shouldFlip) {
         bestObj = flipObject(bestObj);
-        greedyFlipped++;
       }
       resultList.push(bestObj);
       currentPos = { ...getObjectEndpoints(bestObj).end };
@@ -194,7 +196,6 @@ export function optimizeCADObjects(
   }
 
   // ===== ШАГ 2: 2-Opt refinement =====
-  let optFlipped = 0;
   let improved = true;
   let passes = 0;
 
@@ -207,30 +208,18 @@ export function optimizeCADObjects(
 
       for (let j = i + 1; j <= jMax; j++) {
         const prevEnd = i === 0 ? startPos : getObjectEndpoints(resultList[i - 1]).end;
-        const currentDist = calculateSubsegmentDist(resultList, i, j, prevEnd);
+        const nextStart =
+          j + 1 < resultList.length ? getObjectEndpoints(resultList[j + 1]).start : null;
 
-        // Пробуем реверс + переворот каждого объекта
-        const reversedSub = resultList
-          .slice(i, j + 1)
-          .reverse()
-          .map((o) => {
-            const flipped = flipObject(o);
-            if (flipped !== o) optFlipped++;
-            return flipped;
-          });
+        const currentCost = segmentChainCost(resultList.slice(i, j + 1), false, prevEnd, nextStart);
+        const reversedCost = segmentChainCost(resultList.slice(i, j + 1), true, prevEnd, nextStart);
 
-        const testList = [
-          ...resultList.slice(0, i),
-          ...reversedSub,
-          ...resultList.slice(j + 1),
-        ];
-
-        const newDist = calculateSubsegmentDist(testList, i, j, prevEnd);
-
-        if (newDist < currentDist - cfg.improvementThreshold) {
-          for (let k = 0; k < reversedSub.length; k++) {
-            resultList[i + k] = reversedSub[k];
-          }
+        if (reversedCost < currentCost - cfg.improvementThreshold) {
+          const seg = resultList
+            .slice(i, j + 1)
+            .reverse()
+            .map((o) => flipObject(o));
+          for (let k = 0; k < seg.length; k++) resultList[i + k] = seg[k];
           improved = true;
         }
       }
@@ -246,8 +235,15 @@ export function optimizeCADObjects(
   const newIds = resultList.map((o) => o.id);
   const reorderedCount = totalObjects - longestCommonSubsequenceLength(originalIds, newIds);
 
-  // flippedCount — учитываем перевороты и в greedy, и в 2-opt
-  const flippedCount = greedyFlipped + optFlipped;
+  // flippedCount — сколько объектов реально сменили ориентацию (было → стало)
+  let flippedCount = 0;
+  for (const o of resultList) {
+    const origStart = originalStartById.get(o.id);
+    if (!origStart) continue;
+    const nowStart = getObjectEndpoints(o).start;
+    if (!isFinitePoint(origStart) || !isFinitePoint(nowStart)) continue;
+    if (euclideanDistance(nowStart, origStart) > 1e-6) flippedCount++;
+  }
 
   const elapsedMs = performance.now() - startTime;
   const estimatedTimeSavedSec = savedDistance / cfg.rapidSpeedMmPerSec;
@@ -288,27 +284,36 @@ function calculateTotalRapidDistance(
   return total;
 }
 
-function calculateSubsegmentDist(
-  list: CADObject[],
-  fromIdx: number,
-  toIdx: number,
-  prevEndPos: Point2D
+// Чистовая «цепочка» стоимости сегмента: вход из prevEnd + обход сегмента + выход к nextStart.
+// reversed=true считает вариант «развернуть сегмент и перевернуть каждый объект»,
+// не создавая новых массивов — только индексы.
+function segmentChainCost(
+  seg: CADObject[],
+  reversed: boolean,
+  prevEnd: Point2D,
+  nextStart: Point2D | null
 ): number {
-  let dist = 0;
-  let pos = { ...prevEndPos };
+  const len = seg.length;
+  const at = (k: number): CADObject => (reversed ? seg[len - 1 - k] : seg[k]);
+  // При реверсе ориентация объекта инвертируется → меняем местами start/end локально.
+  const endpoints = (obj: CADObject): { start: Point2D; end: Point2D } => {
+    const e = getObjectEndpoints(obj);
+    return reversed ? { start: e.end, end: e.start } : e;
+  };
 
-  for (let k = fromIdx; k <= toIdx; k++) {
-    const { start, end } = getObjectEndpoints(list[k]);
-    dist += euclideanDistance(pos, start);
-    pos = { ...end };
+  let cost = 0;
+  let pos = prevEnd;
+  for (let k = 0; k < len; k++) {
+    const { start, end } = endpoints(at(k));
+    cost += euclideanDistance(pos, start);
+    pos = end;
   }
+  if (nextStart) cost += euclideanDistance(pos, nextStart);
+  return cost;
+}
 
-  if (toIdx + 1 < list.length) {
-    const nextStart = getObjectEndpoints(list[toIdx + 1]).start;
-    dist += euclideanDistance(pos, nextStart);
-  }
-
-  return dist;
+function isFinitePoint(p: Point2D): boolean {
+  return Number.isFinite(p.x) && Number.isFinite(p.y);
 }
 
 // Длина LCS для корректного подсчета перестановок (O(n*m))
