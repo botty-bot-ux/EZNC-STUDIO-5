@@ -2,56 +2,23 @@ import React from 'react';
 import { ChevronLeft, Shapes } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useProjectStore } from '../../store/useProjectStore';
-import { LayerItemAccordion } from './LayerItemAccordion';
+import { FiguresList } from './FiguresList';
+import { useIsMobile } from '../../hooks/useIsMobile';
 
 // Левая панель — простой текстовый список фигур на прозрачном фоне.
 // Выбранная фигура синим; её свойства (координаты, Ø, глубина) — на правой панели «Свойства».
+// На мобильных фигуры живут в нижней шторке «Фигуры» (см. MobileTabBar), поэтому панель скрывается.
 export const LeftToolbar: React.FC = () => {
-  const {
-    objects,
-    selectedObjectIds,
-    setSelectedObjectId,
-    toggleObjectSelection,
-    deleteObject,
-    duplicateObject,
-    updateObject,
-    reorderObjects,
-    setActiveTab,
-    leftPanelOpen,
-    toggleLeftPanel,
-  } = useProjectStore(
+  const isMobile = useIsMobile();
+  const { objects, leftPanelOpen, toggleLeftPanel } = useProjectStore(
     useShallow((s) => ({
       objects: s.objects,
-      selectedObjectIds: s.selectedObjectIds,
-      setSelectedObjectId: s.setSelectedObjectId,
-      toggleObjectSelection: s.toggleObjectSelection,
-      deleteObject: s.deleteObject,
-      duplicateObject: s.duplicateObject,
-      updateObject: s.updateObject,
-      reorderObjects: s.reorderObjects,
-      setActiveTab: s.setActiveTab,
       leftPanelOpen: s.leftPanelOpen,
       toggleLeftPanel: s.toggleLeftPanel,
     }))
   );
 
-  const moveObjectUp = (idx: number) => {
-    if (idx <= 0) return;
-    const newObjs = [...objects];
-    const temp = newObjs[idx];
-    newObjs[idx] = newObjs[idx - 1];
-    newObjs[idx - 1] = temp;
-    reorderObjects(newObjs);
-  };
-
-  const moveObjectDown = (idx: number) => {
-    if (idx >= objects.length - 1) return;
-    const newObjs = [...objects];
-    const temp = newObjs[idx];
-    newObjs[idx] = newObjs[idx + 1];
-    newObjs[idx + 1] = temp;
-    reorderObjects(newObjs);
-  };
+  if (isMobile) return null;
 
   if (!leftPanelOpen) {
     return (
@@ -92,38 +59,8 @@ export const LeftToolbar: React.FC = () => {
       </div>
 
       {/* Figures list */}
-      <div className="flex-1 overflow-y-auto min-h-0 py-1 space-y-0.5 custom-scrollbar">
-        {objects.length === 0 ? (
-          <div className="px-2 py-3 text-xs text-slate-500">
-            Фигур нет. Добавьте с верхней панели или импортируйте DXF/G-код.
-          </div>
-        ) : (
-          objects.map((obj, idx) => {
-            const isSelected = selectedObjectIds.includes(obj.id);
-            return (
-              <LayerItemAccordion
-                key={obj.id}
-                obj={obj}
-                index={idx}
-                totalCount={objects.length}
-                isSelected={isSelected}
-                onSelect={(e) => {
-                  if (e && (e.ctrlKey || e.shiftKey || e.metaKey)) {
-                    toggleObjectSelection(obj.id);
-                  } else {
-                    setSelectedObjectId(obj.id);
-                  }
-                  setActiveTab('properties');
-                }}
-                onMoveUp={() => moveObjectUp(idx)}
-                onMoveDown={() => moveObjectDown(idx)}
-                onDelete={() => deleteObject(obj.id)}
-                onDuplicate={() => duplicateObject(obj.id)}
-                onUpdate={(partial) => updateObject(obj.id, partial)}
-              />
-            );
-          })
-        )}
+      <div className="flex-1 min-h-0">
+        <FiguresList />
       </div>
     </aside>
   );

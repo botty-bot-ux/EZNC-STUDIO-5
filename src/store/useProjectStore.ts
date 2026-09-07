@@ -4,12 +4,14 @@ import {
   ActiveTool,
   CADObject,
   MachineSettings,
+  MobileSheet,
   NewCADObjectInput,
   OperationItem,
   Point2D,
   PostprocessorTemplates,
   ProjectData,
   ToolpathSegment,
+  UnderlayState,
   ViewMode,
   WarningItem,
 } from '../types';
@@ -23,6 +25,7 @@ import {
   INITIAL_OBJECTS,
   INITIAL_OPERATIONS,
   LOCAL_STORAGE_KEY,
+  DEFAULT_UNDERLAY,
 } from './initialState';
 
 interface HistoryState {
@@ -47,6 +50,8 @@ interface ProjectStore {
   // Kept out of `objects` so it never triggers history, autosave or G-code regen.
   liveEdit: { id: string; patch: Partial<CADObject> } | null;
   liveMeasure: { start: Point2D; end: Point2D } | null;
+  // Session-only background reference image («подложка»). Never persisted, never affects G-code.
+  underlay: UnderlayState;
   activeTool: ActiveTool;
   activeTab: ActiveTab;
   viewMode: ViewMode;
@@ -70,6 +75,10 @@ interface ProjectStore {
   toggleLeftPanel: () => void;
   toggleRightPanel: () => void;
 
+  // Мобильная шторка (сессонное состояние, не сохраняется).
+  mobileSheet: MobileSheet;
+  setMobileSheet: (sheet: MobileSheet) => void;
+
   // Actions
   setProjectName: (name: string) => void;
   setActiveTool: (tool: ActiveTool) => void;
@@ -85,6 +94,12 @@ interface ProjectStore {
   setInspectorTarget: (target: 'object' | 'operation' | 'tool') => void;
   setLiveEdit: (v: { id: string; patch: Partial<CADObject> } | null) => void;
   setLiveMeasure: (v: { start: Point2D; end: Point2D } | null) => void;
+
+  // Подложка (фоновая референсная картинка) — только на сессию.
+  setUnderlayImage: (src: string) => void;
+  updateUnderlay: (partial: Partial<UnderlayState>) => void;
+  fitUnderlayToSheet: () => void;
+  clearUnderlay: () => void;
 
   updateMachine: (partial: Partial<MachineSettings>) => void;
 
@@ -225,6 +240,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
     inspectorTarget: 'object',
     liveEdit: null,
     liveMeasure: null,
+    underlay: DEFAULT_UNDERLAY,
     activeTool: 'select',
     activeTab: 'gcode',
     viewMode: 'edit',
@@ -246,18 +262,22 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
     toggleLeftPanel: () => set((state) => ({ leftPanelOpen: !state.leftPanelOpen })),
     toggleRightPanel: () => set((state) => ({ rightPanelOpen: !state.rightPanelOpen })),
 
+    mobileSheet: 'none',
+    setMobileSheet: (sheet: MobileSheet) => set({ mobileSheet: sheet }),
+
     setProjectName: (name: string) => syncAndSave({ projectName: name }),
 
     setActiveTool: (tool: ActiveTool) =>
       set((state) => ({
         activeTool: tool,
         ...(tool === 'measure'
-          ? { activeTab: 'properties' as ActiveTab, rightPanelOpen: true, viewMode: state.viewMode === 'gcode' ? 'edit' : state.viewMode }
+          ? { activeTab: 'properties' as ActiveTab, mobileSheet: 'properties' as MobileSheet, rightPanelOpen: true, viewMode: state.viewMode === 'gcode' ? 'edit' : state.viewMode }
           : {}),
       })),
     setActiveTab: (tab: ActiveTab) =>
       set((state) => ({
         activeTab: tab,
+        mobileSheet: tab,
         rightPanelOpen: tab === 'properties' ? true : state.rightPanelOpen,
         viewMode: tab === 'gcode' ? 'gcode' : state.viewMode === 'gcode' ? 'edit' : state.viewMode,
       })),
@@ -327,6 +347,36 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
 
     setLiveEdit: (v) => set({ liveEdit: v }),
     setLiveMeasure: (v) => set({ liveMeasure: v }),
+
+    // Подложка — только на сессию: plain set, без истории/автосейва/генерации G-кода.
+    setUnderlayImage: (src) => {
+      const sheet = get().machine.stockSheet;
+      const widthX = sheet?.widthX ?? 1081;
+      const widthY = sheet?.widthY ?? 1681;
+      const cur = get().underlay;
+      set({
+        underlay: {
+          src,
+          x: -widthX,
+          y: -widthY,
+          w: widthX,
+          h: widthY,
+          opacity: cur.opacity,
+          visible: true,
+          frozen: false,
+        },
+      });
+    },
+    updateUnderlay: (partial) => set({ underlay: { ...get().underlay, ...partial } }),
+    fitUnderlayToSheet: () => {
+      const sheet = get().machine.stockSheet;
+      const widthX = sheet?.widthX ?? 1081;
+      const widthY = sheet?.widthY ?? 1681;
+      set({
+        underlay: { ...get().underlay, x: -widthX, y: -widthY, w: widthX, h: widthY },
+      });
+    },
+    clearUnderlay: () => set({ underlay: { ...DEFAULT_UNDERLAY } }),
 
     updateMachine: (partial: Partial<MachineSettings>) => {
       pushHistory();
@@ -684,6 +734,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
         manualGcodeDirty: false,
         selectedObjectId: null,
         selectedOperationId: null,
+        underlay: DEFAULT_UNDERLAY,
       });
     },
 
@@ -701,6 +752,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
             manualGcodeDirty: false,
             selectedObjectId: null,
             selectedOperationId: null,
+            underlay: DEFAULT_UNDERLAY,
           });
           return true;
         }
@@ -726,6 +778,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
           manualGcodeDirty: false,
           selectedObjectId: null,
           selectedOperationId: null,
+          underlay: DEFAULT_UNDERLAY,
         });
         return true;
       }
@@ -762,6 +815,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
           operations: newOps.length > 0 ? newOps : get().operations,
           selectedObjectId: null,
           selectedOperationId: null,
+          underlay: DEFAULT_UNDERLAY,
           viewMode: 'preview',
         });
 

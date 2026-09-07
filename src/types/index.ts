@@ -98,6 +98,18 @@ export interface StockSheetSettings {
   color?: string; // hex color for dashed line outline
 }
 
+// Фоновая референсная картинка («подложка»/чертёж). Только на сессию — не сохраняется и не влияет на G-код.
+export interface UnderlayState {
+  src: string | null; // data-URL загруженного изображения
+  x: number; // мир, минимальный угол по X (мм)
+  y: number; // мир, минимальный угол по Y (мм)
+  w: number; // размер вдоль мировой оси X (мм)
+  h: number; // размер вдоль мировой оси Y (мм)
+  opacity: number; // 0..1
+  visible: boolean;
+  frozen: boolean; // заморозка — блокирует перетаскивание/изменение
+}
+
 export interface MachineSettings {
   units: UnitSystem;
   controllerProfile: ControllerProfile;
@@ -161,6 +173,8 @@ export interface WarningItem {
 
 export type ActiveTool = 'select' | 'point' | 'line' | 'polyline' | 'rectangle' | 'circle' | 'arc' | 'measure';
 export type ActiveTab = 'machine' | 'gcode' | 'properties';
+// Мобильная нижняя шторка: какая панель открыта поверх холста ('none' — всё закрыто).
+export type MobileSheet = 'none' | 'figures' | ActiveTab;
 export type ViewMode = 'edit' | 'preview' | 'gcode';
 
 export interface ToolpathSegment {

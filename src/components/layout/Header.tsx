@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   AlertTriangle,
   CircleDot,
@@ -6,11 +6,13 @@ import {
   FilePlus,
   FolderOpen,
   MousePointer,
+  MoreHorizontal,
   Redo,
   Ruler,
   Save,
   TrendingUp,
   Undo,
+  X,
   Zap,
 } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
@@ -18,6 +20,7 @@ import { useProjectStore } from '../../store/useProjectStore';
 import { saveAs } from 'file-saver';
 import { OptimizationModal } from '../modals/OptimizationModal';
 import { useOptimization } from '../../hooks/useOptimization';
+import { useIsMobile } from '../../hooks/useIsMobile';
 
 export const Header: React.FC = () => {
   const {
@@ -165,6 +168,144 @@ export const Header: React.FC = () => {
     setActiveTool('select');
     setActiveTab('machine');
   };
+
+  const isMobile = useIsMobile();
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  // ─────────────── Мобильный компактный Header: 2 ряда ───────────────
+  if (isMobile) {
+    const toolBtn = (active: boolean) =>
+      `p-2 rounded-lg transition-all shrink-0 ${
+        active ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25' : 'text-slate-600 hover:bg-white/60'
+      }`;
+    const menuItems = [
+      { label: 'Новый проект', Icon: FilePlus, onClick: () => newProject(), color: 'text-blue-600' },
+      { label: 'Открыть (.nc / .cnc)', Icon: FolderOpen, onClick: () => fileInputRef.current?.click(), color: 'text-amber-600' },
+      { label: 'Оптимизация маршрута', Icon: Zap, onClick: () => handleOptimizeClick(), color: 'text-amber-500' },
+      { label: 'Сохранить как (.nc)', Icon: Save, onClick: () => handleSaveAs(), color: 'text-emerald-600' },
+    ];
+
+    return (
+      <header
+        className="relative bg-[#f8fafc]/95 backdrop-blur text-slate-800 flex flex-col gap-1 px-2 pt-1.5 pb-1 select-none shrink-0 z-20"
+        style={{ paddingTop: 'calc(env(safe-area-inset-top) + 6px)' }}
+      >
+        {/* Row 1: тип листа, название, меню */}
+        <div className="flex items-center gap-1.5 min-w-0">
+          <div className="grid grid-cols-2 gap-0.5 bg-slate-100/90 p-0.5 rounded-xl border border-slate-200/90 shrink-0">
+            <button
+              onClick={() => applySheet(false)}
+              className={`px-2 py-1 rounded-lg text-[11px] font-bold whitespace-nowrap ${
+                !isRail ? 'bg-blue-600 text-white' : 'text-slate-600'
+              }`}
+            >
+              Изг. Ø3
+            </button>
+            <button
+              onClick={() => applySheet(true)}
+              className={`px-2 py-1 rounded-lg text-[11px] font-bold whitespace-nowrap ${
+                isRail ? 'bg-blue-600 text-white' : 'text-slate-600'
+              }`}
+            >
+              Царг. Ø8
+            </button>
+          </div>
+
+          <input
+            type="text"
+            value={projectName}
+            onChange={(e) => setProjectName(e.target.value)}
+            className="bg-slate-100/80 text-slate-800 text-sm font-semibold px-2 py-1 rounded-xl border border-slate-200 focus:border-blue-500 focus:bg-white focus:outline-none flex-1 min-w-0 text-center"
+            placeholder="Проект"
+          />
+
+          {(errorCount > 0 || warningCount > 0) && (
+            <button
+              onClick={() => setActiveTab('machine')}
+              className={`flex items-center gap-1 px-2 py-1.5 rounded-xl text-xs font-bold shrink-0 ${
+                errorCount > 0 ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-700'
+              }`}
+            >
+              <AlertTriangle className="w-4 h-4 shrink-0" />
+              {errorCount > 0 ? errorCount : warningCount}
+            </button>
+          )}
+
+          <button
+            onClick={() => setMenuOpen((v) => !v)}
+            title="Меню проекта"
+            className="p-2 rounded-xl bg-slate-100/90 border border-slate-200/90 text-slate-600 shrink-0"
+          >
+            {menuOpen ? <X className="w-4 h-4" /> : <MoreHorizontal className="w-4 h-4" />}
+          </button>
+        </div>
+
+        {/* Row 2: инструменты черчения + undo/redo */}
+        <div className="flex items-center gap-1 bg-slate-100/90 px-1 py-0.5 rounded-xl border border-slate-200/90 overflow-x-auto">
+          <button onClick={() => setActiveTool('select')} title="Выбор и перемещение" className={toolBtn(activeTool === 'select')}>
+            <MousePointer className="w-4 h-4" />
+          </button>
+          {isRail && (
+            <button onClick={() => setActiveTool('point')} title="Отверстие / Точка" className={toolBtn(activeTool === 'point')}>
+              <CircleDot className={`w-4 h-4 ${activeTool === 'point' ? 'text-white' : 'text-purple-600'}`} />
+            </button>
+          )}
+          <button onClick={() => setActiveTool('line')} title="Линия / Отрезок" className={toolBtn(activeTool === 'line')}>
+            <TrendingUp className={`w-4 h-4 ${activeTool === 'line' ? 'text-white' : 'text-blue-600'}`} />
+          </button>
+          {!isRail && (
+            <button onClick={() => setActiveTool('arc')} title="Дуга окружности" className={toolBtn(activeTool === 'arc')}>
+              <Compass className={`w-4 h-4 ${activeTool === 'arc' ? 'text-white' : 'text-cyan-600'}`} />
+            </button>
+          )}
+          <button onClick={() => setActiveTool('measure')} title="Линейка / Штангенциркуль" className={toolBtn(activeTool === 'measure')}>
+            <Ruler className={`w-4 h-4 ${activeTool === 'measure' ? 'text-white' : 'text-rose-500'}`} />
+          </button>
+
+          <div className="w-px h-5 bg-slate-200 mx-0.5 shrink-0" />
+
+          <button onClick={undo} disabled={undoCount === 0} title="Отменить" className="p-2 rounded-lg text-slate-600 disabled:opacity-30 hover:bg-white transition-all shrink-0">
+            <Undo className="w-4 h-4" />
+          </button>
+          <button onClick={redo} disabled={redoCount === 0} title="Повторить" className="p-2 rounded-lg text-slate-600 disabled:opacity-30 hover:bg-white transition-all shrink-0">
+            <Redo className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Выпадающее меню файловых действий */}
+        {menuOpen && (
+          <>
+            <div className="fixed inset-0 z-30" onClick={() => setMenuOpen(false)} />
+            <div className="absolute right-2 top-full mt-1 z-40 w-56 bg-white rounded-2xl border border-slate-200 shadow-2xl p-1.5 flex flex-col gap-0.5">
+              {menuItems.map(({ label, Icon, onClick, color }) => (
+                <button
+                  key={label}
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onClick();
+                  }}
+                  className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-semibold text-slate-700 hover:bg-slate-100 active:bg-slate-200 transition-colors text-left"
+                >
+                  <Icon className={`w-4 h-4 shrink-0 ${color}`} />
+                  <span>{label}</span>
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+
+        <input
+          type="file"
+          ref={fileInputRef}
+          onChange={handleOpenFile}
+          accept=".nc,.cnc,.gcode,.json,.tap,.txt"
+          className="hidden"
+        />
+
+        <OptimizationModal isOpen={isOptModalOpen} onClose={closeOptModal} result={optResult} />
+      </header>
+    );
+  }
 
   return (
     <header className="h-16 bg-gradient-to-b from-[#f8fafc] via-[#f8fafc]/95 via-70% to-transparent text-slate-800 flex items-center justify-between px-4 select-none shrink-0 z-20 gap-2">

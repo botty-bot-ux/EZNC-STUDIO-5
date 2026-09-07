@@ -21,6 +21,9 @@ import {
   drawSelectionBox,
   drawSnapIndicator,
   drawToolpathSegments,
+  drawUnderlay,
+  getUnderlayCanvasRect,
+  UNDERLAY_HANDLE_PX,
 } from './canvasDrawers';
 import {
   HoveredHandle,
@@ -29,6 +32,7 @@ import {
   getArcFrom3Points,
 } from './canvasUtils';
 import { constrainAngle } from '../../lib/geometry/transform';
+import { useIsMobile } from '../../hooks/useIsMobile';
 
 /** Point at distance `len` from `origin` along angle `ang` (radians). */
 function pointFromPolar(origin: Point2D, ang: number, len: number): Point2D {
@@ -37,6 +41,18 @@ function pointFromPolar(origin: Point2D, ang: number, len: number): Point2D {
 
 interface SceneCanvasProps {
   onCursorMove?: (pt: Point2D | null) => void;
+}
+
+/**
+ * Единый «курсор» для мыши и касаний: все обработчики холста работают с этим
+ * типизированным минимумом, поэтому тач и мышь проходят один и тот же код.
+ */
+interface CanvasPointer {
+  clientX: number;
+  clientY: number;
+  shiftKey: boolean;
+  ctrlKey: boolean;
+  button?: number;
 }
 
 function shiftCADObject(obj: CADObject, dx: number, dy: number): Partial<CADObject> {
@@ -112,6 +128,9 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
     gridStep,
     setLiveEdit,
     setLiveMeasure,
+    underlay,
+    updateUnderlay,
+    mobileSheet,
   } = useProjectStore(
     useShallow((s) => ({
       objects: s.objects,
@@ -135,12 +154,27 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
       gridStep: s.gridStep,
       setLiveEdit: s.setLiveEdit,
       setLiveMeasure: s.setLiveMeasure,
+      underlay: s.underlay,
+      updateUnderlay: s.updateUnderlay,
+      mobileSheet: s.mobileSheet,
     }))
   );
 
   // Canvas Pan & Zoom
   const [pan, setPan] = useState<Point2D>({ x: 350, y: 350 });
   const [zoom, setZoom] = useState<number>(1.2);
+
+  // Перерисовка/ресайз канваса при изменении размера окна (телефон: адресная строка, поворот)
+  const [viewportVer, setViewportVer] = useState(0);
+  useEffect(() => {
+    const onResize = () => setViewportVer((v) => v + 1);
+    window.addEventListener('resize', onResize);
+    window.addEventListener('orientationchange', onResize);
+    return () => {
+      window.removeEventListener('resize', onResize);
+      window.removeEventListener('orientationchange', onResize);
+    };
+  }, []);
 
   // Magnetic Snapping
   const [objectSnapEnabled, setObjectSnapEnabled] = useState<boolean>(true);
@@ -168,6 +202,41 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
   // Active Measurement Tool state
   const [measureStartPt, setMeasureStartPt] = useState<Point2D | null>(null);
   const [measureEndPt, setMeasureEndPt] = useState<Point2D | null>(null);
+
+  // Подложка (фоновая референсная картинка, только на сессию): кэш загруженного
+  // изображения + версия для ре-рендера после загрузки + временное состояние драга.
+  const underlayImgRef = useRef<HTMLImageElement | null>(null);
+  const [underlayImgVer, setUnderlayImgVer] = useState(0);
+  const underlayDragRef = useRef<
+    | { mode: 'move'; startWorld: Point2D; origX: number; origY: number }
+    | {
+        mode: 'resize';
+        startWorld: Point2D;
+        origX: number;
+        origY: number;
+        origW: number;
+        origH: number;
+      }
+    | null
+  >(null);
+
+  useEffect(() => {
+    if (!underlay.src) {
+      underlayImgRef.current = null;
+      setUnderlayImgVer((v) => v + 1);
+      return;
+    }
+    const img = new Image();
+    img.onload = () => {
+      underlayImgRef.current = img;
+      setUnderlayImgVer((v) => v + 1);
+    };
+    img.onerror = () => {
+      underlayImgRef.current = null;
+      setUnderlayImgVer((v) => v + 1);
+    };
+    img.src = underlay.src;
+  }, [underlay.src]);
 
   // Dynamic distance input (DYN) shared by the line tool and the arc's start→end
   // chord: type a distance, press Enter to place the point at that length.
@@ -206,6 +275,28 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
     });
     setDrawStartPt(null);
     setLineLengthInput('');
+  };
+
+  // DYN: place the pending line end / arc chord end at the typed length along the
+  // current rubber-band direction. Used by Enter (desktop) and the on-screen OK (mobile).
+  const commitDynLength = () => {
+    const ds = drawStateRef.current;
+    const anchor =
+      ds.activeTool === 'line'
+        ? ds.drawStartPt
+        : ds.activeTool === 'arc' && !ds.drawArcEndPt
+        ? ds.drawArcStartPt
+        : null;
+    if (!anchor) return;
+    const L = parseFloat(ds.lineLengthInput);
+    if (!(L > 0)) return;
+    const end = pointFromPolar(anchor, ds.lineDirAngle, L);
+    if (ds.activeTool === 'arc') {
+      setDrawArcEndPt(end);
+      setLineLengthInput('');
+    } else {
+      finishLineRef.current(end);
+    }
   };
 
   useEffect(() => {
@@ -325,16 +416,9 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
           return;
         }
         if (e.key === 'Enter') {
-          const L = parseFloat(ds.lineLengthInput);
-          if (L > 0) {
+          if (parseFloat(ds.lineLengthInput) > 0) {
             e.preventDefault();
-            const end = pointFromPolar(dynAnchor, ds.lineDirAngle, L);
-            if (ds.activeTool === 'arc') {
-              setDrawArcEndPt(end);
-              setLineLengthInput('');
-            } else {
-              finishLineRef.current(end);
-            }
+            commitDynLength();
             return;
           }
         }
@@ -415,6 +499,9 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
     // 1. Grid with Work Area Mask & Fade
     drawGrid(ctx, width, height, pan, zoom, gridStep, machine);
 
+    // 1b. Подложка — фоновая референсная картинка (поверх фона, под остальными слоями)
+    drawUnderlay(ctx, underlayImgRef.current, underlay, pan, zoom);
+
     // 2. Machine Bounds & Stock
     drawMachineBoundsAndStock(ctx, machine, pan, zoom);
 
@@ -466,6 +553,7 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
   }, [
     pan,
     zoom,
+    viewportVer,
     gridStep,
     displayObjects,
     selectedObjectId,
@@ -485,17 +573,19 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
     selectionBoxStart,
     selectionBoxCurrent,
     machine,
+    underlay,
+    underlayImgVer,
   ]);
 
-  // Handle Mouse Down
-  const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  // Handle Press Down (mouse or single touch)
+  const pointerDown = (e: CanvasPointer) => {
     if (!canvasRef.current) return;
     const rect = canvasRef.current.getBoundingClientRect();
     const mousePx = { x: e.clientX - rect.left, y: e.clientY - rect.top };
     const rawWorldPt = canvasToWorld(mousePx.x, mousePx.y, pan, zoom);
 
     // Middle click / Space or Pan
-    if (e.button === 1 || e.buttons === 4) {
+    if (e.button === 1) {
       setDragMode('pan');
       setDragStartCanvasPt(mousePx);
       return;
@@ -692,6 +782,50 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
         setDragObjInitial(null);
         setDragIds(currentSelectedIds);
         setLiveDrag({ mode: 'none' });
+      } else if (underlay.src && underlay.visible && !underlay.frozen) {
+        // 3. Подложка (фоновая картинка): сначала угол-ручка изменения размера, потом тело
+        const uRect = getUnderlayCanvasRect(underlay, pan, zoom);
+        const hs = UNDERLAY_HANDLE_PX;
+        const hx = uRect.x + uRect.w;
+        const hy = uRect.y + uRect.h;
+        if (
+          mousePx.x >= hx - hs &&
+          mousePx.x <= hx + hs &&
+          mousePx.y >= hy - hs &&
+          mousePx.y <= hy + hs
+        ) {
+          underlayDragRef.current = {
+            mode: 'resize',
+            startWorld: rawWorldPt,
+            origX: underlay.x,
+            origY: underlay.y,
+            origW: underlay.w,
+            origH: underlay.h,
+          };
+          return;
+        }
+        if (
+          mousePx.x >= uRect.x &&
+          mousePx.x <= uRect.x + uRect.w &&
+          mousePx.y >= uRect.y &&
+          mousePx.y <= uRect.y + uRect.h
+        ) {
+          underlayDragRef.current = {
+            mode: 'move',
+            startWorld: rawWorldPt,
+            origX: underlay.x,
+            origY: underlay.y,
+          };
+          return;
+        }
+        // Промах мимо картинки — обычное рамочное выделение
+        if (!e.shiftKey) {
+          setSelectedObjectIds([]);
+        }
+        setDragMode('selection_box');
+        setSelectionBoxStart(mousePx);
+        setSelectionBoxCurrent(mousePx);
+        setDragStartCanvasPt(mousePx);
       } else {
         // Clicked empty area
         if (!e.shiftKey) {
@@ -705,12 +839,29 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
     }
   };
 
-  // Handle Mouse Move
-  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  // Handle Move (mouse drag or single-finger drag)
+  const pointerMove = (e: CanvasPointer) => {
     if (!canvasRef.current) return;
     const rect = canvasRef.current.getBoundingClientRect();
     const mousePx = { x: e.clientX - rect.left, y: e.clientY - rect.top };
     const rawWorldPt = canvasToWorld(mousePx.x, mousePx.y, pan, zoom);
+
+    // 0. Подложка: перетаскивание / изменение размера фонового чертежа
+    const uDrag = underlayDragRef.current;
+    if (uDrag) {
+      if (uDrag.mode === 'move') {
+        const dx = rawWorldPt.x - uDrag.startWorld.x;
+        const dy = rawWorldPt.y - uDrag.startWorld.y;
+        updateUnderlay({ x: uDrag.origX + dx, y: uDrag.origY + dy });
+      } else {
+        const w = Math.max(1, rawWorldPt.x - uDrag.origX);
+        const h = Math.max(1, rawWorldPt.y - uDrag.origY);
+        updateUnderlay({ w, h });
+      }
+      setCurrentMouseProgPt(rawWorldPt);
+      onCursorMove?.(rawWorldPt);
+      return;
+    }
 
     // 1. Pan Mode
     if (dragMode === 'pan') {
@@ -843,7 +994,12 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
     }
   };
 
-  const handleMouseUp = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const pointerUp = (e: CanvasPointer) => {
+    // Подложка: геометрия уже пишется в стор на каждый move — просто завершаем жест.
+    if (underlayDragRef.current) {
+      underlayDragRef.current = null;
+      return;
+    }
     if (dragMode === 'selection_box') {
       if (selectionBoxStart && selectionBoxCurrent) {
         const distPx = Math.hypot(
@@ -915,8 +1071,132 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
     setPan({ x: newPanX, y: newPanY });
   };
 
+  // ───────────────────────── Тач-жесты (телефон) ─────────────────────────
+  // 1 палец = курсор (тап = клик,.drag = перетаскивание), 2 пальца = щипок-зум + панорама.
+  const isMobile = useIsMobile();
+  const touchModeRef = useRef<'none' | 'single' | 'pinch'>('none');
+  const lastTouchTsRef = useRef(0);
+  const pinchRef = useRef<{
+    startDist: number;
+    startMid: Point2D; // в px относительно канваса
+    startZoom: number;
+    startPan: Point2D;
+  } | null>(null);
+
+  // Отменить незавершённое одиночное перетаскивание при переходе к щипку (без коммита).
+  const cancelPointerInteraction = () => {
+    underlayDragRef.current = null;
+    setDragMode('none');
+    setLiveDrag({ mode: 'none' });
+    setSelectionBoxStart(null);
+    setSelectionBoxCurrent(null);
+    setDragIds([]);
+    setDragObjInitial(null);
+  };
+
+  const handleTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    lastTouchTsRef.current = Date.now();
+    if (e.touches.length >= 2) {
+      touchModeRef.current = 'pinch';
+      cancelPointerInteraction();
+      if (!canvasRef.current) return;
+      const rect = canvasRef.current.getBoundingClientRect();
+      const t0 = e.touches[0];
+      const t1 = e.touches[1];
+      pinchRef.current = {
+        startDist: Math.max(Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY), 1),
+        startMid: {
+          x: (t0.clientX + t1.clientX) / 2 - rect.left,
+          y: (t0.clientY + t1.clientY) / 2 - rect.top,
+        },
+        startZoom: zoom,
+        startPan: pan,
+      };
+      return;
+    }
+    if (e.touches.length === 1) {
+      touchModeRef.current = 'single';
+      const t = e.touches[0];
+      pointerDown({ clientX: t.clientX, clientY: t.clientY, shiftKey: false, ctrlKey: false, button: 0 });
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    lastTouchTsRef.current = Date.now();
+    if (touchModeRef.current === 'pinch') {
+      const g = pinchRef.current;
+      if (!g || e.touches.length < 2 || !canvasRef.current) return;
+      const rect = canvasRef.current.getBoundingClientRect();
+      const t0 = e.touches[0];
+      const t1 = e.touches[1];
+      const dist = Math.max(Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY), 1);
+      const mid = {
+        x: (t0.clientX + t1.clientX) / 2 - rect.left,
+        y: (t0.clientY + t1.clientY) / 2 - rect.top,
+      };
+      const newZoom = Math.min(Math.max(g.startZoom * (dist / g.startDist), 0.1), 15.0);
+      const k = newZoom / g.startZoom;
+      setZoom(newZoom);
+      setPan({
+        x: mid.x - (g.startMid.x - g.startPan.x) * k,
+        y: mid.y - (g.startMid.y - g.startPan.y) * k,
+      });
+      return;
+    }
+    if (touchModeRef.current === 'single' && e.touches.length === 1) {
+      const t = e.touches[0];
+      pointerMove({ clientX: t.clientX, clientY: t.clientY, shiftKey: false, ctrlKey: false });
+    }
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    lastTouchTsRef.current = Date.now();
+    if (touchModeRef.current === 'pinch') {
+      if (e.touches.length === 0) {
+        touchModeRef.current = 'none';
+        pinchRef.current = null;
+      }
+      // Один палец остался после щипка — ждём полного отпускания, чтобы не «прыгало».
+      return;
+    }
+    if (touchModeRef.current === 'single' && e.touches.length === 0) {
+      touchModeRef.current = 'none';
+      const t = e.changedTouches[0];
+      if (t) {
+        pointerUp({ clientX: t.clientX, clientY: t.clientY, shiftKey: false, ctrlKey: false });
+      }
+      setCurrentMouseProgPt(null);
+      setActiveSnapInfo(null);
+    }
+  };
+
+  // Браузер после тапа генерирует «синтетические» mouse-события — глушим их,
+  // чтобы каждый жест не выполнился дважды.
+  const touchedRecently = () => Date.now() - lastTouchTsRef.current < 1500;
+  const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (touchedRecently()) return;
+    pointerDown(e);
+  };
+  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (touchedRecently()) return;
+    pointerMove(e);
+  };
+  const handleMouseUp = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (touchedRecently()) return;
+    pointerUp(e);
+  };
+
+  // Мобильная шторка открыта — поднимаем плавающую панель координат/масштаба над ней
+  // (шторка занимает нижние 54% области холста, см. App.tsx).
+  const controlsBottomStyle =
+    isMobile && mobileSheet !== 'none' ? { bottom: 'calc(54% + 10px)' } : undefined;
+
   return (
-    <div ref={containerRef} className="relative w-full h-full bg-[#f1f5f9] overflow-hidden select-none">
+    <div
+      ref={containerRef}
+      className="relative w-full h-full bg-[#f1f5f9] overflow-hidden select-none"
+      onContextMenu={(e) => e.preventDefault()}
+    >
       <canvas
         ref={canvasRef}
         onMouseDown={handleMouseDown}
@@ -924,7 +1204,12 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseLeave}
         onWheel={handleWheel}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchEnd}
         className="w-full h-full cursor-crosshair block"
+        style={{ touchAction: 'none' }}
       />
 
       <CanvasHud
@@ -936,6 +1221,9 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
         measureEndPt={measureEndPt}
         lineLengthInput={lineLengthInput}
         onCancelDraw={cancelDrawing}
+        isMobile={isMobile}
+        onLineLengthChange={setLineLengthInput}
+        onDynCommit={commitDynLength}
       />
 
       <CanvasControls
@@ -950,6 +1238,7 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
         onToggleTrajectory={() => setViewMode(viewMode === 'preview' ? 'edit' : 'preview')}
         onToggleGridSnap={() => setSnapToGrid(!snapToGrid)}
         onToggleObjectSnap={() => setObjectSnapEnabled(!objectSnapEnabled)}
+        bottomStyle={controlsBottomStyle}
       />
     </div>
   );

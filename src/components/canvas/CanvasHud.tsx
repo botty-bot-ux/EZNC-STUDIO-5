@@ -10,6 +10,10 @@ interface CanvasHudProps {
   measureEndPt?: Point2D | null;
   lineLengthInput?: string;
   onCancelDraw: () => void;
+  // Мобильный DYN-ввод: экранная клавиатура вместо физических клавиш.
+  isMobile?: boolean;
+  onLineLengthChange?: (v: string) => void;
+  onDynCommit?: () => void;
 }
 
 // Плавающие окна координат/замера перенесены в правую панель «Свойства».
@@ -23,6 +27,9 @@ export const CanvasHud: React.FC<CanvasHudProps> = ({
   measureEndPt,
   lineLengthInput,
   onCancelDraw,
+  isMobile,
+  onLineLengthChange,
+  onDynCommit,
 }) => {
   // HUD banner for active tool instruction
   const getToolInstruction = () => {
@@ -76,10 +83,53 @@ export const CanvasHud: React.FC<CanvasHudProps> = ({
     ((activeTool === 'line' && !!drawStartPt) ||
       (activeTool === 'arc' && !!drawArcStartPt && !drawArcEndPt));
 
+  // Мобильный режим: поле ввода длины активно, пока стоит первая точка линии/хорды дуги.
+  const mobileDynActive =
+    !!isMobile &&
+    (activeTool === 'line'
+      ? !!drawStartPt
+      : activeTool === 'arc'
+      ? !!drawArcStartPt && !drawArcEndPt
+      : false);
+
   return (
     <>
-      {/* Dynamic distance readout (DYN) while typing a line / arc-chord length */}
-      {dynReadoutActive && (
+      {/* Мобильный DYN-ввод длины с экранной клавиатуры */}
+      {mobileDynActive && (
+        <div className="absolute top-2 left-1/2 -translate-x-1/2 z-40 flex items-center gap-1.5 bg-slate-900/95 backdrop-blur-md border border-amber-500/40 px-2 py-1.5 rounded-2xl shadow-2xl">
+          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider ml-1">
+            {activeTool === 'arc' ? 'Хорда' : 'Длина'}
+          </span>
+          <input
+            inputMode="decimal"
+            value={lineLengthInput ?? ''}
+            onChange={(e) =>
+              onLineLengthChange?.(
+                (e.target.value.replace(/[^0-9.,]/g, '').replace(',', '.') || '').slice(0, 10)
+              )
+            }
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                (e.target as HTMLInputElement).blur();
+                onDynCommit?.();
+              }
+            }}
+            placeholder="0"
+            className="w-20 bg-slate-800 border border-slate-600 rounded-lg px-2 py-1 text-right font-mono text-xl font-bold text-amber-400 tabular-nums focus:outline-none focus:border-amber-500"
+          />
+          <span className="text-xs text-slate-400 shrink-0">мм</span>
+          <button
+            onClick={() => onDynCommit?.()}
+            className="bg-blue-600 active:bg-blue-500 text-white text-xs font-bold px-3 py-2 rounded-lg shrink-0"
+          >
+            Готово
+          </button>
+        </div>
+      )}
+
+      {/* Dynamic distance readout (DYN) while typing a line / arc-chord length (desktop) */}
+      {dynReadoutActive && !isMobile && (
         <div className="absolute top-16 left-1/2 -translate-x-1/2 z-30 bg-slate-900/95 backdrop-blur-md text-white border border-amber-500/50 px-5 py-2.5 rounded-2xl shadow-2xl flex items-center gap-2 animate-in fade-in slide-in-from-top-2 duration-150">
           <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider">
             {activeTool === 'arc' ? 'Хорда' : 'Длина'}
@@ -96,7 +146,11 @@ export const CanvasHud: React.FC<CanvasHudProps> = ({
 
       {/* Active tool instruction banner */}
       {instruction && (
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 bg-blue-600/90 text-white backdrop-blur-md px-4 py-2 rounded-2xl shadow-xl flex items-center gap-3 text-xs font-semibold animate-in fade-in duration-150">
+        <div
+          className={`absolute left-1/2 -translate-x-1/2 z-20 bg-blue-600/90 text-white backdrop-blur-md px-4 py-2 rounded-2xl shadow-xl flex items-center gap-3 text-xs font-semibold animate-in fade-in duration-150 ${
+            isMobile ? 'top-16' : 'top-4'
+          }`}
+        >
           <span>{instruction}</span>
           <button
             onClick={onCancelDraw}

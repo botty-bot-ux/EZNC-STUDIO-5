@@ -1,4 +1,4 @@
-import { CADObject, MachineSettings, OperationItem } from '../types';
+import { CADObject, MachineSettings, OperationItem, UnderlayState } from '../types';
 
 export const LOCAL_STORAGE_KEY = 'cnc_studio_project_v1';
 
@@ -117,3 +117,15 @@ export const INITIAL_OPERATIONS: OperationItem[] = [
     comment: 'Контурная резка по линиям',
   },
 ];
+
+// Пустая подложка: фоновая референсная картинка существует только на время сессии.
+export const DEFAULT_UNDERLAY: UnderlayState = {
+  src: null,
+  x: 0,
+  y: 0,
+  w: 0,
+  h: 0,
+  opacity: 0.5,
+  visible: true,
+  frozen: false,
+};

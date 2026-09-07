@@ -7,6 +7,13 @@ import {
   AlertTriangle,
   CheckCircle2,
   Info,
+  ImagePlus,
+  Eye,
+  EyeOff,
+  Lock,
+  Unlock,
+  Maximize,
+  Trash2,
 } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useProjectStore } from '../../store/useProjectStore';
@@ -16,12 +23,27 @@ const HEIGHT_OPTIONS = [250, 360, 1081, 1121, 1201];
 const HEIGHT_LABELS: Record<number, string> = { 250: 'парящая', 360: 'царга' };
 
 export const MachineSettingsPanel: React.FC = () => {
-  const { machine, updateMachine, warnings, setSelectedObjectId } = useProjectStore(
+  const {
+    machine,
+    updateMachine,
+    warnings,
+    setSelectedObjectId,
+    underlay,
+    setUnderlayImage,
+    updateUnderlay,
+    fitUnderlayToSheet,
+    clearUnderlay,
+  } = useProjectStore(
     useShallow((s) => ({
       machine: s.machine,
       updateMachine: s.updateMachine,
       warnings: s.warnings,
       setSelectedObjectId: s.setSelectedObjectId,
+      underlay: s.underlay,
+      setUnderlayImage: s.setUnderlayImage,
+      updateUnderlay: s.updateUnderlay,
+      fitUnderlayToSheet: s.fitUnderlayToSheet,
+      clearUnderlay: s.clearUnderlay,
     }))
   );
 
@@ -43,6 +65,17 @@ export const MachineSettingsPanel: React.FC = () => {
   const heightOptions = HEIGHT_OPTIONS.includes(heightVal)
     ? HEIGHT_OPTIONS
     : [heightVal, ...HEIGHT_OPTIONS].sort((a, b) => a - b);
+
+  const handleUnderlayFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') setUnderlayImage(reader.result);
+    };
+    reader.readAsDataURL(file);
+    e.target.value = ''; // разрешить повторно выбрать тот же файл
+  };
 
   const errors = warnings.filter((w) => w.level === 'error');
   const warnList = warnings.filter((w) => w.level === 'warning');
@@ -307,6 +340,107 @@ export const MachineSettingsPanel: React.FC = () => {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* 3b. ПОДЛОЖКА — фоновый референсный чертёж (только на сессию) */}
+      <div className="bg-white/90 p-3 rounded-xl border border-slate-200/80 shadow-2xs space-y-2.5">
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+            <ImagePlus className="w-3.5 h-3.5 text-sky-600" />
+            Подложка
+          </span>
+          {underlay.src && (
+            <button
+              type="button"
+              onClick={clearUnderlay}
+              className="text-[10px] flex items-center gap-1 text-rose-600 hover:text-rose-700 font-bold transition-colors"
+            >
+              <Trash2 className="w-3 h-3" /> Убрать
+            </button>
+          )}
+        </div>
+
+        <p className="text-[10px] text-slate-400 leading-snug">
+          Фоновая картинка-чертёж для обводки. Двигается и растягивается за угол на холсте.
+          Видна только в этой сессии и не влияет на G-код.
+        </p>
+
+        <label className="block">
+          <span className="text-[10px] text-slate-500 block mb-1 font-medium">Изображение</span>
+          <input
+            type="file"
+            accept="image/*"
+            onChange={handleUnderlayFile}
+            className="w-full text-[11px] text-slate-600 file:mr-2 file:rounded-lg file:border-0 file:bg-sky-50 file:px-2 file:py-1.5 file:text-[11px] file:font-bold file:text-sky-700 hover:file:bg-sky-100 file:transition-colors"
+          />
+        </label>
+
+        {underlay.src && (
+          <>
+            <div>
+              <label className="text-[10px] text-slate-500 block mb-1 font-medium flex items-center justify-between">
+                <span>Прозрачность</span>
+                <span className="font-mono text-slate-700">{Math.round(underlay.opacity * 100)}%</span>
+              </label>
+              <input
+                type="range"
+                min={10}
+                max={100}
+                value={Math.round(underlay.opacity * 100)}
+                onChange={(e) =>
+                  updateUnderlay({ opacity: (parseFloat(e.target.value) || 50) / 100 })
+                }
+                className="w-full accent-sky-600 cursor-pointer"
+              />
+            </div>
+
+            <button
+              type="button"
+              onClick={fitUnderlayToSheet}
+              className="w-full flex items-center justify-center gap-1.5 text-[11px] font-bold text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 rounded-lg px-2 py-1.5 transition-colors"
+            >
+              <Maximize className="w-3.5 h-3.5" /> Разместить по листу
+            </button>
+
+            <div className="flex items-center justify-between pt-1">
+              <span className="text-[10px] text-slate-500 font-medium flex items-center gap-1">
+                {underlay.visible ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                Показывать
+              </span>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={underlay.visible}
+                  onChange={(e) => updateUnderlay({ visible: e.target.checked })}
+                  className="sr-only peer"
+                />
+                <div className="w-7 h-4 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-sky-500" />
+              </label>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] text-slate-500 font-medium flex items-center gap-1">
+                {underlay.frozen ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
+                Заморозить
+              </span>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={underlay.frozen}
+                  onChange={(e) => updateUnderlay({ frozen: e.target.checked })}
+                  className="sr-only peer"
+                />
+                <div className="w-7 h-4 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-slate-600" />
+              </label>
+            </div>
+
+            {underlay.frozen && (
+              <p className="text-[10px] text-slate-400 leading-snug">
+                Заморожена — картинку нельзя сдвинуть или растянуть на холсте.
+              </p>
+            )}
+          </>
+        )}
       </div>
 
       {/* 4. ОШИБКИ И ПРЕДУПРЕЖДЕНИЯ */}

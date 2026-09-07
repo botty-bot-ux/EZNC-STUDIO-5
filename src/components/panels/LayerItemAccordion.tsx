@@ -87,9 +87,9 @@ export const LayerItemAccordion: React.FC<FigureRowProps> = ({
         {displayName || obj.name}
       </span>
 
-      {/* Hover actions */}
+      {/* Hover actions (на телефоне — всегда видны, hover отсутствует) */}
       <div
-        className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity"
+        className="flex items-center gap-0.5 shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 focus-within:opacity-100 transition-opacity"
         onClick={(e) => e.stopPropagation()}
       >
         <button

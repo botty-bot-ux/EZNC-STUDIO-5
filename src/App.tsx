@@ -1,12 +1,26 @@
 import React from 'react';
 import { useShallow } from 'zustand/react/shallow';
+import { X } from 'lucide-react';
 import { Header } from './components/layout/Header';
 import { LeftToolbar } from './components/panels/LeftToolbar';
 import { RightSidebar } from './components/panels/RightSidebar';
+import { MobileTabBar } from './components/layout/MobileTabBar';
+import { FiguresList } from './components/panels/FiguresList';
+import { PropertiesPanel } from './components/panels/PropertiesPanel';
+import { MachineSettingsPanel } from './components/panels/MachineSettingsPanel';
+import { GcodeEditor } from './components/editor/GcodeEditor';
 import { SceneCanvas } from './components/canvas/SceneCanvas';
 import { useProjectStore } from './store/useProjectStore';
+import { useIsMobile } from './hooks/useIsMobile';
 
 export default function App() {
+  const isMobile = useIsMobile();
+  const { mobileSheet, setMobileSheet } = useProjectStore(
+    useShallow((s) => ({
+      mobileSheet: s.mobileSheet,
+      setMobileSheet: s.setMobileSheet,
+    }))
+  );
   const {
     selectedObjectId,
     selectedObjectIds,
@@ -89,8 +103,73 @@ export default function App() {
     setSelectedObjectIds,
   ]);
 
+  const sheetTitle =
+    mobileSheet === 'gcode'
+      ? 'Редактор G-кода'
+      : mobileSheet === 'properties'
+      ? 'Свойства'
+      : mobileSheet === 'machine'
+      ? 'Параметры станка'
+      : 'Фигуры';
+
+  // Monaco тяжёлый: после первого открытия держим редактор G-кода смонтированным,
+  // скрывая его через CSS. Иначе каждое закрытие шторки убивает редактор и рождает
+  // «ERR Canceled» + повторную загрузку.
+  const [gcodeSeen, setGcodeSeen] = React.useState(false);
+  React.useEffect(() => {
+    if (mobileSheet === 'gcode') setGcodeSeen(true);
+  }, [mobileSheet]);
+
+  // ───────────────────── Мобильная раскладка (телефон) ─────────────────────
+  if (isMobile) {
+    return (
+      <div className="flex flex-col h-dvh w-screen bg-[#f8fafc] text-slate-800 overflow-hidden font-sans">
+        <Header />
+
+        <div className="flex-1 relative min-h-0 overflow-hidden bg-[#f8fafc]">
+          <main className="absolute inset-0 bg-[#f8fafc] overflow-hidden">
+            <SceneCanvas />
+          </main>
+
+          {/* Нижняя шторка с панелью (Фигуры / Свойства / G-код / Станок) */}
+          <div
+            className={`absolute inset-x-0 bottom-0 top-[46%] z-30 flex-col bg-white/95 backdrop-blur-2xl border-t border-slate-200 rounded-t-2xl shadow-[0_-8px_30px_rgba(15,23,42,0.18)] overflow-hidden ${
+              mobileSheet === 'none' ? 'hidden' : 'flex'
+            }`}
+          >
+            <div className="flex items-center justify-between px-3 py-2 border-b border-slate-200/80 shrink-0 select-none">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                {sheetTitle}
+              </span>
+              <button
+                onClick={() => setMobileSheet('none')}
+                title="Закрыть"
+                className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-200/60 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="flex-1 min-h-0 overflow-hidden">
+              {mobileSheet === 'figures' && <FiguresList />}
+              {mobileSheet === 'properties' && <PropertiesPanel />}
+              {mobileSheet === 'machine' && <MachineSettingsPanel />}
+              {gcodeSeen && (
+                <div className={mobileSheet === 'gcode' ? 'h-full' : 'hidden'}>
+                  <GcodeEditor />
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <MobileTabBar />
+      </div>
+    );
+  }
+
+  // ───────────────────── Десктопная раскладка ─────────────────────
   return (
-    <div className="flex flex-col h-screen w-screen bg-[#f8fafc] text-slate-800 overflow-hidden font-sans">
+    <div className="flex flex-col h-dvh w-screen bg-[#f8fafc] text-slate-800 overflow-hidden font-sans">
       {/* Top Header */}
       <Header />
 

@@ -14,6 +14,8 @@ interface CanvasControlsProps {
   onToggleGridSnap: () => void;
   onToggleObjectSnap: () => void;
   onToggleTrajectory: () => void;
+  // Мобильная шторка открыта — поднимаем панель выше (inline-стиль для bottom).
+  bottomStyle?: React.CSSProperties;
 }
 
 export const CanvasControls: React.FC<CanvasControlsProps> = ({
@@ -28,9 +30,13 @@ export const CanvasControls: React.FC<CanvasControlsProps> = ({
   onToggleGridSnap,
   onToggleObjectSnap,
   onToggleTrajectory,
+  bottomStyle,
 }) => {
   return (
-    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-1.5 bg-white/90 backdrop-blur-2xl border border-white/90 p-1.5 rounded-2xl shadow-2xl shadow-slate-900/15 text-slate-700 z-20 max-w-[95vw] overflow-x-auto">
+    <div
+      style={bottomStyle}
+      className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-1.5 bg-white/90 backdrop-blur-2xl border border-white/90 p-1.5 rounded-2xl shadow-2xl shadow-slate-900/15 text-slate-700 z-20 max-w-[95vw] overflow-x-auto"
+    >
       {/* Координаты курсора на рабочем поле */}
       <div
         title="Текущие координаты курсора на рабочем поле (X, Y в мм)"

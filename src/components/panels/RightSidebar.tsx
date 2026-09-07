@@ -5,8 +5,10 @@ import { useProjectStore } from '../../store/useProjectStore';
 import { MachineSettingsPanel } from './MachineSettingsPanel';
 import { GcodeEditor } from '../editor/GcodeEditor';
 import { PropertiesPanel } from './PropertiesPanel';
+import { useIsMobile } from '../../hooks/useIsMobile';
 
 export const RightSidebar: React.FC = () => {
+  const isMobile = useIsMobile();
   const { activeTab, setActiveTab, warnings, rightPanelOpen, toggleRightPanel } = useProjectStore(
     useShallow((s) => ({
       activeTab: s.activeTab,
@@ -18,6 +20,15 @@ export const RightSidebar: React.FC = () => {
   );
 
   const errorCount = warnings.filter((w) => w.level === 'error').length;
+
+  // Monaco держим смонтированным после первого открытия вкладки G-кода (см. контент ниже).
+  const [gcodeSeen, setGcodeSeen] = React.useState(false);
+  React.useEffect(() => {
+    if (activeTab === 'gcode') setGcodeSeen(true);
+  }, [activeTab]);
+
+  // На мобильных те же панели живут в нижней шторке (MobileTabBar + App).
+  if (isMobile) return null;
 
   if (!rightPanelOpen) {
     return (
@@ -103,8 +114,12 @@ export const RightSidebar: React.FC = () => {
       {/* Tab content area */}
       <div className="flex-1 overflow-hidden bg-slate-50/40 min-h-0 flex flex-col">
         {activeTab === 'properties' && <PropertiesPanel />}
-        {activeTab === 'gcode' && <GcodeEditor />}
         {activeTab === 'machine' && <MachineSettingsPanel />}
+        {gcodeSeen && (
+          <div className={activeTab === 'gcode' ? 'flex-1 min-h-0 flex flex-col' : 'hidden'}>
+            <GcodeEditor />
+          </div>
+        )}
       </div>
     </aside>
   );
