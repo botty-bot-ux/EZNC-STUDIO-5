@@ -1116,33 +1116,6 @@ export function drawSnapIndicator(
     ctx.stroke();
   }
 
-  // Draw snap label badge
-  ctx.font = 'bold 11px system-ui, -apple-system, sans-serif';
-  const labelText = `🧲 ${activeSnapInfo.label}`;
-  const textWidth = ctx.measureText(labelText).width;
-  const bgW = textWidth + 18;
-  const bgH = 22;
-  const bgX = sp.x - bgW / 2;
-  const bgY = sp.y - 34;
-
-  ctx.fillStyle = 'rgba(15, 23, 42, 0.94)';
-  ctx.strokeStyle = isCenter ? '#f59e0b' : isEndpoint ? '#22c55e' : '#38bdf8';
-  ctx.lineWidth = 1;
-
-  ctx.beginPath();
-  if (typeof ctx.roundRect === 'function') {
-    ctx.roundRect(bgX, bgY, bgW, bgH, 6);
-  } else {
-    ctx.rect(bgX, bgY, bgW, bgH);
-  }
-  ctx.fill();
-  ctx.stroke();
-
-  ctx.fillStyle = '#ffffff';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(labelText, sp.x, bgY + bgH / 2);
-
   ctx.restore();
 }
 
