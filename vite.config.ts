@@ -15,6 +15,20 @@ export default defineConfig(() => {
       },
       dedupe: ['react', 'react-dom'],
     },
+    build: {
+      rollupOptions: {
+        output: {
+          // Split stable, heavy libraries into their own vendor chunks so the app
+          // bundle stays small and browsers can cache libraries across deploys.
+          manualChunks(id) {
+            if (!id.includes('node_modules')) return;
+            if (id.includes('@monaco-editor') || id.includes('monaco-editor')) return 'vendor-monaco';
+            if (id.includes('zustand')) return 'vendor-zustand';
+            if (id.includes('/react') || id.includes('scheduler')) return 'vendor-react';
+          },
+        },
+      },
+    },
     server: {
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
       // Do not modifyâfile watching is disabled to prevent flickering during agent edits.

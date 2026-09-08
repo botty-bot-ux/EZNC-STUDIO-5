@@ -1,4 +1,5 @@
 import React from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { Circle, CircleDot, Layers, LineDotRightHorizontal, Ruler, Sliders, Spline, Square, Trash2 } from 'lucide-react';
 import { useProjectStore } from '../../store/useProjectStore';
 import { ArcObject, CircleObject, LineObject, PointHoleObject, RectangleObject } from '../../types';
@@ -20,7 +21,20 @@ export const PropertiesPanel: React.FC = () => {
     activeTool,
     liveEdit,
     liveMeasure,
-  } = useProjectStore();
+  } = useProjectStore(
+    useShallow((s) => ({
+      selectedObjectId: s.selectedObjectId,
+      selectedObjectIds: s.selectedObjectIds,
+      objects: s.objects,
+      updateObject: s.updateObject,
+      updateSelectedObjects: s.updateSelectedObjects,
+      deleteObject: s.deleteObject,
+      deleteSelectedObjects: s.deleteSelectedObjects,
+      activeTool: s.activeTool,
+      liveEdit: s.liveEdit,
+      liveMeasure: s.liveMeasure,
+    }))
+  );
 
   // ── Линейка / штангенциркуль: живой замер вместо плавающего окна ──
   if (activeTool === 'measure') {
