@@ -272,14 +272,14 @@ export const Header: React.FC = () => {
           <button onClick={() => setActiveTool('select')} title="Выбор и перемещение" className={toolBtn(activeTool === 'select')}>
             <MousePointer className="w-4 h-4" />
           </button>
+          <button onClick={() => setActiveTool('line')} title="Линия / Отрезок" className={toolBtn(activeTool === 'line')}>
+            <LineDotRightHorizontal className={`w-4 h-4 ${activeTool === 'line' ? 'text-white' : 'text-blue-600'}`} />
+          </button>
           {isRail && (
             <button onClick={() => setActiveTool('point')} title="Отверстие / Точка" className={toolBtn(activeTool === 'point')}>
               <CircleDot className={`w-4 h-4 ${activeTool === 'point' ? 'text-white' : 'text-purple-600'}`} />
             </button>
           )}
-          <button onClick={() => setActiveTool('line')} title="Линия / Отрезок" className={toolBtn(activeTool === 'line')}>
-            <LineDotRightHorizontal className={`w-4 h-4 ${activeTool === 'line' ? 'text-white' : 'text-blue-600'}`} />
-          </button>
           {!isRail && (
             <button onClick={() => setActiveTool('arc')} title="Дуга окружности" className={toolBtn(activeTool === 'arc')}>
               <Spline className={`w-4 h-4 ${activeTool === 'arc' ? 'text-white' : 'text-cyan-600'}`} />
@@ -382,6 +382,18 @@ export const Header: React.FC = () => {
             <MousePointer className="w-4 h-4" />
           </button>
 
+          <button
+            onClick={() => setActiveTool('line')}
+            title="Линия / Отрезок (L) · Shift = углы 90°/45°"
+            className={`p-2 rounded-lg transition-all ${
+              activeTool === 'line'
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+            }`}
+          >
+            <LineDotRightHorizontal className={`w-4 h-4 ${activeTool === 'line' ? 'text-white' : 'text-blue-600'}`} />
+          </button>
+
           {isRail && (
             <button
               onClick={() => setActiveTool('point')}
@@ -395,18 +407,6 @@ export const Header: React.FC = () => {
               <CircleDot className={`w-4 h-4 ${activeTool === 'point' ? 'text-white' : 'text-purple-600'}`} />
             </button>
           )}
-
-          <button
-            onClick={() => setActiveTool('line')}
-            title="Линия / Отрезок (L) · Shift = углы 90°/45°"
-            className={`p-2 rounded-lg transition-all ${
-              activeTool === 'line'
-                ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
-            }`}
-          >
-            <LineDotRightHorizontal className={`w-4 h-4 ${activeTool === 'line' ? 'text-white' : 'text-blue-600'}`} />
-          </button>
 
           {!isRail && (
             <button
