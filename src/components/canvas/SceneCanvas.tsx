@@ -39,6 +39,25 @@ function pointFromPolar(origin: Point2D, ang: number, len: number): Point2D {
   return { x: origin.x + len * Math.cos(ang), y: origin.y + len * Math.sin(ang) };
 }
 
+/** Не выпускать точку за грани +X (x=0) и +Y (y=0) заготовки (лист лежит в x<=0, y<=0). */
+function clampToPosFaces(pt: Point2D): Point2D {
+  return { x: Math.min(pt.x, 0), y: Math.min(pt.y, 0) };
+}
+
+/**
+ * Если конец отрезка/хорды ушёл за грани +X/+Y, укоротить луч anchor→end до
+ * пересечения с ближайшей гранью — отрезок «упирается» в неё.
+ */
+function clampRayToPosFaces(anchor: Point2D, end: Point2D): Point2D {
+  const dx = end.x - anchor.x;
+  const dy = end.y - anchor.y;
+  let t = 1;
+  if (end.x > 0 && dx > 1e-9) t = Math.min(t, Math.max(0, -anchor.x / dx));
+  if (end.y > 0 && dy > 1e-9) t = Math.min(t, Math.max(0, -anchor.y / dy));
+  if (t >= 1) return end;
+  return { x: anchor.x + dx * t, y: anchor.y + dy * t };
+}
+
 interface SceneCanvasProps {
   onCursorMove?: (pt: Point2D | null) => void;
 }
@@ -263,13 +282,20 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
   const finishLineRef = useRef<(end: Point2D) => void>(() => {});
   finishLineRef.current = (end: Point2D) => {
     if (!drawStartPt) return;
+    const clamped = clampRayToPosFaces(drawStartPt, end);
+    if (Math.hypot(clamped.x - drawStartPt.x, clamped.y - drawStartPt.y) < 0.1) {
+      // Уперся в грань ровно в свою же точку — не создаём вырожденный отрезок.
+      setDrawStartPt(null);
+      setLineLengthInput('');
+      return;
+    }
     addObject({
       name: `Отрезок ${objects.length + 1}`,
       type: 'line',
       startX: drawStartPt.x,
       startY: drawStartPt.y,
-      endX: end.x,
-      endY: end.y,
+      endX: clamped.x,
+      endY: clamped.y,
       depth: 5,
       operationType: 'cut',
     });
@@ -292,7 +318,7 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
     if (!(L > 0)) return;
     const end = pointFromPolar(anchor, ds.lineDirAngle, L);
     if (ds.activeTool === 'arc') {
-      setDrawArcEndPt(end);
+      setDrawArcEndPt(clampRayToPosFaces(anchor, end));
       setLineLengthInput('');
     } else {
       finishLineRef.current(end);
@@ -624,7 +650,7 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
 
     if (activeTool === 'line') {
       if (!drawStartPt) {
-        setDrawStartPt(snapPt);
+        setDrawStartPt(clampToPosFaces(snapPt));
         setLineLengthInput('');
         setLineDirAngle(0);
       } else {
@@ -692,7 +718,7 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
 
     if (activeTool === 'arc') {
       if (!drawArcStartPt) {
-        setDrawArcStartPt(snapPt);
+        setDrawArcStartPt(clampToPosFaces(snapPt));
         setLineLengthInput('');
         setLineDirAngle(0);
       } else if (!drawArcEndPt) {
@@ -706,7 +732,7 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
         } else {
           end = snapPt;
         }
-        setDrawArcEndPt(end);
+        setDrawArcEndPt(clampRayToPosFaces(drawArcStartPt, end));
         setLineLengthInput('');
       } else {
         const arcData = getArcFrom3Points(drawArcStartPt, drawArcEndPt, snapPt);
@@ -919,6 +945,8 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
       if (L > 0) {
         previewPt = pointFromPolar(dynAnchor, ang, L);
       }
+      // Резинка не выходит за грани +X/+Y: конец «упирается» в ближайшую грань.
+      previewPt = clampRayToPosFaces(dynAnchor, previewPt);
     }
     setCurrentMouseProgPt(previewPt);
     onCursorMove?.(previewPt);
