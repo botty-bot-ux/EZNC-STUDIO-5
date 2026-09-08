@@ -87,7 +87,7 @@ export const MachineSettingsPanel: React.FC = () => {
       <div className="bg-white/90 dark:bg-slate-900/90 p-3 rounded-xl border border-slate-200/80 dark:border-slate-700/80 shadow-2xs space-y-2">
         <div className="flex items-center justify-between">
           <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-            <Square className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+            <Square className="w-3.5 h-3.5 text-accent" />
             Заготовка листа
           </span>
 
@@ -107,7 +107,7 @@ export const MachineSettingsPanel: React.FC = () => {
               }
               className="sr-only peer"
             />
-            <div className="w-7 h-4 bg-slate-300 dark:bg-slate-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white peer-checked:after:dark:border-slate-700 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:dark:bg-slate-900 after:border-slate-300 after:dark:border-slate-600 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-emerald-500" />
+            <div className="w-7 h-4 bg-slate-300 dark:bg-slate-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white peer-checked:after:dark:border-slate-700 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:dark:bg-slate-900 after:border-slate-300 after:dark:border-slate-600 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-primary" />
           </label>
         </div>
 
@@ -131,7 +131,7 @@ export const MachineSettingsPanel: React.FC = () => {
                     },
                   });
                 }}
-                className="w-full bg-slate-100/80 dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/90 rounded-lg px-2 py-1.5 text-xs text-slate-800 dark:text-slate-100 font-bold focus:border-emerald-500 focus:bg-white focus:dark:bg-slate-800 focus:outline-none cursor-pointer transition-all"
+                className="w-full bg-slate-100/80 dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/90 rounded-lg px-2 py-1.5 text-xs text-slate-800 dark:text-slate-100 font-bold focus:border-primary focus:bg-white focus:dark:bg-slate-800 focus:outline-none cursor-pointer transition-all"
               >
                 {widthOptions.map((w) => (
                   <option key={w} value={w}>
@@ -159,7 +159,7 @@ export const MachineSettingsPanel: React.FC = () => {
                     },
                   });
                 }}
-                className="w-full bg-slate-100/80 dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/90 rounded-lg px-2 py-1.5 text-xs text-slate-800 dark:text-slate-100 font-bold focus:border-emerald-500 focus:bg-white focus:dark:bg-slate-800 focus:outline-none cursor-pointer transition-all"
+                className="w-full bg-slate-100/80 dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/90 rounded-lg px-2 py-1.5 text-xs text-slate-800 dark:text-slate-100 font-bold focus:border-primary focus:bg-white focus:dark:bg-slate-800 focus:outline-none cursor-pointer transition-all"
               >
                 {heightOptions.map((h) => (
                   <option key={h} value={h}>
@@ -175,7 +175,7 @@ export const MachineSettingsPanel: React.FC = () => {
       {/* 2. ИНСТРУМЕНТ И РЕЖИМЫ */}
       <div className="bg-white/90 dark:bg-slate-900/90 p-3 rounded-xl border border-slate-200/80 dark:border-slate-700/80 shadow-2xs space-y-2.5">
         <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-          <Wrench className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+          <Wrench className="w-3.5 h-3.5 text-accent" />
           Инструмент и режимы
         </span>
 
@@ -195,7 +195,7 @@ export const MachineSettingsPanel: React.FC = () => {
                 const val = parseFloat(e.target.value) || 1;
                 updateMachine({ toolDiameter: Math.max(0.1, val) });
               }}
-              className="w-full bg-amber-50/60 dark:bg-amber-500/15 border border-amber-200/90 rounded-lg px-2.5 py-1.5 font-mono font-bold text-amber-900 dark:text-amber-300 text-xs focus:bg-white focus:dark:bg-slate-800 focus:border-amber-500 focus:outline-none transition-all"
+              className="w-full bg-slate-100/80 dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/90 rounded-lg px-2.5 py-1.5 font-mono font-bold text-slate-800 dark:text-slate-100 text-xs focus:bg-white focus:dark:bg-slate-800 focus:border-primary focus:outline-none transition-all"
             />
             <span className="text-slate-400 dark:text-slate-500 font-bold text-xs shrink-0">мм</span>
           </div>
@@ -211,7 +211,7 @@ export const MachineSettingsPanel: React.FC = () => {
               type="number"
               value={machine.spindleSpeed}
               onChange={(e) => updateMachine({ spindleSpeed: parseInt(e.target.value) || 15000 })}
-              className="w-full bg-slate-100/80 dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/90 rounded-lg px-2.5 py-1.5 font-mono font-bold text-slate-800 dark:text-slate-100 text-xs focus:bg-white focus:dark:bg-slate-800 focus:border-amber-500 focus:outline-none transition-all"
+              className="w-full bg-slate-100/80 dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/90 rounded-lg px-2.5 py-1.5 font-mono font-bold text-slate-800 dark:text-slate-100 text-xs focus:bg-white focus:dark:bg-slate-800 focus:border-primary focus:outline-none transition-all"
             />
           </div>
 
@@ -224,7 +224,7 @@ export const MachineSettingsPanel: React.FC = () => {
                 type="number"
                 value={machine.feedCut}
                 onChange={(e) => updateMachine({ feedCut: parseFloat(e.target.value) || 1000 })}
-                className="w-full bg-slate-100/80 dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/90 rounded-lg px-2.5 py-1.5 font-mono font-bold text-slate-800 dark:text-slate-100 text-xs focus:bg-white focus:dark:bg-slate-800 focus:border-amber-500 focus:outline-none transition-all"
+                className="w-full bg-slate-100/80 dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/90 rounded-lg px-2.5 py-1.5 font-mono font-bold text-slate-800 dark:text-slate-100 text-xs focus:bg-white focus:dark:bg-slate-800 focus:border-primary focus:outline-none transition-all"
               />
             </div>
 
@@ -239,7 +239,7 @@ export const MachineSettingsPanel: React.FC = () => {
                   const val = parseFloat(e.target.value) || 700;
                   updateMachine({ feedPlunge: val, feedDrill: val });
                 }}
-                className="w-full bg-slate-100/80 dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/90 rounded-lg px-2.5 py-1.5 font-mono font-bold text-slate-800 dark:text-slate-100 text-xs focus:bg-white focus:dark:bg-slate-800 focus:border-amber-500 focus:outline-none transition-all"
+                className="w-full bg-slate-100/80 dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/90 rounded-lg px-2.5 py-1.5 font-mono font-bold text-slate-800 dark:text-slate-100 text-xs focus:bg-white focus:dark:bg-slate-800 focus:border-primary focus:outline-none transition-all"
               />
             </div>
           </div>
@@ -254,7 +254,7 @@ export const MachineSettingsPanel: React.FC = () => {
                 type="number"
                 value={machine.safeZ}
                 onChange={(e) => updateMachine({ safeZ: parseFloat(e.target.value) || 20 })}
-                className="w-full bg-emerald-50/60 dark:bg-emerald-500/15 border border-emerald-200/80 rounded-lg px-2.5 py-1.5 font-mono font-bold text-emerald-800 dark:text-emerald-400 text-xs focus:bg-white focus:dark:bg-slate-800 focus:border-emerald-500 focus:outline-none transition-all"
+                className="w-full bg-slate-100/80 dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/90 rounded-lg px-2.5 py-1.5 font-mono font-bold text-slate-800 dark:text-slate-100 text-xs focus:bg-white focus:dark:bg-slate-800 focus:border-primary focus:outline-none transition-all"
               />
             </div>
 
@@ -267,7 +267,7 @@ export const MachineSettingsPanel: React.FC = () => {
                 step="0.5"
                 value={machine.cutDepth ?? 5}
                 onChange={(e) => updateMachine({ cutDepth: parseFloat(e.target.value) || 5 })}
-                className="w-full bg-blue-50/60 dark:bg-blue-500/15 border border-blue-200/80 rounded-lg px-2.5 py-1.5 font-mono font-bold text-blue-800 dark:text-blue-400 text-xs focus:bg-white focus:dark:bg-slate-800 focus:border-blue-500 focus:outline-none transition-all"
+                className="w-full bg-slate-100/80 dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/90 rounded-lg px-2.5 py-1.5 font-mono font-bold text-slate-800 dark:text-slate-100 text-xs focus:bg-white focus:dark:bg-slate-800 focus:border-primary focus:outline-none transition-all"
               />
             </div>
           </div>
@@ -277,7 +277,7 @@ export const MachineSettingsPanel: React.FC = () => {
       {/* 3. РАБОЧАЯ ЗОНА СТАНКА */}
       <div className="bg-white/90 dark:bg-slate-900/90 p-3 rounded-xl border border-slate-200/80 dark:border-slate-700/80 shadow-2xs space-y-2">
         <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-          <Shield className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+          <Shield className="w-3.5 h-3.5 text-accent" />
           Границы рабочей зоны
         </span>
 
@@ -346,14 +346,14 @@ export const MachineSettingsPanel: React.FC = () => {
       <div className="bg-white/90 dark:bg-slate-900/90 p-3 rounded-xl border border-slate-200/80 dark:border-slate-700/80 shadow-2xs space-y-2.5">
         <div className="flex items-center justify-between">
           <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-            <ImagePlus className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" />
+            <ImagePlus className="w-3.5 h-3.5 text-accent" />
             Подложка
           </span>
           {underlay.src && (
             <button
               type="button"
               onClick={clearUnderlay}
-              className="text-[12px] flex items-center gap-1 text-rose-600 dark:text-rose-400 hover:text-rose-700 hover:dark:text-rose-400 font-bold transition-colors"
+              className="text-[12px] flex items-center gap-1 text-danger hover:opacity-80 font-bold transition-colors"
             >
               <Trash2 className="w-3 h-3" /> Убрать
             </button>
@@ -371,7 +371,7 @@ export const MachineSettingsPanel: React.FC = () => {
             type="file"
             accept="image/*"
             onChange={handleUnderlayFile}
-            className="w-full text-[13px] text-slate-600 dark:text-slate-300 file:mr-2 file:rounded-lg file:border-0 file:bg-sky-50 file:dark:bg-sky-500/15 file:px-2 file:py-1.5 file:text-[13px] file:font-bold file:text-sky-700 file:dark:text-sky-400 hover:file:bg-sky-100 hover:file:dark:bg-sky-500/20 file:transition-colors"
+            className="w-full text-[13px] text-slate-600 dark:text-slate-300 file:mr-2 file:rounded-lg file:border-0 file:bg-slate-100 file:dark:bg-slate-800 file:px-2 file:py-1.5 file:text-[13px] file:font-bold file:text-slate-700 file:dark:text-slate-200 hover:file:bg-slate-200 hover:file:dark:bg-slate-700 file:transition-colors"
           />
         </label>
 
@@ -390,14 +390,14 @@ export const MachineSettingsPanel: React.FC = () => {
                 onChange={(e) =>
                   updateUnderlay({ opacity: (parseFloat(e.target.value) || 50) / 100 })
                 }
-                className="w-full accent-sky-600 cursor-pointer"
+                className="w-full accent-primary cursor-pointer"
               />
             </div>
 
             <button
               type="button"
               onClick={fitUnderlayToSheet}
-              className="w-full flex items-center justify-center gap-1.5 text-[13px] font-bold text-sky-700 dark:text-sky-400 bg-sky-50 dark:bg-sky-500/15 hover:bg-sky-100 hover:dark:bg-sky-500/20 border border-sky-200 rounded-lg px-2 py-1.5 transition-colors"
+              className="w-full flex items-center justify-center gap-1.5 text-[13px] font-bold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 hover:dark:bg-slate-700 border border-line rounded-lg px-2 py-1.5 transition-colors"
             >
               <Maximize className="w-3.5 h-3.5" /> Разместить по листу
             </button>
@@ -414,7 +414,7 @@ export const MachineSettingsPanel: React.FC = () => {
                   onChange={(e) => updateUnderlay({ visible: e.target.checked })}
                   className="sr-only peer"
                 />
-                <div className="w-7 h-4 bg-slate-300 dark:bg-slate-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white peer-checked:after:dark:border-slate-700 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:dark:bg-slate-900 after:border-slate-300 after:dark:border-slate-600 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-sky-500" />
+                <div className="w-7 h-4 bg-slate-300 dark:bg-slate-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white peer-checked:after:dark:border-slate-700 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:dark:bg-slate-900 after:border-slate-300 after:dark:border-slate-600 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-primary" />
               </label>
             </div>
 
@@ -447,18 +447,18 @@ export const MachineSettingsPanel: React.FC = () => {
       <div className="bg-white/90 dark:bg-slate-900/90 p-3 rounded-xl border border-slate-200/80 dark:border-slate-700/80 shadow-2xs space-y-2">
         <div className="flex items-center justify-between">
           <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-            <AlertCircle className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
+            <AlertCircle className="w-3.5 h-3.5 text-accent" />
             Проверка безопасности ({warnings.length})
           </span>
         </div>
 
         {warnings.length === 0 ? (
-          <div className="p-3 text-center text-emerald-700 dark:text-emerald-400 bg-emerald-50/80 dark:bg-emerald-500/15 border border-emerald-200/80 rounded-lg space-y-1">
-            <div className="flex items-center justify-center gap-1.5 font-bold text-xs text-emerald-800 dark:text-emerald-400">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+          <div className="p-3 text-center text-slate-700 dark:text-slate-200 bg-slate-50 dark:bg-slate-800/60 border border-line rounded-lg space-y-1">
+            <div className="flex items-center justify-center gap-1.5 font-bold text-xs text-slate-800 dark:text-slate-100">
+              <CheckCircle2 className="w-4 h-4 text-accent shrink-0" />
               <span>Все проверки пройдены</span>
             </div>
-            <p className="text-[12px] text-emerald-600/90 dark:text-emerald-400/90">
+            <p className="text-[12px] text-slate-500 dark:text-slate-400">
               Ошибок и выходов за пределы рабочей зоны станка не обнаружено.
             </p>
           </div>
@@ -468,10 +468,10 @@ export const MachineSettingsPanel: React.FC = () => {
             {errors.map((item) => (
               <div
                 key={item.id}
-                className="p-2.5 bg-rose-50 dark:bg-rose-500/15 border border-rose-200 rounded-lg text-rose-900 dark:text-rose-300 space-y-1"
+                className="p-2.5 bg-danger/10 border border-danger/30 rounded-lg text-danger space-y-1"
               >
                 <div className="flex items-center justify-between gap-1">
-                  <div className="flex items-center gap-1.5 font-bold text-xs text-rose-700 dark:text-rose-400">
+                  <div className="flex items-center gap-1.5 font-bold text-xs text-danger">
                     <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                     <span>{item.title}</span>
                   </div>
@@ -480,13 +480,13 @@ export const MachineSettingsPanel: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => setSelectedObjectId(item.objectId || null)}
-                      className="text-[12px] bg-rose-100 dark:bg-rose-500/15 hover:bg-rose-200 hover:dark:bg-rose-500/20 text-rose-800 dark:text-rose-400 px-2 py-0.5 rounded font-medium transition-colors shrink-0"
+                      className="text-[12px] bg-danger/15 hover:bg-danger/25 text-danger px-2 py-0.5 rounded font-medium transition-colors shrink-0"
                     >
                       Перейти
                     </button>
                   )}
                 </div>
-                <p className="text-[12px] text-rose-800/90 dark:text-rose-400/90 leading-relaxed">{item.message}</p>
+                <p className="text-[12px] text-danger leading-relaxed">{item.message}</p>
               </div>
             ))}
 
@@ -494,10 +494,10 @@ export const MachineSettingsPanel: React.FC = () => {
             {warnList.map((item) => (
               <div
                 key={item.id}
-                className="p-2.5 bg-amber-50 dark:bg-amber-500/15 border border-amber-200 rounded-lg text-amber-900 dark:text-amber-300 space-y-1"
+                className="p-2.5 bg-slate-100 dark:bg-slate-800 border border-line rounded-lg text-slate-700 dark:text-slate-200 space-y-1"
               >
                 <div className="flex items-center justify-between gap-1">
-                  <div className="flex items-center gap-1.5 font-bold text-xs text-amber-700 dark:text-amber-400">
+                  <div className="flex items-center gap-1.5 font-bold text-xs text-slate-700 dark:text-slate-200">
                     <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
                     <span>{item.title}</span>
                   </div>
@@ -506,13 +506,13 @@ export const MachineSettingsPanel: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => setSelectedObjectId(item.objectId || null)}
-                      className="text-[12px] bg-amber-100 dark:bg-amber-500/15 hover:bg-amber-200 hover:dark:bg-amber-500/20 text-amber-800 dark:text-amber-400 px-2 py-0.5 rounded font-medium transition-colors shrink-0"
+                      className="text-[12px] bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 hover:dark:bg-slate-600 text-slate-700 dark:text-slate-200 px-2 py-0.5 rounded font-medium transition-colors shrink-0"
                     >
                       Перейти
                     </button>
                   )}
                 </div>
-                <p className="text-[12px] text-amber-800/90 dark:text-amber-400/90 leading-relaxed">{item.message}</p>
+                <p className="text-[12px] text-slate-600 dark:text-slate-300 leading-relaxed">{item.message}</p>
               </div>
             ))}
 
@@ -520,13 +520,13 @@ export const MachineSettingsPanel: React.FC = () => {
             {infos.map((item) => (
               <div
                 key={item.id}
-                className="p-2.5 bg-blue-50 dark:bg-blue-500/15 border border-blue-200 rounded-lg text-blue-900 dark:text-blue-300 space-y-1"
+                className="p-2.5 bg-slate-100 dark:bg-slate-800 border border-line rounded-lg text-slate-700 dark:text-slate-200 space-y-1"
               >
-                <div className="flex items-center gap-1.5 font-bold text-xs text-blue-700 dark:text-blue-400">
+                <div className="flex items-center gap-1.5 font-bold text-xs text-slate-700 dark:text-slate-200">
                   <Info className="w-3.5 h-3.5 shrink-0" />
                   <span>{item.title}</span>
                 </div>
-                <p className="text-[12px] text-blue-800/90 dark:text-blue-400/90 leading-relaxed">{item.message}</p>
+                <p className="text-[12px] text-slate-600 dark:text-slate-300 leading-relaxed">{item.message}</p>
               </div>
             ))}
           </div>

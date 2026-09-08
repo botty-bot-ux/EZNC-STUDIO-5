@@ -57,7 +57,7 @@ export const CanvasControls: React.FC<CanvasControlsProps> = ({
         title={showTrajectory ? 'Траектория: ВКЛ (нажмите для скрытия)' : 'Траектория: ВЫКЛ (нажмите для показа)'}
         className={`p-2 rounded-xl transition-all cursor-pointer flex items-center justify-center shrink-0 ${
           showTrajectory
-            ? 'bg-blue-600 text-white'
+            ? 'bg-primary text-primary-fg'
             : 'hover:bg-slate-100 hover:dark:bg-slate-700 text-slate-600 dark:text-slate-300'
         }`}
       >
@@ -71,7 +71,7 @@ export const CanvasControls: React.FC<CanvasControlsProps> = ({
         title={snapToGrid ? 'Привязка к сетке: ВКЛ (S)' : 'Привязка к сетке: ВЫКЛ (S)'}
         className={`p-2 rounded-xl transition-all cursor-pointer flex items-center justify-center shrink-0 ${
           snapToGrid
-            ? 'bg-blue-600 text-white'
+            ? 'bg-primary text-primary-fg'
             : 'hover:bg-slate-100 hover:dark:bg-slate-700 text-slate-600 dark:text-slate-300'
         }`}
       >
@@ -83,7 +83,7 @@ export const CanvasControls: React.FC<CanvasControlsProps> = ({
         title={objectSnapEnabled ? 'Магнитная привязка O-SNAP: ВКЛ' : 'Магнитная привязка O-SNAP: ВЫКЛ'}
         className={`p-2 rounded-xl transition-all cursor-pointer flex items-center justify-center shrink-0 ${
           objectSnapEnabled
-            ? 'bg-amber-500 text-white'
+            ? 'bg-primary text-primary-fg'
             : 'hover:bg-slate-100 hover:dark:bg-slate-700 text-slate-600 dark:text-slate-300'
         }`}
       >

@@ -21,7 +21,7 @@ export const CircleProperties: React.FC<CirclePropertiesProps> = ({ obj, onUpdat
           value={obj.radius}
           onChange={(radius) => onUpdate({ radius })}
           step="0.5"
-          className="text-emerald-700 dark:text-emerald-400 font-bold"
+          className="text-slate-800 dark:text-slate-100 font-bold"
           fallbackValue={1}
         />
       </div>

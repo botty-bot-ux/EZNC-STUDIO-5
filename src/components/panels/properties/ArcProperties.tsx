@@ -17,13 +17,13 @@ export const ArcProperties: React.FC<ArcPropertiesProps> = ({ obj, onUpdate }) =
           label="X1, мм"
           value={obj.startX}
           onChange={(startX) => onUpdate({ startX })}
-          className="text-emerald-700 dark:text-emerald-400"
+          className="text-slate-800 dark:text-slate-100"
         />
         <PropertyInput
           label="Y1, мм"
           value={obj.startY}
           onChange={(startY) => onUpdate({ startY })}
-          className="text-emerald-700 dark:text-emerald-400"
+          className="text-slate-800 dark:text-slate-100"
         />
       </div>
 
@@ -32,13 +32,13 @@ export const ArcProperties: React.FC<ArcPropertiesProps> = ({ obj, onUpdate }) =
           label="X2, мм"
           value={obj.endX}
           onChange={(endX) => onUpdate({ endX })}
-          className="text-rose-700 dark:text-rose-400"
+          className="text-slate-800 dark:text-slate-100"
         />
         <PropertyInput
           label="Y2, мм"
           value={obj.endY}
           onChange={(endY) => onUpdate({ endY })}
-          className="text-rose-700 dark:text-rose-400"
+          className="text-slate-800 dark:text-slate-100"
         />
       </div>
 
@@ -47,13 +47,13 @@ export const ArcProperties: React.FC<ArcPropertiesProps> = ({ obj, onUpdate }) =
           label="Xc, мм"
           value={obj.centerX}
           onChange={(centerX) => onUpdate({ centerX })}
-          className="text-cyan-700 dark:text-cyan-400"
+          className="text-slate-800 dark:text-slate-100"
         />
         <PropertyInput
           label="Yc, мм"
           value={obj.centerY}
           onChange={(centerY) => onUpdate({ centerY })}
-          className="text-cyan-700 dark:text-cyan-400"
+          className="text-slate-800 dark:text-slate-100"
         />
       </div>
 
@@ -63,7 +63,7 @@ export const ArcProperties: React.FC<ArcPropertiesProps> = ({ obj, onUpdate }) =
           value={obj.radius}
           onChange={(radius) => onUpdate({ radius: Math.max(0.1, radius) })}
           step="0.5"
-          className="text-amber-700 dark:text-amber-400 font-bold"
+          className="text-slate-800 dark:text-slate-100 font-bold"
           fallbackValue={1}
         />
       </div>
@@ -75,8 +75,8 @@ export const ArcProperties: React.FC<ArcPropertiesProps> = ({ obj, onUpdate }) =
           onClick={() => onUpdate({ clockwise: !obj.clockwise })}
           className={`flex-1 py-1 px-2 rounded-lg font-semibold text-xs border transition-all flex items-center justify-center gap-1 shadow-xs ${
             obj.clockwise
-              ? 'bg-cyan-50 dark:bg-cyan-500/15 border-cyan-300 text-cyan-800 dark:text-cyan-400 hover:bg-cyan-100 hover:dark:bg-cyan-500/20'
-              : 'bg-emerald-50 dark:bg-emerald-500/15 border-emerald-300 text-emerald-800 dark:text-emerald-400 hover:bg-emerald-100 hover:dark:bg-emerald-500/20'
+              ? 'bg-slate-100 dark:bg-slate-800 border-line text-slate-800 dark:text-slate-100 hover:bg-slate-200 hover:dark:bg-slate-700'
+              : 'bg-slate-100 dark:bg-slate-800 border-line text-slate-800 dark:text-slate-100 hover:bg-slate-200 hover:dark:bg-slate-700'
           }`}
         >
           <span>{obj.clockwise ? '↻ G02 (по час.)' : '↺ G03 (против)'}</span>

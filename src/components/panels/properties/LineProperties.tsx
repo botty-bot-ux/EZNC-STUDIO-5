@@ -31,7 +31,7 @@ export const LineProperties: React.FC<LinePropertiesProps> = ({ obj, onUpdate })
         type="button"
         onClick={handleSwapPoints}
         title="Поменять начальную и конечную точки местами"
-        className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 hover:dark:bg-slate-600 border border-slate-200/80 dark:border-slate-700/80 text-slate-600 dark:text-slate-300 hover:text-blue-600 hover:dark:text-blue-400 transition-colors shrink-0 flex items-center justify-center self-center"
+        className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 hover:dark:bg-slate-600 border border-slate-200/80 dark:border-slate-700/80 text-slate-600 dark:text-slate-300 hover:text-primary transition-colors shrink-0 flex items-center justify-center self-center"
       >
         <ArrowLeftRight className="w-4 h-4" />
       </button>

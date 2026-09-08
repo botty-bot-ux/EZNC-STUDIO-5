@@ -37,7 +37,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-200/80 dark:border-slate-700/80 pb-3">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center text-white">
+            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-primary-fg">
               <Cpu className="w-5 h-5" />
             </div>
             <h3 className="font-bold text-base text-slate-900 dark:text-slate-100">Экспорт на ЧПУ</h3>
@@ -66,7 +66,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
               </span>
 
               <span className="text-slate-500 dark:text-slate-400">Экономия</span>
-              <span className="text-right font-mono font-semibold text-emerald-600 dark:text-emerald-400">
+              <span className="text-right font-mono font-semibold text-accent">
                 {toLen(result.savedDistance)} · −{result.savedPercentage.toFixed(0)}%
               </span>
 
@@ -82,7 +82,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
               </span>
               <button
                 onClick={onUndoOptimize}
-                className="inline-flex items-center gap-1 text-[13px] font-semibold text-slate-500 dark:text-slate-400 hover:text-rose-600 hover:dark:text-rose-400 transition-colors shrink-0"
+                className="inline-flex items-center gap-1 text-[13px] font-semibold text-slate-500 dark:text-slate-400 hover:text-danger transition-colors shrink-0"
               >
                 <Undo2 className="w-3.5 h-3.5" />
                 Отменить
@@ -91,7 +91,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
           </div>
         ) : (
           <div className="rounded-xl border border-slate-200 dark:border-slate-700 p-3.5 text-xs text-slate-500 dark:text-slate-400 flex items-center gap-2">
-            <Zap className="w-4 h-4 text-amber-500 dark:text-amber-400 shrink-0" />
+            <Zap className="w-4 h-4 text-accent shrink-0" />
             <span>Маршрут не оптимизирован — выгрузка как есть.</span>
           </div>
         )}
@@ -101,16 +101,16 @@ export const ExportModal: React.FC<ExportModalProps> = ({
           <button
             onClick={onOptimize}
             disabled={!hasObjects}
-            className="px-4 py-2.5 rounded-xl text-xs font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/15 border border-amber-200 hover:bg-amber-100 hover:dark:bg-amber-500/20 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm inline-flex items-center gap-1.5"
+            className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 border border-line hover:bg-slate-200 hover:dark:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm inline-flex items-center gap-1.5"
           >
-            <Zap className="w-4 h-4 fill-amber-500 text-amber-500 dark:text-amber-400" />
+            <Zap className="w-4 h-4 fill-accent text-accent" />
             Оптимизировать
           </button>
 
           <button
             onClick={onExport}
             disabled={!hasObjects}
-            className="px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed shadow-sm transition-all cursor-pointer inline-flex items-center gap-1.5"
+            className="px-5 py-2.5 rounded-xl text-xs font-bold text-primary-fg bg-primary hover:opacity-90 active:opacity-100 disabled:opacity-40 disabled:cursor-not-allowed shadow-sm transition-all cursor-pointer inline-flex items-center gap-1.5"
           >
             <Download className="w-4 h-4" />
             Экспорт .nc на станок

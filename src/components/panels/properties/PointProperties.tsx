@@ -31,7 +31,7 @@ export const PointProperties: React.FC<PointPropertiesProps> = ({ obj, onUpdate 
             onClick={() => setDrillMode('11mm')}
             className={`py-0.5 px-1.5 text-xs font-semibold rounded-lg transition-all ${
               currentMode === '11mm'
-                ? 'bg-purple-600 text-white shadow-sm font-bold'
+                ? 'bg-primary text-primary-fg shadow-sm font-bold'
                 : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:dark:text-slate-100 hover:bg-slate-200/60 hover:dark:bg-slate-600/60'
             }`}
           >
@@ -42,7 +42,7 @@ export const PointProperties: React.FC<PointPropertiesProps> = ({ obj, onUpdate 
             onClick={() => setDrillMode('9mm')}
             className={`py-0.5 px-1.5 text-xs font-semibold rounded-lg transition-all ${
               currentMode === '9mm'
-                ? 'bg-purple-600 text-white shadow-sm font-bold'
+                ? 'bg-primary text-primary-fg shadow-sm font-bold'
                 : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:dark:text-slate-100 hover:bg-slate-200/60 hover:dark:bg-slate-600/60'
             }`}
           >
@@ -53,7 +53,7 @@ export const PointProperties: React.FC<PointPropertiesProps> = ({ obj, onUpdate 
             onClick={() => setDrillMode('3mm')}
             className={`py-0.5 px-1.5 text-xs font-semibold rounded-lg transition-all ${
               currentMode === '3mm'
-                ? 'bg-purple-600 text-white shadow-sm font-bold'
+                ? 'bg-primary text-primary-fg shadow-sm font-bold'
                 : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:dark:text-slate-100 hover:bg-slate-200/60 hover:dark:bg-slate-600/60'
             }`}
           >

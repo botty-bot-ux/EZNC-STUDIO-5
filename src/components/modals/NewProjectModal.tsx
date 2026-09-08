@@ -43,14 +43,14 @@ export const NewProjectModal: React.FC<NewProjectModalProps> = ({
       title: 'Изголовье',
       subtitle: 'Фреза Ø3 мм · лист 1681×1081 · узор (линии и дуги)',
       Icon: Spline,
-      iconClass: 'bg-cyan-50 text-cyan-600 dark:bg-cyan-500/15 dark:text-cyan-400',
+      iconClass: 'bg-slate-100 text-accent dark:bg-slate-800 dark:text-accent',
     },
     {
       mode: 'rail',
       title: 'Царга',
       subtitle: 'Фреза Ø8 мм · лист 2080×360 · рез и отверстия',
       Icon: CircleDot,
-      iconClass: 'bg-purple-50 text-purple-600 dark:bg-purple-500/15 dark:text-purple-400',
+      iconClass: 'bg-slate-100 text-accent dark:bg-slate-800 dark:text-accent',
     },
   ];
 
@@ -66,7 +66,7 @@ export const NewProjectModal: React.FC<NewProjectModalProps> = ({
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-200/80 dark:border-slate-700/80 pb-3">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white">
+            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-primary-fg">
               <FilePlus className="w-5 h-5" />
             </div>
             <h3 className="font-bold text-base text-slate-900 dark:text-slate-100">Новый проект</h3>
@@ -92,7 +92,7 @@ export const NewProjectModal: React.FC<NewProjectModalProps> = ({
             <button
               key={mode}
               onClick={() => onCreate(mode)}
-              className="flex items-center gap-3 p-3.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-blue-400 hover:dark:border-blue-500 hover:bg-blue-50/50 hover:dark:bg-blue-500/10 active:bg-blue-50 active:dark:bg-blue-500/15 transition-all text-left cursor-pointer"
+              className="flex items-center gap-3 p-3.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-primary/40 hover:bg-slate-50 hover:dark:bg-slate-800 active:bg-slate-100 active:dark:bg-slate-700 transition-all text-left cursor-pointer"
             >
               <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${iconClass}`}>
                 <Icon className="w-5 h-5" />

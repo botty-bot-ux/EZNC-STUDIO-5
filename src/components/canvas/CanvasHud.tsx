@@ -99,7 +99,7 @@ export const CanvasHud: React.FC<CanvasHudProps> = ({
     <>
       {/* Мобильный DYN-ввод длины с экранной клавиатуры */}
       {mobileDynActive && (
-        <div className="absolute top-24 left-1/2 -translate-x-1/2 z-40 flex items-center gap-1.5 bg-slate-900 dark:bg-slate-100 border border-amber-500/40 px-2 py-1.5 rounded-2xl shadow-md">
+        <div className="absolute top-24 left-1/2 -translate-x-1/2 z-40 flex items-center gap-1.5 bg-slate-900 dark:bg-slate-100 border border-slate-600 dark:border-slate-300 px-2 py-1.5 rounded-2xl shadow-md">
           <span className="text-xs text-slate-400 dark:text-slate-500 font-semibold ml-1">
             {activeTool === 'arc' ? 'Хорда' : 'Длина'}
           </span>
@@ -119,12 +119,12 @@ export const CanvasHud: React.FC<CanvasHudProps> = ({
               }
             }}
             placeholder="0"
-            className="w-20 bg-slate-800 border border-slate-600 rounded-lg px-2 py-1 text-right font-mono text-xl font-bold text-amber-400 tabular-nums focus:outline-none focus:border-amber-500"
+            className="w-20 bg-slate-800 border border-slate-600 rounded-lg px-2 py-1 text-right font-mono text-xl font-bold text-slate-100 dark:text-slate-900 tabular-nums focus:outline-none focus:border-slate-400"
           />
           <span className="text-xs text-slate-400 dark:text-slate-500 shrink-0">мм</span>
           <button
             onClick={() => onDynCommit?.()}
-            className="bg-blue-600 active:bg-blue-500 text-white text-xs font-bold px-3 py-2 rounded-lg shrink-0"
+            className="bg-white text-slate-900 active:bg-slate-200 dark:bg-slate-900 dark:text-white dark:active:bg-slate-700 text-xs font-bold px-3 py-2 rounded-lg shrink-0"
           >
             Готово
           </button>
@@ -150,14 +150,14 @@ export const CanvasHud: React.FC<CanvasHudProps> = ({
       {/* Active tool instruction banner */}
       {instruction && (
         <div
-          className={`absolute left-1/2 -translate-x-1/2 z-20 bg-blue-600 text-white px-4 py-2 rounded-2xl shadow-md flex items-center gap-3 text-xs font-semibold ${
+          className={`absolute left-1/2 -translate-x-1/2 z-20 bg-white dark:bg-slate-900 border border-line text-slate-700 dark:text-slate-200 px-4 py-2 rounded-2xl shadow-md flex items-center gap-3 text-xs font-semibold ${
             isMobile ? 'top-24' : 'top-20'
           }`}
         >
           <span>{instruction}</span>
           <button
             onClick={onCancelDraw}
-            className="bg-white/20 dark:bg-slate-900/20 hover:bg-white/30 hover:dark:bg-slate-800/30 px-2 py-0.5 rounded-lg text-[13px] transition-colors"
+            className="bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 hover:dark:bg-slate-700 px-2 py-0.5 rounded-lg text-[13px] transition-colors"
           >
             ESC
           </button>

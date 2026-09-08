@@ -184,13 +184,13 @@ export const Header: React.FC = () => {
   if (isMobile) {
     const toolBtn = (active: boolean) =>
       `p-2 rounded-lg transition-all shrink-0 ${
-        active ? 'bg-blue-600 text-white' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 hover:dark:bg-slate-800/60'
+        active ? 'bg-primary text-primary-fg' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 hover:dark:bg-slate-800/60'
       }`;
     const menuItems = [
-      { label: 'Новый проект', Icon: FilePlus, onClick: () => setNewProjectOpen(true), color: 'text-blue-600 dark:text-blue-400' },
-      { label: 'Открыть (.json / .nc)', Icon: FolderOpen, onClick: () => fileInputRef.current?.click(), color: 'text-amber-600 dark:text-amber-400' },
-      { label: 'Сохранить проект (.json)', Icon: Save, onClick: () => handleSaveProject(), color: 'text-emerald-600 dark:text-emerald-400' },
-      { label: 'Экспорт на ЧПУ', Icon: Download, onClick: () => openExportModal(), color: 'text-teal-600 dark:text-teal-400' },
+      { label: 'Новый проект', Icon: FilePlus, onClick: () => setNewProjectOpen(true), color: 'text-accent' },
+      { label: 'Открыть (.json / .nc)', Icon: FolderOpen, onClick: () => fileInputRef.current?.click(), color: 'text-accent' },
+      { label: 'Сохранить проект (.json)', Icon: Save, onClick: () => handleSaveProject(), color: 'text-accent' },
+      { label: 'Экспорт на ЧПУ', Icon: Download, onClick: () => openExportModal(), color: 'text-accent' },
     ];
 
     return (
@@ -204,7 +204,7 @@ export const Header: React.FC = () => {
             type="text"
             value={projectName}
             onChange={(e) => setProjectName(e.target.value)}
-            className="bg-slate-100/80 dark:bg-slate-800/80 text-slate-800 dark:text-slate-100 text-sm font-semibold px-2 py-1 rounded-xl border border-slate-200 dark:border-slate-700 focus:border-blue-500 focus:bg-white focus:dark:bg-slate-800 focus:outline-none flex-1 min-w-0 text-center"
+            className="bg-slate-100/80 dark:bg-slate-800/80 text-slate-800 dark:text-slate-100 text-sm font-semibold px-2 py-1 rounded-xl border border-slate-200 dark:border-slate-700 focus:border-primary focus:bg-white focus:dark:bg-slate-800 focus:outline-none flex-1 min-w-0 text-center"
             placeholder="Проект"
           />
 
@@ -212,7 +212,7 @@ export const Header: React.FC = () => {
             <button
               onClick={() => setActiveTab('machine')}
               className={`flex items-center gap-1 px-2 py-1.5 rounded-xl text-xs font-bold shrink-0 ${
-                errorCount > 0 ? 'bg-rose-50 dark:bg-rose-500/15 text-rose-600 dark:text-rose-400' : 'bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-400'
+                errorCount > 0 ? 'bg-danger/10 text-danger' : 'bg-slate-100 dark:bg-slate-800 text-muted'
               }`}
             >
               <AlertTriangle className="w-4 h-4 shrink-0" />
@@ -243,20 +243,20 @@ export const Header: React.FC = () => {
             <MousePointer className="w-4 h-4" />
           </button>
           <button onClick={() => setActiveTool('line')} title="Линия / Отрезок" className={toolBtn(activeTool === 'line')}>
-            <LineDotRightHorizontal className={`w-4 h-4 ${activeTool === 'line' ? 'text-white' : 'text-blue-600 dark:text-blue-400'}`} />
+            <LineDotRightHorizontal className={`w-4 h-4 ${activeTool === 'line' ? 'text-primary-fg' : 'text-accent'}`} />
           </button>
           {isRail && (
             <button onClick={() => setActiveTool('point')} title="Отверстие / Точка" className={toolBtn(activeTool === 'point')}>
-              <CircleDot className={`w-4 h-4 ${activeTool === 'point' ? 'text-white' : 'text-purple-600 dark:text-purple-400'}`} />
+              <CircleDot className={`w-4 h-4 ${activeTool === 'point' ? 'text-primary-fg' : 'text-accent'}`} />
             </button>
           )}
           {!isRail && (
             <button onClick={() => setActiveTool('arc')} title="Дуга окружности" className={toolBtn(activeTool === 'arc')}>
-              <Spline className={`w-4 h-4 ${activeTool === 'arc' ? 'text-white' : 'text-cyan-600 dark:text-cyan-400'}`} />
+              <Spline className={`w-4 h-4 ${activeTool === 'arc' ? 'text-primary-fg' : 'text-accent'}`} />
             </button>
           )}
           <button onClick={() => setActiveTool('measure')} title="Линейка / Штангенциркуль" className={toolBtn(activeTool === 'measure')}>
-            <Ruler className={`w-4 h-4 ${activeTool === 'measure' ? 'text-white' : 'text-rose-500 dark:text-rose-400'}`} />
+            <Ruler className={`w-4 h-4 ${activeTool === 'measure' ? 'text-primary-fg' : 'text-accent'}`} />
           </button>
 
           <div className="w-px h-5 bg-slate-200 dark:bg-slate-700 mx-0.5 shrink-0" />
@@ -330,17 +330,17 @@ export const Header: React.FC = () => {
           <button
             onClick={() => setNewProjectOpen(true)}
             title="Новый проект"
-            className="p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:text-blue-600 hover:dark:text-blue-400 hover:bg-white hover:dark:bg-slate-800 transition-all hover:shadow-sm"
+            className="p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:text-primary hover:bg-white hover:dark:bg-slate-800 transition-all hover:shadow-sm"
           >
-            <FilePlus className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+            <FilePlus className="w-4 h-4 text-accent" />
           </button>
 
           <button
             onClick={() => fileInputRef.current?.click()}
             title="Открыть проект (.json / .nc)"
-            className="p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:text-amber-600 hover:dark:text-amber-400 hover:bg-white hover:dark:bg-slate-800 transition-all hover:shadow-sm"
+            className="p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:text-primary hover:bg-white hover:dark:bg-slate-800 transition-all hover:shadow-sm"
           >
-            <FolderOpen className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+            <FolderOpen className="w-4 h-4 text-accent" />
           </button>
           <input
             type="file"
@@ -353,9 +353,9 @@ export const Header: React.FC = () => {
           <button
             onClick={handleSaveProject}
             title="Сохранить проект (.json)"
-            className="p-2 rounded-lg text-slate-700 dark:text-slate-200 hover:text-emerald-600 hover:dark:text-emerald-400 hover:bg-white hover:dark:bg-slate-800 transition-all hover:shadow-sm flex items-center gap-1.5 cursor-pointer"
+            className="p-2 rounded-lg text-slate-700 dark:text-slate-200 hover:text-primary hover:bg-white hover:dark:bg-slate-800 transition-all hover:shadow-sm flex items-center gap-1.5 cursor-pointer"
           >
-            <Save className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+            <Save className="w-4 h-4 text-accent" />
           </button>
         </div>
 
@@ -364,7 +364,7 @@ export const Header: React.FC = () => {
           <button
             onClick={toggleTheme}
             title={theme === 'dark' ? 'Светлая тема' : 'Тёмная тема'}
-            className="p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:text-amber-500 hover:dark:text-amber-400 hover:bg-white hover:dark:bg-slate-800 transition-all cursor-pointer"
+            className="p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:text-primary hover:bg-white hover:dark:bg-slate-800 transition-all cursor-pointer"
           >
             {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
           </button>
@@ -379,7 +379,7 @@ export const Header: React.FC = () => {
             title="Выбор и перемещение (S)"
             className={`p-2 rounded-lg transition-all ${
               activeTool === 'select'
-                ? 'bg-blue-600 text-white'
+                ? 'bg-primary text-primary-fg'
                 : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:dark:text-slate-100 hover:bg-slate-50 hover:dark:bg-slate-800/60'
             }`}
           >
@@ -391,11 +391,11 @@ export const Header: React.FC = () => {
             title="Линия / Отрезок (L) · Shift = углы 90°/45°"
             className={`p-2 rounded-lg transition-all ${
               activeTool === 'line'
-                ? 'bg-blue-600 text-white'
+                ? 'bg-primary text-primary-fg'
                 : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:dark:text-slate-100 hover:bg-slate-50 hover:dark:bg-slate-800/60'
             }`}
           >
-            <LineDotRightHorizontal className={`w-4 h-4 ${activeTool === 'line' ? 'text-white' : 'text-blue-600 dark:text-blue-400'}`} />
+            <LineDotRightHorizontal className={`w-4 h-4 ${activeTool === 'line' ? 'text-primary-fg' : 'text-accent'}`} />
           </button>
 
           {isRail && (
@@ -404,11 +404,11 @@ export const Header: React.FC = () => {
               title="Отверстие / Точка (H)"
               className={`p-2 rounded-lg transition-all ${
                 activeTool === 'point'
-                  ? 'bg-blue-600 text-white'
+                  ? 'bg-primary text-primary-fg'
                   : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:dark:text-slate-100 hover:bg-slate-50 hover:dark:bg-slate-800/60'
               }`}
             >
-              <CircleDot className={`w-4 h-4 ${activeTool === 'point' ? 'text-white' : 'text-purple-600 dark:text-purple-400'}`} />
+              <CircleDot className={`w-4 h-4 ${activeTool === 'point' ? 'text-primary-fg' : 'text-accent'}`} />
             </button>
           )}
 
@@ -418,11 +418,11 @@ export const Header: React.FC = () => {
               title="Дуга окружности (A) · Shift = хорда 90°/45°"
               className={`p-2 rounded-lg transition-all ${
                 activeTool === 'arc'
-                  ? 'bg-blue-600 text-white'
+                  ? 'bg-primary text-primary-fg'
                   : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:dark:text-slate-100 hover:bg-slate-50 hover:dark:bg-slate-800/60'
               }`}
             >
-              <Spline className={`w-4 h-4 ${activeTool === 'arc' ? 'text-white' : 'text-cyan-600 dark:text-cyan-400'}`} />
+              <Spline className={`w-4 h-4 ${activeTool === 'arc' ? 'text-primary-fg' : 'text-accent'}`} />
             </button>
           )}
 
@@ -431,11 +431,11 @@ export const Header: React.FC = () => {
             title="Линейка / Штангенциркуль (M)"
             className={`p-2 rounded-lg transition-all ${
               activeTool === 'measure'
-                ? 'bg-blue-600 text-white'
+                ? 'bg-primary text-primary-fg'
                 : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:dark:text-slate-100 hover:bg-slate-50 hover:dark:bg-slate-800/60'
             }`}
           >
-            <Ruler className={`w-4 h-4 ${activeTool === 'measure' ? 'text-white' : 'text-rose-500 dark:text-rose-400'}`} />
+            <Ruler className={`w-4 h-4 ${activeTool === 'measure' ? 'text-primary-fg' : 'text-accent'}`} />
           </button>
         </div>
       </div>
@@ -446,7 +446,7 @@ export const Header: React.FC = () => {
         <button
           onClick={openExportModal}
           title="Оптимизировать маршрут и выгрузить чистый G-код на станок"
-          className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 shadow-sm transition-all cursor-pointer"
+          className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold text-primary-fg bg-primary hover:opacity-90 active:opacity-100 shadow-sm transition-all cursor-pointer"
         >
           <Download className="w-4 h-4" />
           Экспорт на ЧПУ
@@ -459,8 +459,8 @@ export const Header: React.FC = () => {
             title={errorCount > 0 ? `${errorCount} ошибок` : `${warningCount} предупреждений`}
             className={`flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-xs font-medium border transition-all ${
               errorCount > 0
-                ? 'bg-rose-50 dark:bg-rose-500/15 border-rose-200 text-rose-600 dark:text-rose-400 hover:bg-rose-100 hover:dark:bg-rose-500/20 shadow-sm'
-                : 'bg-amber-50 dark:bg-amber-500/15 border-amber-200 text-amber-700 dark:text-amber-400 hover:bg-amber-100 hover:dark:bg-amber-500/20 shadow-sm'
+                ? 'bg-danger/10 border-danger/30 text-danger hover:bg-danger/15 shadow-sm'
+                : 'bg-slate-100 dark:bg-slate-800 border-line text-muted hover:bg-slate-200 hover:dark:bg-slate-700 shadow-sm'
             }`}
           >
             <AlertTriangle className="w-4 h-4 shrink-0" />

@@ -80,7 +80,7 @@ export const MoveDialog: React.FC<MoveDialogProps> = ({ isOpen, ids, onClose, on
       >
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-2">
-            <Move className="w-4 h-4 text-sky-600 dark:text-sky-400" />
+            <Move className="w-4 h-4 text-accent" />
             <h3 className="font-semibold text-sm">Переместить</h3>
             {ids.length > 1 && (
               <span className="text-[13px] text-slate-400 dark:text-slate-500">· {ids.length} фигур</span>
@@ -111,7 +111,7 @@ export const MoveDialog: React.FC<MoveDialogProps> = ({ isOpen, ids, onClose, on
                 }
               }}
               placeholder="0"
-              className="mt-1 w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 font-mono text-sm text-center focus:border-sky-500 focus:bg-white focus:dark:bg-slate-900 focus:outline-none transition-all"
+              className="mt-1 w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 font-mono text-sm text-center focus:border-primary focus:bg-white focus:dark:bg-slate-900 focus:outline-none transition-all"
             />
           </label>
           <label className="block">
@@ -128,7 +128,7 @@ export const MoveDialog: React.FC<MoveDialogProps> = ({ isOpen, ids, onClose, on
                 }
               }}
               placeholder="0"
-              className="mt-1 w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 font-mono text-sm text-center focus:border-sky-500 focus:bg-white focus:dark:bg-slate-900 focus:outline-none transition-all"
+              className="mt-1 w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 font-mono text-sm text-center focus:border-primary focus:bg-white focus:dark:bg-slate-900 focus:outline-none transition-all"
             />
           </label>
         </div>
@@ -143,7 +143,7 @@ export const MoveDialog: React.FC<MoveDialogProps> = ({ isOpen, ids, onClose, on
           <button
             onClick={confirm}
             disabled={!canApply}
-            className="px-5 py-2 rounded-xl text-xs font-bold text-white bg-sky-600 hover:bg-sky-500 active:bg-sky-700 disabled:opacity-40 disabled:cursor-not-allowed shadow-sm transition-all cursor-pointer"
+            className="px-5 py-2 rounded-xl text-xs font-bold text-primary-fg bg-primary hover:opacity-90 active:opacity-100 disabled:opacity-40 disabled:cursor-not-allowed shadow-sm transition-all cursor-pointer"
           >
             Подтвердить
           </button>

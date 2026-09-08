@@ -30,7 +30,7 @@ export const PropertyInput: React.FC<PropertyInputProps> = ({
         step={step}
         value={value}
         onChange={(e) => onChange(parseFloat(e.target.value) || fallbackValue)}
-        className={`w-full bg-slate-50 dark:bg-slate-900 border border-slate-200/90 dark:border-slate-700/90 rounded-lg px-2 py-1 text-xs font-mono focus:bg-white focus:dark:bg-slate-800 focus:border-blue-500 focus:outline-none transition-all ${className}`}
+        className={`w-full bg-slate-50 dark:bg-slate-900 border border-slate-200/90 dark:border-slate-700/90 rounded-lg px-2 py-1 text-xs font-mono focus:bg-white focus:dark:bg-slate-800 focus:border-primary focus:outline-none transition-all ${className}`}
       />
     </div>
   );

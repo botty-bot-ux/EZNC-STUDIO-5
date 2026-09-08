@@ -57,7 +57,7 @@ export const PropertiesPanel: React.FC = () => {
     return (
       <div className="p-4 space-y-3 text-xs text-slate-800 dark:text-slate-100 overflow-y-auto h-full select-none">
         <div className="flex items-center gap-2 pb-2 border-b border-slate-200/80 dark:border-slate-700/80">
-          <Ruler className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+          <Ruler className="w-4 h-4 text-accent" />
           <span className="font-bold text-sm text-slate-800 dark:text-slate-100">Линейка</span>
         </div>
         {body}
@@ -75,7 +75,7 @@ export const PropertiesPanel: React.FC = () => {
       <div className="p-4 space-y-4 text-xs text-slate-800 dark:text-slate-100 overflow-y-auto h-full select-none">
         <div className="flex items-center justify-between pb-3 border-b border-slate-200/80 dark:border-slate-700/80">
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-blue-100 dark:bg-blue-500/15 flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold">
+            <div className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-accent font-bold">
               <Layers className="w-4 h-4" />
             </div>
             <div>
@@ -97,8 +97,8 @@ export const PropertiesPanel: React.FC = () => {
               title={allFrozen ? 'Разморозить (разрешить перемещение)' : 'Заморозить (запретить случайное перемещение)'}
               className={`p-1.5 rounded-lg transition-all ${
                 allFrozen
-                  ? 'text-sky-600 dark:text-sky-400 bg-sky-50 dark:bg-sky-500/20 hover:bg-sky-100 hover:dark:bg-sky-500/30'
-                  : 'text-slate-400 dark:text-slate-500 hover:text-sky-600 hover:dark:text-sky-400 hover:bg-sky-50 hover:dark:bg-sky-500/20'
+                  ? 'text-primary bg-primary/10 hover:bg-primary/15'
+                  : 'text-slate-400 dark:text-slate-500 hover:text-primary hover:bg-slate-100 hover:dark:bg-slate-700'
               }`}
             >
               {allFrozen ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
@@ -107,7 +107,7 @@ export const PropertiesPanel: React.FC = () => {
               <button
                 onClick={() => setMoveOpen(true)}
                 title="Переместить (точное смещение по X/Y)"
-                className="p-1.5 rounded-lg text-slate-400 dark:text-slate-500 hover:text-sky-600 hover:dark:text-sky-400 hover:bg-sky-50 hover:dark:bg-sky-500/20 transition-all"
+                className="p-1.5 rounded-lg text-slate-400 dark:text-slate-500 hover:text-primary hover:bg-slate-100 hover:dark:bg-slate-700 transition-all"
               >
                 <Move className="w-4 h-4" />
               </button>
@@ -115,7 +115,7 @@ export const PropertiesPanel: React.FC = () => {
             <button
               onClick={deleteSelectedObjects}
               title="Удалить выбранные объекты"
-              className="p-1.5 rounded-lg text-slate-400 dark:text-slate-500 hover:text-rose-600 hover:dark:text-rose-400 hover:bg-rose-50 hover:dark:bg-rose-500/20 transition-all"
+              className="p-1.5 rounded-lg text-slate-400 dark:text-slate-500 hover:text-danger hover:bg-danger/10 transition-all"
             >
               <Trash2 className="w-4 h-4" />
             </button>
@@ -184,11 +184,11 @@ export const PropertiesPanel: React.FC = () => {
     <div className="p-4 space-y-4 text-xs text-slate-800 dark:text-slate-100 overflow-y-auto h-full select-none">
       <div className="flex items-center justify-between pb-3 border-b border-slate-200/80 dark:border-slate-700/80">
         <div className="flex items-center gap-2">
-          {selectedObj.type === 'point' && <CircleDot className="w-4 h-4 text-purple-600 dark:text-purple-400" />}
-          {selectedObj.type === 'line' && <LineDotRightHorizontal className="w-4 h-4 text-blue-600 dark:text-blue-400" />}
-          {selectedObj.type === 'rectangle' && <Square className="w-4 h-4 text-amber-600 dark:text-amber-400" />}
-          {selectedObj.type === 'circle' && <Circle className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />}
-          {selectedObj.type === 'arc' && <Spline className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />}
+          {selectedObj.type === 'point' && <CircleDot className="w-4 h-4 text-accent" />}
+          {selectedObj.type === 'line' && <LineDotRightHorizontal className="w-4 h-4 text-accent" />}
+          {selectedObj.type === 'rectangle' && <Square className="w-4 h-4 text-accent" />}
+          {selectedObj.type === 'circle' && <Circle className="w-4 h-4 text-accent" />}
+          {selectedObj.type === 'arc' && <Spline className="w-4 h-4 text-accent" />}
 
           <span className="font-bold text-sm text-slate-800 dark:text-slate-100 truncate">{selectedObj.name}</span>
         </div>
@@ -206,8 +206,8 @@ export const PropertiesPanel: React.FC = () => {
             title={selectedObj.frozen === true ? 'Разморозить (разрешить перемещение)' : 'Заморозить (запретить случайное перемещение)'}
             className={`p-1.5 rounded-lg transition-all ${
               selectedObj.frozen === true
-                ? 'text-sky-600 dark:text-sky-400 bg-sky-50 dark:bg-sky-500/20 hover:bg-sky-100 hover:dark:bg-sky-500/30'
-                : 'text-slate-400 dark:text-slate-500 hover:text-sky-600 hover:dark:text-sky-400 hover:bg-sky-50 hover:dark:bg-sky-500/20'
+                ? 'text-primary bg-primary/10 hover:bg-primary/15'
+                : 'text-slate-400 dark:text-slate-500 hover:text-primary hover:bg-slate-100 hover:dark:bg-slate-700'
             }`}
           >
             {selectedObj.frozen === true ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
@@ -216,7 +216,7 @@ export const PropertiesPanel: React.FC = () => {
             <button
               onClick={() => setMoveOpen(true)}
               title="Переместить (точное смещение по X/Y)"
-              className="p-1.5 rounded-lg text-slate-400 dark:text-slate-500 hover:text-sky-600 hover:dark:text-sky-400 hover:bg-sky-50 hover:dark:bg-sky-500/20 transition-all"
+              className="p-1.5 rounded-lg text-slate-400 dark:text-slate-500 hover:text-primary hover:bg-slate-100 hover:dark:bg-slate-700 transition-all"
             >
               <Move className="w-4 h-4" />
             </button>
@@ -224,7 +224,7 @@ export const PropertiesPanel: React.FC = () => {
           <button
             onClick={() => deleteObject(selectedObj.id)}
             title="Удалить объект"
-            className="p-1.5 rounded-lg text-slate-400 dark:text-slate-500 hover:text-rose-600 hover:dark:text-rose-400 hover:bg-rose-50 hover:dark:bg-rose-500/20 transition-all"
+            className="p-1.5 rounded-lg text-slate-400 dark:text-slate-500 hover:text-danger hover:bg-danger/10 transition-all"
           >
             <Trash2 className="w-4 h-4" />
           </button>
@@ -239,18 +239,18 @@ export const PropertiesPanel: React.FC = () => {
             type="text"
             value={selectedObj.name}
             onChange={(e) => updateObject(selectedObj.id, { name: e.target.value })}
-            className="w-full bg-slate-100/80 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-800 dark:text-slate-100 focus:border-blue-500 focus:bg-white focus:dark:bg-slate-800 focus:outline-none transition-all"
+            className="w-full bg-slate-100/80 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-800 dark:text-slate-100 focus:border-primary focus:bg-white focus:dark:bg-slate-800 focus:outline-none transition-all"
           />
         </div>
 
         {/* Live length / angle readout for a segment */}
         {lineInfo && (
-          <div className="flex items-center justify-between p-2.5 rounded-xl bg-amber-50/70 dark:bg-amber-500/15 border border-amber-200/80 font-mono text-xs">
+          <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-line font-mono text-xs">
             <span className="text-slate-500 dark:text-slate-400">Длина</span>
-            <span className="font-bold text-amber-700 dark:text-amber-400">{lineInfo.len.toFixed(2)} мм</span>
+            <span className="font-bold text-slate-800 dark:text-slate-100">{lineInfo.len.toFixed(2)} мм</span>
             <span className="text-slate-300 dark:text-slate-600">|</span>
             <span className="text-slate-500 dark:text-slate-400">Угол</span>
-            <span className="font-bold text-sky-700 dark:text-sky-400">{lineInfo.angleDeg.toFixed(1)}°</span>
+            <span className="font-bold text-slate-800 dark:text-slate-100">{lineInfo.angleDeg.toFixed(1)}°</span>
           </div>
         )}
 

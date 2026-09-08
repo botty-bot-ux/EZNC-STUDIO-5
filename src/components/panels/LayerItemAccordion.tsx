@@ -67,24 +67,24 @@ export const LayerItemAccordion: React.FC<FigureRowProps> = ({
     <div
       onClick={onSelect}
       className={`group flex items-center gap-1.5 px-1.5 py-1 rounded-md cursor-pointer select-none transition-colors ${
-        isSelected ? 'bg-blue-500/10' : 'hover:bg-slate-500/5 hover:dark:bg-slate-500/5'
+        isSelected ? 'bg-primary/10' : 'hover:bg-slate-500/5 hover:dark:bg-slate-500/5'
       }`}
     >
       <TypeIcon
-        className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400 dark:text-slate-500'} ${
+        className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-primary' : 'text-slate-400 dark:text-slate-500'} ${
           isVisible ? '' : 'opacity-40'
         }`}
       />
 
       {isFrozen && (
-        <Snowflake className="w-3 h-3 shrink-0 text-sky-500 dark:text-sky-400" aria-label="Заморожено" />
+        <Snowflake className="w-3 h-3 shrink-0 text-accent" aria-label="Заморожено" />
       )}
 
       <span
         title={obj.name}
         className={`flex-1 min-w-0 truncate text-xs ${
           isSelected
-            ? 'text-blue-600 dark:text-blue-400 font-semibold'
+            ? 'text-primary font-semibold'
             : isVisible
             ? 'text-slate-700 dark:text-slate-200'
             : 'text-slate-400 dark:text-slate-500 line-through'
@@ -103,7 +103,7 @@ export const LayerItemAccordion: React.FC<FigureRowProps> = ({
           onClick={onMoveUp}
           disabled={index === 0}
           title="Выше"
-          className="p-0.5 rounded text-slate-400 dark:text-slate-500 hover:text-blue-600 hover:dark:text-blue-400 disabled:opacity-0"
+          className="p-0.5 rounded text-slate-400 dark:text-slate-500 hover:text-primary disabled:opacity-0"
         >
           <ChevronUp className="w-3.5 h-3.5" />
         </button>
@@ -112,7 +112,7 @@ export const LayerItemAccordion: React.FC<FigureRowProps> = ({
           onClick={onMoveDown}
           disabled={index === totalCount - 1}
           title="Ниже"
-          className="p-0.5 rounded text-slate-400 dark:text-slate-500 hover:text-blue-600 hover:dark:text-blue-400 disabled:opacity-0"
+          className="p-0.5 rounded text-slate-400 dark:text-slate-500 hover:text-primary disabled:opacity-0"
         >
           <ChevronDown className="w-3.5 h-3.5" />
         </button>
@@ -120,7 +120,7 @@ export const LayerItemAccordion: React.FC<FigureRowProps> = ({
           type="button"
           onClick={() => onUpdate({ visible: !isVisible })}
           title={isVisible ? 'Скрыть' : 'Показать'}
-          className="p-0.5 rounded text-slate-400 dark:text-slate-500 hover:text-blue-600 hover:dark:text-blue-400"
+          className="p-0.5 rounded text-slate-400 dark:text-slate-500 hover:text-primary"
         >
           {isVisible ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
         </button>
@@ -130,8 +130,8 @@ export const LayerItemAccordion: React.FC<FigureRowProps> = ({
           title={isFrozen ? 'Разморозить' : 'Заморозить (нельзя двигать)'}
           className={`p-0.5 rounded transition-colors ${
             isFrozen
-              ? 'text-sky-500 dark:text-sky-400 opacity-100'
-              : 'text-slate-400 dark:text-slate-500 hover:text-sky-600 hover:dark:text-sky-400'
+              ? 'text-accent opacity-100'
+              : 'text-slate-400 dark:text-slate-500 hover:text-accent'
           }`}
         >
           <Snowflake className="w-3.5 h-3.5" />
@@ -140,7 +140,7 @@ export const LayerItemAccordion: React.FC<FigureRowProps> = ({
           type="button"
           onClick={onDuplicate}
           title="Дублировать"
-          className="p-0.5 rounded text-slate-400 dark:text-slate-500 hover:text-amber-600 hover:dark:text-amber-400"
+          className="p-0.5 rounded text-slate-400 dark:text-slate-500 hover:text-primary"
         >
           <Copy className="w-3.5 h-3.5" />
         </button>
@@ -148,7 +148,7 @@ export const LayerItemAccordion: React.FC<FigureRowProps> = ({
           type="button"
           onClick={onDelete}
           title="Удалить"
-          className="p-0.5 rounded text-slate-400 dark:text-slate-500 hover:text-rose-600 hover:dark:text-rose-400"
+          className="p-0.5 rounded text-slate-400 dark:text-slate-500 hover:text-danger"
         >
           <Trash2 className="w-3.5 h-3.5" />
         </button>

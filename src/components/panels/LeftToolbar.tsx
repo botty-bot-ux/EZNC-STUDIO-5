@@ -26,11 +26,11 @@ export const LeftToolbar: React.FC = () => {
         <button
           onClick={toggleLeftPanel}
           title="Показать список фигур"
-          className="relative w-11 h-11 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-md flex items-center justify-center cursor-pointer hover:bg-white hover:dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:text-blue-600 hover:dark:text-blue-400 transition-colors"
+          className="relative w-11 h-11 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-md flex items-center justify-center cursor-pointer hover:bg-white hover:dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:text-primary transition-colors"
         >
-          <Shapes className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+          <Shapes className="w-5 h-5 text-accent" />
           {objects.length > 0 && (
-            <span className="absolute -top-1 -right-1 bg-blue-600 text-white text-[12px] font-bold px-1.5 py-0.2 rounded-full min-w-[18px] text-center border-2 border-white dark:border-slate-700 shadow-sm">
+            <span className="absolute -top-1 -right-1 bg-primary text-primary-fg text-[12px] font-bold px-1.5 py-0.2 rounded-full min-w-[18px] text-center border-2 border-white dark:border-slate-700 shadow-sm">
               {objects.length}
             </span>
           )}
@@ -44,7 +44,7 @@ export const LeftToolbar: React.FC = () => {
       {/* Header */}
       <div className="px-1.5 py-1 flex items-center justify-between gap-2 shrink-0">
         <div className="flex items-center gap-1.5 min-w-0">
-          <Shapes className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
+          <Shapes className="w-4 h-4 text-accent shrink-0" />
           <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Фигуры</span>
           <span className="text-[12px] font-bold text-slate-400 dark:text-slate-500">{objects.length}</span>
         </div>

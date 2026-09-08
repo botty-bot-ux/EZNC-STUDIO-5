@@ -17,6 +17,39 @@
   --text-lg--line-height: 1.85rem;
   --text-xl: 1.5rem;      /* 20 → 24px */
   --text-xl--line-height: 2rem;
+
+  /* Семантическая монохромная палитра (значения берутся из runtime-переменных
+     ниже и сами переключаются в .dark). Единый стиль вместо «радуги» акцентов. */
+  --color-primary: var(--c-primary);
+  --color-primary-fg: var(--c-primary-fg);
+  --color-accent: var(--c-accent);
+  --color-accent-fg: var(--c-accent-fg);
+  --color-line: var(--c-line);
+  --color-muted: var(--c-muted);
+  --color-danger: var(--c-danger);
+  --color-danger-fg: var(--c-danger-fg);
+}
+
+:root {
+  --c-primary: #212529;      /* solid-кнопки, активные вкладки, выбор */
+  --c-primary-fg: #ffffff;
+  --c-accent: #687385;       /* приглушённый акцент: иконки, вторичные выделения */
+  --c-accent-fg: #ffffff;
+  --c-line: #e2e8f0;         /* рамки */
+  --c-muted: #64748b;        /* вторичный текст */
+  --c-danger: #dc2626;       /* только ошибки/удаление */
+  --c-danger-fg: #ffffff;
+}
+
+.dark {
+  --c-primary: #f8fafc;      /* на тёмном фоне solid = светлая плашка */
+  --c-primary-fg: #0b1220;
+  --c-accent: #94a3b8;
+  --c-accent-fg: #0b1220;
+  --c-line: #334155;
+  --c-muted: #94a3b8;
+  --c-danger: #f87171;
+  --c-danger-fg: #0b1220;
 }
 
 @layer base {
@@ -32,7 +65,7 @@
     overscroll-behavior: none;
   }
   body {
-    @apply antialiased selection:bg-blue-500 selection:text-white;
+    @apply antialiased selection:bg-primary selection:text-primary-fg;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
     -webkit-tap-highlight-color: transparent;
     touch-action: manipulation;

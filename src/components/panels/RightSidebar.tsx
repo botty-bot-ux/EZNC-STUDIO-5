@@ -35,9 +35,9 @@ export const RightSidebar: React.FC = () => {
       <button
         onClick={toggleRightPanel}
         title="Открыть панель свойств и станка"
-        className="absolute right-4 top-20 z-20 w-11 h-11 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-md flex items-center justify-center cursor-pointer hover:bg-white hover:dark:bg-slate-800 transition-colors text-slate-700 dark:text-slate-200 hover:text-blue-600 hover:dark:text-blue-400"
+        className="absolute right-4 top-20 z-20 w-11 h-11 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-md flex items-center justify-center cursor-pointer hover:bg-white hover:dark:bg-slate-800 transition-colors text-slate-700 dark:text-slate-200 hover:text-primary"
       >
-        <Sliders className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+        <Sliders className="w-5 h-5 text-accent" />
       </button>
     );
   }
@@ -72,7 +72,7 @@ export const RightSidebar: React.FC = () => {
           title="Свойства выбранной фигуры"
           className={`py-2 rounded-xl flex flex-col items-center justify-center gap-1 transition-all ${
             activeTab === 'properties'
-              ? 'bg-blue-600 text-white'
+              ? 'bg-primary text-primary-fg'
               : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:dark:text-slate-100 hover:bg-slate-50 hover:dark:bg-slate-800/60'
           }`}
         >
@@ -85,7 +85,7 @@ export const RightSidebar: React.FC = () => {
           title="Редактор G-кода"
           className={`py-2 rounded-xl flex flex-col items-center justify-center gap-1 transition-all ${
             activeTab === 'gcode'
-              ? 'bg-blue-600 text-white'
+              ? 'bg-primary text-primary-fg'
               : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:dark:text-slate-100 hover:bg-slate-50 hover:dark:bg-slate-800/60'
           }`}
         >
@@ -98,7 +98,7 @@ export const RightSidebar: React.FC = () => {
           title="Настройки станка"
           className={`relative py-2 rounded-xl flex flex-col items-center justify-center gap-1 transition-all ${
             activeTab === 'machine'
-              ? 'bg-blue-600 text-white'
+              ? 'bg-primary text-primary-fg'
               : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:dark:text-slate-100 hover:bg-slate-50 hover:dark:bg-slate-800/60'
           }`}
         >
@@ -106,7 +106,7 @@ export const RightSidebar: React.FC = () => {
           <span>Станок</span>
 
           {errorCount > 0 && (
-            <span className="absolute top-1 right-2 w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+            <span className="absolute top-1 right-2 w-2 h-2 rounded-full bg-danger animate-pulse" />
           )}
         </button>
       </div>

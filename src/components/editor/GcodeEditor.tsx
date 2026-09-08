@@ -48,7 +48,7 @@ export const GcodeEditor: React.FC = () => {
       {/* Editor toolbar */}
       <div className="py-2 px-3 bg-slate-100/90 dark:bg-slate-800/90 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between gap-2 shrink-0 select-none shadow-sm">
         <div className="flex items-center gap-1.5 text-[13px] font-mono text-slate-600 dark:text-slate-300 font-semibold truncate">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+          <span className="w-2 h-2 rounded-full bg-accent shrink-0" />
           <span className="truncate">NcStudio (*.NC)</span>
         </div>
 
@@ -56,7 +56,7 @@ export const GcodeEditor: React.FC = () => {
           <button
             onClick={parseManualGcode}
             title="Применить изменения G-кода и обновить объекты в графическом редакторе"
-            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+            className="px-3 py-1.5 bg-primary hover:opacity-90 text-primary-fg text-xs font-semibold rounded-lg flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
           >
             <RefreshCw className="w-3.5 h-3.5 shrink-0" />
             <span className="text-[13px]">Обновить графический редактор</span>
