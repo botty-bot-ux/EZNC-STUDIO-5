@@ -972,6 +972,8 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
                 : { x: dragObjInitial.startX, y: dragObjInitial.startY };
             pt = constrainAngle(anchor, snapPt, e.shiftKey ? 45 : 90);
           }
+          // Стенка: конец не вытягивается за грани +X/+Y (соскальзывает вдоль грани).
+          pt = clampToPosFaces(pt);
           setLiveDrag(
             dragMode === 'line_start'
               ? { mode: 'edit', id: selectedObjectId, patch: { startX: pt.x, startY: pt.y } }
@@ -980,11 +982,13 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
         } else if (dragObjInitial.type === 'arc') {
           const base = dragObjInitial;
           if (dragMode === 'arc_start') {
-            const r = Math.hypot(snapPt.x - base.centerX, snapPt.y - base.centerY);
-            setLiveDrag({ mode: 'edit', id: selectedObjectId, patch: { startX: snapPt.x, startY: snapPt.y, radius: r } });
+            const s = clampToPosFaces(snapPt);
+            const r = Math.hypot(s.x - base.centerX, s.y - base.centerY);
+            setLiveDrag({ mode: 'edit', id: selectedObjectId, patch: { startX: s.x, startY: s.y, radius: r } });
           } else if (dragMode === 'arc_end') {
-            const r = Math.hypot(snapPt.x - base.centerX, snapPt.y - base.centerY);
-            setLiveDrag({ mode: 'edit', id: selectedObjectId, patch: { endX: snapPt.x, endY: snapPt.y, radius: r } });
+            const s = clampToPosFaces(snapPt);
+            const r = Math.hypot(s.x - base.centerX, s.y - base.centerY);
+            setLiveDrag({ mode: 'edit', id: selectedObjectId, patch: { endX: s.x, endY: s.y, radius: r } });
           } else if (dragMode === 'arc_center') {
             const dx = snapPt.x - base.centerX;
             const dy = snapPt.y - base.centerY;
