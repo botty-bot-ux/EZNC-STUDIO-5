@@ -79,7 +79,7 @@ export const MoveDialog: React.FC<MoveDialogProps> = ({ isOpen, ids, onClose, on
       <div
         role="dialog"
         aria-modal="true"
-        className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl w-full max-w-xs p-5 shadow-2xl shadow-slate-500/20 text-slate-800 dark:text-slate-100"
+        className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl w-full max-w-xs p-5 shadow-lg text-slate-800 dark:text-slate-100"
       >
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-2">
@@ -146,7 +146,7 @@ export const MoveDialog: React.FC<MoveDialogProps> = ({ isOpen, ids, onClose, on
           <button
             onClick={confirm}
             disabled={!canApply}
-            className="px-5 py-2 rounded-xl text-xs font-bold text-white bg-sky-600 hover:bg-sky-500 active:bg-sky-700 disabled:opacity-40 disabled:cursor-not-allowed shadow-lg shadow-sky-600/20 transition-all cursor-pointer"
+            className="px-5 py-2 rounded-xl text-xs font-bold text-white bg-sky-600 hover:bg-sky-500 active:bg-sky-700 disabled:opacity-40 disabled:cursor-not-allowed shadow-sm transition-all cursor-pointer"
           >
             Подтвердить
           </button>

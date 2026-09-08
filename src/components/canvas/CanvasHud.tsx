@@ -96,7 +96,7 @@ export const CanvasHud: React.FC<CanvasHudProps> = ({
     <>
       {/* Мобильный DYN-ввод длины с экранной клавиатуры */}
       {mobileDynActive && (
-        <div className="absolute top-2 left-1/2 -translate-x-1/2 z-40 flex items-center gap-1.5 bg-slate-900 dark:bg-slate-100 border border-amber-500/40 px-2 py-1.5 rounded-2xl shadow-2xl">
+        <div className="absolute top-2 left-1/2 -translate-x-1/2 z-40 flex items-center gap-1.5 bg-slate-900 dark:bg-slate-100 border border-amber-500/40 px-2 py-1.5 rounded-2xl shadow-md">
           <span className="text-xs text-slate-400 dark:text-slate-500 font-semibold ml-1">
             {activeTool === 'arc' ? 'Хорда' : 'Длина'}
           </span>
@@ -130,7 +130,7 @@ export const CanvasHud: React.FC<CanvasHudProps> = ({
 
       {/* Dynamic distance readout (DYN) while typing a line / arc-chord length (desktop) */}
       {dynReadoutActive && !isMobile && (
-        <div className="absolute top-16 left-1/2 -translate-x-1/2 z-30 bg-slate-900 dark:bg-slate-100 text-white border border-amber-500/50 px-5 py-2.5 rounded-2xl shadow-2xl flex items-center gap-2">
+        <div className="absolute top-16 left-1/2 -translate-x-1/2 z-30 bg-slate-900 dark:bg-slate-100 text-white border border-amber-500/50 px-5 py-2.5 rounded-2xl shadow-md flex items-center gap-2">
           <span className="text-xs text-slate-400 dark:text-slate-500 font-semibold">
             {activeTool === 'arc' ? 'Хорда' : 'Длина'}
           </span>
@@ -147,7 +147,7 @@ export const CanvasHud: React.FC<CanvasHudProps> = ({
       {/* Active tool instruction banner */}
       {instruction && (
         <div
-          className={`absolute left-1/2 -translate-x-1/2 z-20 bg-blue-600 text-white px-4 py-2 rounded-2xl shadow-xl flex items-center gap-3 text-xs font-semibold ${
+          className={`absolute left-1/2 -translate-x-1/2 z-20 bg-blue-600 text-white px-4 py-2 rounded-2xl shadow-md flex items-center gap-3 text-xs font-semibold ${
             isMobile ? 'top-16' : 'top-4'
           }`}
         >

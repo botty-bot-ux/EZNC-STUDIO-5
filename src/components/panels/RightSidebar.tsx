@@ -35,7 +35,7 @@ export const RightSidebar: React.FC = () => {
       <button
         onClick={toggleRightPanel}
         title="Открыть панель свойств и станка"
-        className="absolute right-4 top-4 z-20 w-11 h-11 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl shadow-slate-900/15 flex items-center justify-center cursor-pointer hover:bg-white hover:dark:bg-slate-800 transition-colors text-slate-700 dark:text-slate-200 hover:text-blue-600 hover:dark:text-blue-400"
+        className="absolute right-4 top-4 z-20 w-11 h-11 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-md flex items-center justify-center cursor-pointer hover:bg-white hover:dark:bg-slate-800 transition-colors text-slate-700 dark:text-slate-200 hover:text-blue-600 hover:dark:text-blue-400"
       >
         <Sliders className="w-5 h-5 text-blue-600 dark:text-blue-400" />
       </button>
@@ -46,7 +46,7 @@ export const RightSidebar: React.FC = () => {
   const panelWidthClass = 'w-96 md:w-[420px]';
 
   return (
-    <aside className={`absolute right-4 top-4 bottom-4 ${panelWidthClass} bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl shadow-slate-900/15 text-slate-800 dark:text-slate-100 flex flex-col select-none z-20 overflow-hidden transition-all duration-200`}>
+    <aside className={`absolute right-4 top-4 bottom-4 ${panelWidthClass} bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-md text-slate-800 dark:text-slate-100 flex flex-col select-none z-20 overflow-hidden transition-all duration-200`}>
       {/* Top Header / Collapse Bar */}
       <div className="px-3 py-2 bg-slate-50 dark:bg-slate-800 border-b border-slate-200/80 dark:border-slate-700/80 flex items-center justify-between shrink-0">
         <button
@@ -72,7 +72,7 @@ export const RightSidebar: React.FC = () => {
           title="Свойства выбранной фигуры"
           className={`py-2 rounded-xl flex flex-col items-center justify-center gap-1 transition-all ${
             activeTab === 'properties'
-              ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25'
+              ? 'bg-blue-600 text-white'
               : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:dark:text-slate-100 hover:bg-slate-50 hover:dark:bg-slate-800/60'
           }`}
         >
@@ -85,7 +85,7 @@ export const RightSidebar: React.FC = () => {
           title="Редактор G-кода"
           className={`py-2 rounded-xl flex flex-col items-center justify-center gap-1 transition-all ${
             activeTab === 'gcode'
-              ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25'
+              ? 'bg-blue-600 text-white'
               : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:dark:text-slate-100 hover:bg-slate-50 hover:dark:bg-slate-800/60'
           }`}
         >
@@ -98,7 +98,7 @@ export const RightSidebar: React.FC = () => {
           title="Настройки станка"
           className={`relative py-2 rounded-xl flex flex-col items-center justify-center gap-1 transition-all ${
             activeTab === 'machine'
-              ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25'
+              ? 'bg-blue-600 text-white'
               : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:dark:text-slate-100 hover:bg-slate-50 hover:dark:bg-slate-800/60'
           }`}
         >

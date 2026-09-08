@@ -209,7 +209,7 @@ export const Header: React.FC = () => {
   if (isMobile) {
     const toolBtn = (active: boolean) =>
       `p-2 rounded-lg transition-all shrink-0 ${
-        active ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 hover:dark:bg-slate-800/60'
+        active ? 'bg-blue-600 text-white' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 hover:dark:bg-slate-800/60'
       }`;
     const menuItems = [
       { label: 'Новый проект', Icon: FilePlus, onClick: () => newProject(), color: 'text-blue-600 dark:text-blue-400' },
@@ -317,7 +317,7 @@ export const Header: React.FC = () => {
         {menuOpen && (
           <>
             <div className="fixed inset-0 z-30" onClick={() => setMenuOpen(false)} />
-            <div className="absolute right-2 top-full mt-1 z-40 w-56 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-2xl p-1.5 flex flex-col gap-0.5">
+            <div className="absolute right-2 top-full mt-1 z-40 w-56 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-md p-1.5 flex flex-col gap-0.5">
               {menuItems.map(({ label, Icon, onClick, color }) => (
                 <button
                   key={label}
@@ -366,7 +366,7 @@ export const Header: React.FC = () => {
             onClick={() => applySheet(false)}
             title="Изголовье — фреза 3 мм (узор)"
             className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
-              !isRail ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:dark:text-slate-100 hover:bg-slate-50 hover:dark:bg-slate-800/60'
+              !isRail ? 'bg-blue-600 text-white' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:dark:text-slate-100 hover:bg-slate-50 hover:dark:bg-slate-800/60'
             }`}
           >
             Изголовье Ø3
@@ -375,7 +375,7 @@ export const Header: React.FC = () => {
             onClick={() => applySheet(true)}
             title="Царга боковая — фреза 8 мм"
             className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
-              isRail ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:dark:text-slate-100 hover:bg-slate-50 hover:dark:bg-slate-800/60'
+              isRail ? 'bg-blue-600 text-white' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:dark:text-slate-100 hover:bg-slate-50 hover:dark:bg-slate-800/60'
             }`}
           >
             Царга Ø8
@@ -389,7 +389,7 @@ export const Header: React.FC = () => {
             title="Выбор и перемещение (S)"
             className={`p-2 rounded-lg transition-all ${
               activeTool === 'select'
-                ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25'
+                ? 'bg-blue-600 text-white'
                 : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:dark:text-slate-100 hover:bg-slate-50 hover:dark:bg-slate-800/60'
             }`}
           >
@@ -401,7 +401,7 @@ export const Header: React.FC = () => {
             title="Линия / Отрезок (L) · Shift = углы 90°/45°"
             className={`p-2 rounded-lg transition-all ${
               activeTool === 'line'
-                ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25'
+                ? 'bg-blue-600 text-white'
                 : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:dark:text-slate-100 hover:bg-slate-50 hover:dark:bg-slate-800/60'
             }`}
           >
@@ -414,7 +414,7 @@ export const Header: React.FC = () => {
               title="Отверстие / Точка (H)"
               className={`p-2 rounded-lg transition-all ${
                 activeTool === 'point'
-                  ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25'
+                  ? 'bg-blue-600 text-white'
                   : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:dark:text-slate-100 hover:bg-slate-50 hover:dark:bg-slate-800/60'
               }`}
             >
@@ -428,7 +428,7 @@ export const Header: React.FC = () => {
               title="Дуга окружности (A) · Shift = хорда 90°/45°"
               className={`p-2 rounded-lg transition-all ${
                 activeTool === 'arc'
-                  ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25'
+                  ? 'bg-blue-600 text-white'
                   : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:dark:text-slate-100 hover:bg-slate-50 hover:dark:bg-slate-800/60'
               }`}
             >
@@ -441,7 +441,7 @@ export const Header: React.FC = () => {
             title="Линейка / Штангенциркуль (M)"
             className={`p-2 rounded-lg transition-all ${
               activeTool === 'measure'
-                ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25'
+                ? 'bg-blue-600 text-white'
                 : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:dark:text-slate-100 hover:bg-slate-50 hover:dark:bg-slate-800/60'
             }`}
           >
@@ -531,7 +531,7 @@ export const Header: React.FC = () => {
         <button
           onClick={openExportModal}
           title="Оптимизировать маршрут и выгрузить чистый G-код на станок"
-          className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold text-white bg-gradient-to-b from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 active:from-emerald-600 active:to-teal-700 shadow-lg shadow-emerald-600/25 transition-all cursor-pointer"
+          className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 shadow-sm transition-all cursor-pointer"
         >
           <Download className="w-4 h-4" />
           Экспорт на ЧПУ

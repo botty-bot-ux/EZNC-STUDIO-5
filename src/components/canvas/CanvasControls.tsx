@@ -35,7 +35,7 @@ export const CanvasControls: React.FC<CanvasControlsProps> = ({
   return (
     <div
       style={bottomStyle}
-      className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-1.5 rounded-2xl shadow-2xl shadow-slate-900/15 text-slate-700 dark:text-slate-200 z-20 max-w-[95vw] overflow-x-auto"
+      className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-1.5 rounded-2xl shadow-md text-slate-700 dark:text-slate-200 z-20 max-w-[95vw] overflow-x-auto"
     >
       {/* Координаты курсора на рабочем поле */}
       <div
@@ -98,7 +98,7 @@ export const CanvasControls: React.FC<CanvasControlsProps> = ({
         title={showTrajectory ? 'Траектория: ВКЛ (нажмите для скрытия)' : 'Траектория: ВЫКЛ (нажмите для показа)'}
         className={`p-2 rounded-xl transition-all cursor-pointer flex items-center justify-center shrink-0 ${
           showTrajectory
-            ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25'
+            ? 'bg-blue-600 text-white'
             : 'hover:bg-slate-100 hover:dark:bg-slate-700 text-slate-600 dark:text-slate-300'
         }`}
       >
@@ -112,7 +112,7 @@ export const CanvasControls: React.FC<CanvasControlsProps> = ({
         title={snapToGrid ? 'Привязка к сетке: ВКЛ (S)' : 'Привязка к сетке: ВЫКЛ (S)'}
         className={`p-2 rounded-xl transition-all cursor-pointer flex items-center justify-center shrink-0 ${
           snapToGrid
-            ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25'
+            ? 'bg-blue-600 text-white'
             : 'hover:bg-slate-100 hover:dark:bg-slate-700 text-slate-600 dark:text-slate-300'
         }`}
       >
@@ -124,7 +124,7 @@ export const CanvasControls: React.FC<CanvasControlsProps> = ({
         title={objectSnapEnabled ? 'Магнитная привязка O-SNAP: ВКЛ' : 'Магнитная привязка O-SNAP: ВЫКЛ'}
         className={`p-2 rounded-xl transition-all cursor-pointer flex items-center justify-center shrink-0 ${
           objectSnapEnabled
-            ? 'bg-amber-500 text-white shadow-md shadow-amber-500/25'
+            ? 'bg-amber-500 text-white'
             : 'hover:bg-slate-100 hover:dark:bg-slate-700 text-slate-600 dark:text-slate-300'
         }`}
       >
