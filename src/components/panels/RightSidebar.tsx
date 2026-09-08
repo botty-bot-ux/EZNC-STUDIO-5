@@ -35,7 +35,7 @@ export const RightSidebar: React.FC = () => {
       <button
         onClick={toggleRightPanel}
         title="Открыть панель свойств и станка"
-        className="absolute right-4 top-4 z-20 w-11 h-11 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl shadow-slate-900/15 flex items-center justify-center cursor-pointer hover:bg-white hover:dark:bg-slate-800 transition-all text-slate-700 dark:text-slate-200 hover:text-blue-600 hover:dark:text-blue-400 hover:scale-105 active:scale-95"
+        className="absolute right-4 top-4 z-20 w-11 h-11 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl shadow-slate-900/15 flex items-center justify-center cursor-pointer hover:bg-white hover:dark:bg-slate-800 transition-colors text-slate-700 dark:text-slate-200 hover:text-blue-600 hover:dark:text-blue-400"
       >
         <Sliders className="w-5 h-5 text-blue-600 dark:text-blue-400" />
       </button>
