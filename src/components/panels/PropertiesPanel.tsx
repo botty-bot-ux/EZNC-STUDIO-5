@@ -47,34 +47,15 @@ export const PropertiesPanel: React.FC = () => {
     if (liveMeasure) {
       const dx = liveMeasure.end.x - liveMeasure.start.x;
       const dy = liveMeasure.end.y - liveMeasure.start.y;
-      const len = Math.hypot(dx, dy);
       const angleDeg = ((Math.atan2(dy, dx) * 180) / Math.PI + 360) % 360;
       body = (
         <div className="space-y-3">
-          <div>
-            <span className="text-xs font-semibold text-slate-400 dark:text-slate-500">Расстояние</span>
-            <div className="font-mono text-3xl font-bold text-slate-800 dark:text-slate-100">
-              {len.toFixed(3)} <span className="text-sm font-normal text-slate-400 dark:text-slate-500">мм</span>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <div className="bg-slate-100/70 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700/80 rounded-lg px-2.5 py-1.5">
-              <span className="text-xs text-slate-400 dark:text-slate-500 block">dX</span>
-              <span className="font-mono text-sm font-bold text-slate-700 dark:text-slate-200">{dx >= 0 ? '+' : ''}{dx.toFixed(2)}</span>
-            </div>
-            <div className="bg-slate-100/70 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700/80 rounded-lg px-2.5 py-1.5">
-              <span className="text-xs text-slate-400 dark:text-slate-500 block">dY</span>
-              <span className="font-mono text-sm font-bold text-slate-700 dark:text-slate-200">{dy >= 0 ? '+' : ''}{dy.toFixed(2)}</span>
-            </div>
-          </div>
           <div className="flex items-center justify-between bg-slate-100/70 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700/80 rounded-lg px-2.5 py-1.5">
             <span className="text-xs text-slate-400 dark:text-slate-500">Угол</span>
             <span className="font-mono text-sm font-bold text-slate-700 dark:text-slate-200">{angleDeg.toFixed(1)}°</span>
           </div>
           <p className="text-[11px] text-slate-400 dark:text-slate-500">
-            {liveMeasure.end.x === liveMeasure.start.x && liveMeasure.end.y === liveMeasure.start.y
-              ? 'Укажите вторую точку на холсте.'
-              : 'Значения обновляются на лету.'}
+            Длину и смещения dX/dY смотри на холсте.
           </p>
         </div>
       );

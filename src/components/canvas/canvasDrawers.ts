@@ -1221,8 +1221,8 @@ export function drawMeasurementTool(
   const badgeW = textWidth + 14;
   const badgeH = 22;
 
-  // Background box for the main distance text
-  ctx.fillStyle = palette.measureBadgeBg; // Deep Slate-900
+  // Background box for the main distance text — white pill, dark value
+  ctx.fillStyle = '#ffffff';
   ctx.strokeStyle = '#f43f5e';
   ctx.lineWidth = 1;
   ctx.shadowColor = 'rgba(15, 23, 42, 0.25)';
@@ -1238,7 +1238,7 @@ export function drawMeasurementTool(
   ctx.stroke();
 
   ctx.shadowBlur = 0;
-  ctx.fillStyle = '#ffffff';
+  ctx.fillStyle = '#0f172a';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(labelText, midX, midY);
