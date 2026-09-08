@@ -490,12 +490,12 @@ export function drawAxisOrigin(
   ctx.textBaseline = 'middle';
   ctx.fillText('-X (Вверх)', right + 10, bottom - 30);
 
-  // -Y (Влево) in red, along the horizontal (Y) axis
+  // -Y (Влево) in red, below the horizontal (Y) axis
   ctx.fillStyle = '#ef4444';
   ctx.font = 'bold 11px system-ui, sans-serif';
   ctx.textAlign = 'right';
-  ctx.textBaseline = 'bottom';
-  ctx.fillText('-Y (Влево)', right - 12, bottom - 8);
+  ctx.textBaseline = 'top';
+  ctx.fillText('-Y (Влево)', right - 12, bottom + 8);
 
   // Work Zero blue dot at (right, bottom)
   ctx.strokeStyle = '#2563eb';
