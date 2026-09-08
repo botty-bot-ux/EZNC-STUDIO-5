@@ -11,6 +11,12 @@ export const GcodeEditor: React.FC = () => {
 
   const handleEditorDidMount: OnMount = (editor) => {
     editor.onDidChangeCursorPosition((e) => {
+      // Реагируем только на ОСОЗНАННОЕ перемещение курсора пользователем внутри редактора.
+      // При любой правке фигуры (удаление, диаметр отверстия…) G-код перегенерируется,
+      // Monaco сбрасывает курсор и тоже шлёт это событие — если его не игнорировать,
+      // выделение в списке фигур само прыгает на «последнюю» фигуру программы.
+      if (!editor.hasTextFocus()) return;
+
       const position = e.position;
       const model = editor.getModel();
       if (!model) return;
