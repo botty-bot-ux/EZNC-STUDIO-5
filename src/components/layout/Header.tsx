@@ -357,7 +357,7 @@ export const Header: React.FC = () => {
   }
 
   return (
-    <header className="h-16 bg-gradient-to-b from-[#f8fafc] via-[#f8fafc]/95 via-70% to-transparent text-slate-800 dark:text-slate-100 flex items-center justify-between px-4 select-none shrink-0 z-20 gap-2">
+    <header className="h-16 bg-gradient-to-b from-[#f8fafc] via-[#f8fafc]/95 via-70% to-transparent dark:from-[#0f172a] dark:via-[#0f172a]/95 text-slate-800 dark:text-slate-100 flex items-center justify-between px-4 select-none shrink-0 z-20 gap-2">
       {/* Left section: Drawing Tools & Undo/Redo */}
       <div className="flex items-center gap-2">
         {/* Тип листа = выбор фрезы (один инструмент на лист) */}
