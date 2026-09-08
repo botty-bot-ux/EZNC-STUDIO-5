@@ -1296,13 +1296,9 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
 
       <CanvasControls
         cursorPos={currentMouseProgPt}
-        zoom={zoom}
         snapToGrid={snapToGrid}
         objectSnapEnabled={objectSnapEnabled}
         showTrajectory={viewMode === 'preview'}
-        onZoomIn={() => setZoom((z) => Math.min(z * 1.2, 15))}
-        onZoomOut={() => setZoom((z) => Math.max(z / 1.2, 0.1))}
-        onFitView={fitView}
         onToggleTrajectory={() => setViewMode(viewMode === 'preview' ? 'edit' : 'preview')}
         onToggleGridSnap={() => setSnapToGrid(!snapToGrid)}
         onToggleObjectSnap={() => setObjectSnapEnabled(!objectSnapEnabled)}
