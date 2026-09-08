@@ -21,6 +21,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { useProjectStore } from '../../store/useProjectStore';
 import { saveAs } from 'file-saver';
 import { ExportModal } from '../modals/ExportModal';
+import { NewProjectModal } from '../modals/NewProjectModal';
 import { useOptimization } from '../../hooks/useOptimization';
 import { useIsMobile } from '../../hooks/useIsMobile';
 
@@ -42,7 +43,6 @@ export const Header: React.FC = () => {
     activeTool,
     setActiveTool,
     machine,
-    updateMachine,
     theme,
     toggleTheme,
   } = useProjectStore(
@@ -63,7 +63,6 @@ export const Header: React.FC = () => {
       activeTool: s.activeTool,
       setActiveTool: s.setActiveTool,
       machine: s.machine,
-      updateMachine: s.updateMachine,
       theme: s.theme,
       toggleTheme: s.toggleTheme,
     }))
@@ -174,36 +173,12 @@ export const Header: React.FC = () => {
   const errorCount = warnings.filter((w) => w.level === 'error').length;
   const warningCount = warnings.filter((w) => w.level === 'warning').length;
 
-  // Тип листа = выбор фрезы (один инструмент на лист).
-  const HEAD_PRESET = {
-    safeZ: 10,
-    cutDepth: 17.5,
-    spindleSpeed: 18000,
-    feedCut: 2000,
-    feedPlunge: 700,
-    feedDrill: 700,
-    toolDiameter: 3.0,
-    toolName: 'Фреза 3мм',
-    stockSheet: { enabled: true, preset: 'custom', widthY: 1681, widthX: 1081, color: '#22c55e' },
-  };
-  const RAIL_PRESET = {
-    cutDepth: 33.5,
-    spindleSpeed: 15000,
-    feedCut: 700,
-    feedPlunge: 700,
-    feedDrill: 700,
-    toolDiameter: 8.0,
-    stockSheet: { enabled: true, preset: 'custom', widthY: 2080, widthX: 360, color: '#22c55e' },
-  };
+  // Режим детали (фреза Ø8 и толще = царга) влияет на набор инструментов черчения.
   const isRail = (machine.toolDiameter ?? 0) >= 5;
-  const applySheet = (rail: boolean) => {
-    updateMachine(rail ? RAIL_PRESET : HEAD_PRESET);
-    setActiveTool('select');
-    setActiveTab('machine');
-  };
 
   const isMobile = useIsMobile();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [newProjectOpen, setNewProjectOpen] = useState(false);
 
   // ─────────────── Мобильный компактный Header: 2 ряда ───────────────
   if (isMobile) {
@@ -212,7 +187,7 @@ export const Header: React.FC = () => {
         active ? 'bg-blue-600 text-white' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 hover:dark:bg-slate-800/60'
       }`;
     const menuItems = [
-      { label: 'Новый проект', Icon: FilePlus, onClick: () => newProject(), color: 'text-blue-600 dark:text-blue-400' },
+      { label: 'Новый проект', Icon: FilePlus, onClick: () => setNewProjectOpen(true), color: 'text-blue-600 dark:text-blue-400' },
       { label: 'Открыть (.json / .nc)', Icon: FolderOpen, onClick: () => fileInputRef.current?.click(), color: 'text-amber-600 dark:text-amber-400' },
       { label: 'Сохранить проект (.json)', Icon: Save, onClick: () => handleSaveProject(), color: 'text-emerald-600 dark:text-emerald-400' },
       { label: 'Экспорт на ЧПУ', Icon: Download, onClick: () => openExportModal(), color: 'text-teal-600 dark:text-teal-400' },
@@ -223,27 +198,8 @@ export const Header: React.FC = () => {
         className="absolute inset-x-0 top-0 bg-transparent text-slate-800 dark:text-slate-100 flex flex-col gap-1 px-2 pt-1.5 pb-1 select-none z-20"
         style={{ paddingTop: 'calc(env(safe-area-inset-top) + 6px)' }}
       >
-        {/* Row 1: тип листа, название, меню */}
+        {/* Row 1: название, меню */}
         <div className="flex items-center gap-1.5 min-w-0">
-          <div className="grid grid-cols-2 gap-0.5 bg-slate-100/90 dark:bg-slate-800/90 p-0.5 rounded-xl border border-slate-200/90 dark:border-slate-700 shrink-0">
-            <button
-              onClick={() => applySheet(false)}
-              className={`px-2 py-1 rounded-lg text-[11px] font-bold whitespace-nowrap ${
-                !isRail ? 'bg-blue-600 text-white' : 'text-slate-600 dark:text-slate-300'
-              }`}
-            >
-              Изг. Ø3
-            </button>
-            <button
-              onClick={() => applySheet(true)}
-              className={`px-2 py-1 rounded-lg text-[11px] font-bold whitespace-nowrap ${
-                isRail ? 'bg-blue-600 text-white' : 'text-slate-600 dark:text-slate-300'
-              }`}
-            >
-              Царг. Ø8
-            </button>
-          </div>
-
           <input
             type="text"
             value={projectName}
@@ -343,6 +299,16 @@ export const Header: React.FC = () => {
           className="hidden"
         />
 
+        <NewProjectModal
+          isOpen={newProjectOpen}
+          onClose={() => setNewProjectOpen(false)}
+          hasObjects={hasObjects}
+          onCreate={(mode) => {
+            setNewProjectOpen(false);
+            newProject(mode);
+          }}
+        />
+
         <ExportModal
           isOpen={isExportModalOpen}
           onClose={closeExportModal}
@@ -360,28 +326,6 @@ export const Header: React.FC = () => {
     <header className="absolute inset-x-0 top-0 h-16 bg-transparent text-slate-800 dark:text-slate-100 flex items-center justify-between px-4 select-none z-20 gap-2">
       {/* Left section: Drawing Tools & Undo/Redo */}
       <div className="flex items-center gap-2">
-        {/* Тип листа = выбор фрезы (один инструмент на лист) */}
-        <div className="grid grid-cols-2 gap-1 bg-slate-100/90 dark:bg-slate-800/90 p-1 rounded-xl border border-slate-200/90 dark:border-slate-700 shadow-inner">
-          <button
-            onClick={() => applySheet(false)}
-            title="Изголовье — фреза 3 мм (узор)"
-            className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
-              !isRail ? 'bg-blue-600 text-white' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:dark:text-slate-100 hover:bg-slate-50 hover:dark:bg-slate-800/60'
-            }`}
-          >
-            Изголовье Ø3
-          </button>
-          <button
-            onClick={() => applySheet(true)}
-            title="Царга боковая — фреза 8 мм"
-            className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
-              isRail ? 'bg-blue-600 text-white' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:dark:text-slate-100 hover:bg-slate-50 hover:dark:bg-slate-800/60'
-            }`}
-          >
-            Царга Ø8
-          </button>
-        </div>
-
         {/* Drawing Tools Toolbar */}
         <div className="flex items-center gap-1 bg-slate-100/90 dark:bg-slate-800/90 p-1 rounded-xl border border-slate-200/90 dark:border-slate-700 shadow-inner">
           <button
@@ -485,7 +429,7 @@ export const Header: React.FC = () => {
       <div className="flex items-center gap-2">
         <div className="flex items-center gap-1 bg-slate-100/90 dark:bg-slate-800/90 p-1 rounded-xl border border-slate-200/90 dark:border-slate-700 shadow-inner">
           <button
-            onClick={newProject}
+            onClick={() => setNewProjectOpen(true)}
             title="Новый проект"
             className="p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:text-blue-600 hover:dark:text-blue-400 hover:bg-white hover:dark:bg-slate-800 transition-all hover:shadow-sm"
           >
@@ -555,6 +499,16 @@ export const Header: React.FC = () => {
           </button>
         )}
       </div>
+
+      <NewProjectModal
+        isOpen={newProjectOpen}
+        onClose={() => setNewProjectOpen(false)}
+        hasObjects={hasObjects}
+        onCreate={(mode) => {
+          setNewProjectOpen(false);
+          newProject(mode);
+        }}
+      />
 
       <ExportModal
         isOpen={isExportModalOpen}

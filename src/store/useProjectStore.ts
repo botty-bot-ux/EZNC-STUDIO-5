@@ -27,6 +27,8 @@ import {
   INITIAL_OPERATIONS,
   LOCAL_STORAGE_KEY,
   DEFAULT_UNDERLAY,
+  PROJECT_MODE_PRESETS,
+  ProjectMode,
 } from './initialState';
 
 interface HistoryState {
@@ -169,7 +171,7 @@ interface ProjectStore {
   parseManualGcode: () => void;
 
   regenerateGcode: () => void;
-  newProject: () => void;
+  newProject: (mode: ProjectMode) => void;
   loadProjectJSON: (jsonStr: string) => boolean;
   loadProjectNC: (fileContent: string, fileName?: string) => boolean;
   exportProjectJSON: () => string;
@@ -861,16 +863,19 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
       });
     },
 
-    newProject: () => {
+    newProject: (mode: ProjectMode) => {
       pushHistory();
       syncAndSave({
         projectName: 'Новый_Проект_ЧПУ',
+        // Режим, выбранный при создании: свой лист и фреза.
+        machine: structuredClone(PROJECT_MODE_PRESETS[mode]),
         objects: [],
         operations: [],
         manualGcodeDirty: false,
         selectedObjectId: null,
         selectedOperationId: null,
         underlay: DEFAULT_UNDERLAY,
+        activeTool: 'select',
       });
     },
 

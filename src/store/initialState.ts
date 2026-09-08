@@ -2,7 +2,7 @@ import { CADObject, MachineSettings, OperationItem, UnderlayState } from '../typ
 
 export const LOCAL_STORAGE_KEY = 'cnc_studio_project_v1';
 
-// Дефолт = пресет «Изголовье Ø3» (совпадает с HEAD_PRESET в Header.tsx).
+// Дефолт = пресет «Изголовье Ø3» (PROJECT_MODE_PRESETS.head).
 export const INITIAL_MACHINE: MachineSettings = {
   units: 'mm',
   controllerProfile: 'ncstudio',
@@ -33,6 +33,31 @@ export const INITIAL_MACHINE: MachineSettings = {
   toolDiameter: 3,
   toolName: 'Фреза 3мм',
   useCannedCycles: true,
+};
+
+// Режим проекта выбирается при создании (модалка «Новый проект»).
+// Тип листа = выбор фрезы: изголовье — узор фрезой Ø3, царга — рез/сверловка фрезой Ø8.
+export type ProjectMode = 'head' | 'rail';
+
+export const PROJECT_MODE_PRESETS: Record<ProjectMode, MachineSettings> = {
+  head: INITIAL_MACHINE,
+  rail: {
+    ...INITIAL_MACHINE,
+    cutDepth: 33.5,
+    spindleSpeed: 15000,
+    feedCut: 700,
+    feedPlunge: 700,
+    feedDrill: 700,
+    toolDiameter: 8,
+    toolName: 'Фреза 8мм',
+    stockSheet: {
+      enabled: true,
+      preset: 'custom',
+      widthY: 2080,
+      widthX: 360,
+      color: '#22c55e',
+    },
+  },
 };
 
 export const INITIAL_OBJECTS: CADObject[] = [
