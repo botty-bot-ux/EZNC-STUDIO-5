@@ -86,7 +86,7 @@ export const MachineSettingsPanel: React.FC = () => {
       {/* 1. ЗАГОТОВКА ЛИСТА */}
       <div className="bg-white/90 dark:bg-slate-900/90 p-3 rounded-xl border border-slate-200/80 dark:border-slate-700/80 shadow-2xs space-y-2">
         <div className="flex items-center justify-between">
-          <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+          <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
             <Square className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
             Заготовка листа
           </span>
@@ -174,7 +174,7 @@ export const MachineSettingsPanel: React.FC = () => {
 
       {/* 2. ИНСТРУМЕНТ И РЕЖИМЫ */}
       <div className="bg-white/90 dark:bg-slate-900/90 p-3 rounded-xl border border-slate-200/80 dark:border-slate-700/80 shadow-2xs space-y-2.5">
-        <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+        <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
           <Wrench className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
           Инструмент и режимы
         </span>
@@ -276,7 +276,7 @@ export const MachineSettingsPanel: React.FC = () => {
 
       {/* 3. РАБОЧАЯ ЗОНА СТАНКА */}
       <div className="bg-white/90 dark:bg-slate-900/90 p-3 rounded-xl border border-slate-200/80 dark:border-slate-700/80 shadow-2xs space-y-2">
-        <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+        <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
           <Shield className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
           Границы рабочей зоны
         </span>
@@ -345,7 +345,7 @@ export const MachineSettingsPanel: React.FC = () => {
       {/* 3b. ПОДЛОЖКА — фоновый референсный чертёж (только на сессию) */}
       <div className="bg-white/90 dark:bg-slate-900/90 p-3 rounded-xl border border-slate-200/80 dark:border-slate-700/80 shadow-2xs space-y-2.5">
         <div className="flex items-center justify-between">
-          <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+          <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
             <ImagePlus className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" />
             Подложка
           </span>
@@ -446,7 +446,7 @@ export const MachineSettingsPanel: React.FC = () => {
       {/* 4. ОШИБКИ И ПРЕДУПРЕЖДЕНИЯ */}
       <div className="bg-white/90 dark:bg-slate-900/90 p-3 rounded-xl border border-slate-200/80 dark:border-slate-700/80 shadow-2xs space-y-2">
         <div className="flex items-center justify-between">
-          <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+          <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
             <AlertCircle className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
             Проверка безопасности ({warnings.length})
           </span>

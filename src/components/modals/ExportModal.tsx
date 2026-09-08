@@ -2,10 +2,8 @@ import React from 'react';
 import {
   ArrowRight,
   CheckCircle2,
-  Clock,
   Cpu,
   Download,
-  Navigation,
   TrendingDown,
   Undo2,
   X,
@@ -70,7 +68,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
           <div className="space-y-4">
             <div className="bg-gradient-to-r from-emerald-50 via-white to-emerald-50 dark:from-emerald-500/10 dark:via-slate-900 dark:to-emerald-500/10 border border-emerald-200 dark:border-emerald-500/30 rounded-xl p-4 space-y-3 shadow-sm">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
+                <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
                   <TrendingDown className="w-4 h-4" />
                   <span>Маршрут оптимизирован</span>
                 </span>
@@ -92,23 +90,14 @@ export const ExportModal: React.FC<ExportModalProps> = ({
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 text-xs">
-              <div className="bg-slate-50/80 dark:bg-slate-900 border border-slate-200/80 dark:border-slate-700/80 rounded-xl p-3.5 space-y-1 shadow-sm">
-                <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
-                  <Clock className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                  <span>Экономия времени</span>
-                </div>
-                <div className="font-mono font-bold text-slate-900 dark:text-slate-100 text-base">~{timeSavedStr}</div>
-                <span className="text-[10px] text-slate-400 dark:text-slate-500 block">Меньше времени на переходы</span>
+            <div className="text-xs border-t border-slate-200/70 dark:border-slate-700/70 pt-3 space-y-1.5">
+              <div className="flex items-baseline justify-between">
+                <span className="text-slate-500 dark:text-slate-400">Экономия времени</span>
+                <span className="font-mono font-semibold text-slate-800 dark:text-slate-100">~{timeSavedStr}</span>
               </div>
-
-              <div className="bg-slate-50/80 dark:bg-slate-900 border border-slate-200/80 dark:border-slate-700/80 rounded-xl p-3.5 space-y-1 shadow-sm">
-                <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
-                  <Navigation className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-                  <span>Сэкономлено пути</span>
-                </div>
-                <div className="font-mono font-bold text-slate-900 dark:text-slate-100 text-base">{toLen(result.savedDistance)}</div>
-                <span className="text-[10px] text-slate-400 dark:text-slate-500 block">Уменьшен износ механики</span>
+              <div className="flex items-baseline justify-between">
+                <span className="text-slate-500 dark:text-slate-400">Сэкономлено пути</span>
+                <span className="font-mono font-semibold text-slate-800 dark:text-slate-100">{toLen(result.savedDistance)}</span>
               </div>
             </div>
 

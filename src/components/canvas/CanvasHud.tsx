@@ -97,7 +97,7 @@ export const CanvasHud: React.FC<CanvasHudProps> = ({
       {/* Мобильный DYN-ввод длины с экранной клавиатуры */}
       {mobileDynActive && (
         <div className="absolute top-2 left-1/2 -translate-x-1/2 z-40 flex items-center gap-1.5 bg-slate-900 dark:bg-slate-100 border border-amber-500/40 px-2 py-1.5 rounded-2xl shadow-2xl">
-          <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider ml-1">
+          <span className="text-xs text-slate-400 dark:text-slate-500 font-semibold ml-1">
             {activeTool === 'arc' ? 'Хорда' : 'Длина'}
           </span>
           <input
@@ -131,7 +131,7 @@ export const CanvasHud: React.FC<CanvasHudProps> = ({
       {/* Dynamic distance readout (DYN) while typing a line / arc-chord length (desktop) */}
       {dynReadoutActive && !isMobile && (
         <div className="absolute top-16 left-1/2 -translate-x-1/2 z-30 bg-slate-900 dark:bg-slate-100 text-white border border-amber-500/50 px-5 py-2.5 rounded-2xl shadow-2xl flex items-center gap-2 animate-in fade-in slide-in-from-top-2 duration-150">
-          <span className="text-xs text-slate-400 dark:text-slate-500 font-semibold uppercase tracking-wider">
+          <span className="text-xs text-slate-400 dark:text-slate-500 font-semibold">
             {activeTool === 'arc' ? 'Хорда' : 'Длина'}
           </span>
           <span className="font-mono text-2xl font-bold text-amber-400 tabular-nums">

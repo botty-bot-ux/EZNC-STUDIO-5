@@ -56,7 +56,7 @@ export const RightSidebar: React.FC = () => {
         >
           <ChevronRight className="w-4 h-4" />
         </button>
-        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+        <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
           {activeTab === 'gcode'
             ? 'Редактор G-кода'
             : activeTab === 'properties'

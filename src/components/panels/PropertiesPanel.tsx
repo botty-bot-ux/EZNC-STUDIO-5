@@ -52,23 +52,23 @@ export const PropertiesPanel: React.FC = () => {
       body = (
         <div className="space-y-3">
           <div>
-            <span className="text-[10px] uppercase tracking-wide font-bold text-slate-400 dark:text-slate-500">Расстояние</span>
+            <span className="text-xs font-semibold text-slate-400 dark:text-slate-500">Расстояние</span>
             <div className="font-mono text-3xl font-bold text-slate-800 dark:text-slate-100">
               {len.toFixed(3)} <span className="text-sm font-normal text-slate-400 dark:text-slate-500">мм</span>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div className="bg-slate-100/70 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700/80 rounded-lg px-2.5 py-1.5">
-              <span className="text-[10px] uppercase tracking-wide text-slate-400 dark:text-slate-500 block">dX</span>
+              <span className="text-xs text-slate-400 dark:text-slate-500 block">dX</span>
               <span className="font-mono text-sm font-bold text-slate-700 dark:text-slate-200">{dx >= 0 ? '+' : ''}{dx.toFixed(2)}</span>
             </div>
             <div className="bg-slate-100/70 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700/80 rounded-lg px-2.5 py-1.5">
-              <span className="text-[10px] uppercase tracking-wide text-slate-400 dark:text-slate-500 block">dY</span>
+              <span className="text-xs text-slate-400 dark:text-slate-500 block">dY</span>
               <span className="font-mono text-sm font-bold text-slate-700 dark:text-slate-200">{dy >= 0 ? '+' : ''}{dy.toFixed(2)}</span>
             </div>
           </div>
           <div className="flex items-center justify-between bg-slate-100/70 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700/80 rounded-lg px-2.5 py-1.5">
-            <span className="text-[10px] uppercase tracking-wide text-slate-400 dark:text-slate-500">Угол</span>
+            <span className="text-xs text-slate-400 dark:text-slate-500">Угол</span>
             <span className="font-mono text-sm font-bold text-slate-700 dark:text-slate-200">{angleDeg.toFixed(1)}°</span>
           </div>
           <p className="text-[11px] text-slate-400 dark:text-slate-500">
@@ -153,7 +153,7 @@ export const PropertiesPanel: React.FC = () => {
         <div className="space-y-3">
           {/* Group summary */}
           <div className="p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200/80 dark:border-slate-700/80 rounded-xl space-y-2">
-            <span className="text-slate-500 dark:text-slate-400 font-medium block text-[11px] uppercase tracking-wider">
+            <span className="text-slate-500 dark:text-slate-400 font-medium block text-xs">
               Состав выделения:
             </span>
             <div className="space-y-1 max-h-48 overflow-y-auto pr-1 custom-scrollbar">
@@ -163,7 +163,7 @@ export const PropertiesPanel: React.FC = () => {
                   className="flex items-center justify-between text-[11px] p-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-700/60"
                 >
                   <span className="font-medium text-slate-700 dark:text-slate-200 truncate">{o.name}</span>
-                  <span className="text-slate-400 dark:text-slate-500 uppercase text-[10px]">{o.type}</span>
+                  <span className="text-slate-400 dark:text-slate-500 text-xs">{o.type}</span>
                 </div>
               ))}
             </div>

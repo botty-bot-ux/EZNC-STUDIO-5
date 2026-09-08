@@ -45,7 +45,7 @@ export const LeftToolbar: React.FC = () => {
       <div className="px-1.5 py-1 flex items-center justify-between gap-2 shrink-0">
         <div className="flex items-center gap-1.5 min-w-0">
           <Shapes className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
-          <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Фигуры</span>
+          <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Фигуры</span>
           <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500">{objects.length}</span>
         </div>
 
