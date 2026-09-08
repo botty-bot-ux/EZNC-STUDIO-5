@@ -565,7 +565,7 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
     drawMachineBoundsAndStock(ctx, machine, pan, zoom, palette);
 
     // 3. Axis Origin & Work Zero
-    drawAxisOrigin(ctx, machine, pan, zoom, palette);
+    drawAxisOrigin(ctx, machine, pan, zoom);
 
     // 4. G-Code Toolpaths (in Preview or Gcode mode)
     if (viewMode === 'preview' || viewMode === 'gcode') {

@@ -449,8 +449,7 @@ export function drawAxisOrigin(
   ctx: CanvasRenderingContext2D,
   machine: MachineSettings,
   pan: Point2D,
-  zoom: number,
-  palette: CanvasPalette = LIGHT_PALETTE
+  zoom: number
 ) {
   const bounds = machine.bounds;
   const minX = Math.min(bounds.xMin, bounds.xMax);
@@ -481,16 +480,18 @@ export function drawAxisOrigin(
   ctx.lineTo(right, bottom);
   ctx.stroke();
 
-  // 3. Labels near Origin (right, bottom):
-  // -X (Вверх) in red next to green axis
-  ctx.fillStyle = '#ef4444';
+  // 3. Labels near Origin (right, bottom).
+  //    Vertical green line = X axis, horizontal red line = Y axis —
+  //    each label is colored to match the line it describes.
+  // -X (Вверх) in green, along the vertical (X) axis
+  ctx.fillStyle = '#22c55e';
   ctx.font = 'bold 11px system-ui, sans-serif';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
   ctx.fillText('-X (Вверх)', right + 10, bottom - 30);
 
-  // -Y (Влево) in green next to red axis
-  ctx.fillStyle = '#22c55e';
+  // -Y (Влево) in red, along the horizontal (Y) axis
+  ctx.fillStyle = '#ef4444';
   ctx.font = 'bold 11px system-ui, sans-serif';
   ctx.textAlign = 'right';
   ctx.textBaseline = 'bottom';
@@ -503,19 +504,6 @@ export function drawAxisOrigin(
   ctx.arc(right, bottom, 5, 0, Math.PI * 2);
   ctx.stroke();
   ctx.fill();
-
-  // Badge (0,0)
-  ctx.fillStyle = palette.labelChip;
-  ctx.fillRect(right + 6, bottom + 6, 36, 16);
-  ctx.strokeStyle = palette.chipBorder;
-  ctx.lineWidth = 1;
-  ctx.strokeRect(right + 6, bottom + 6, 36, 16);
-
-  ctx.fillStyle = palette.labelTextStrong;
-  ctx.font = 'bold 10px tabular-nums, sans-serif';
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'top';
-  ctx.fillText('(0,0)', right + 9, bottom + 8);
 
   ctx.restore();
 }
