@@ -129,6 +129,7 @@ interface ProjectStore {
   loadProjectNC: (fileContent: string, fileName?: string) => boolean;
   exportProjectJSON: () => string;
   exportProjectNC: () => string;
+  exportGcode: () => string;
 
   undo: () => void;
   redo: () => void;
@@ -202,8 +203,12 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
       if (parsed && parsed.objects && parsed.machine) {
         initName = parsed.name || initName;
         initMachine = { ...INITIAL_MACHINE, ...parsed.machine };
-        if (initMachine.safeZ === 10) {
-          initMachine.safeZ = 20;
+        // One-time refresh: a cached project that still carries the OLD default tool/feeds
+        // (i.e. never customized) is upgraded to the new «Изголовье» defaults. Edited projects
+        // keep their own values.
+        const pm = parsed.machine as Partial<MachineSettings> | undefined;
+        if (pm && pm.toolDiameter === 3.175 && pm.cutDepth === 5 && pm.feedCut === 1200) {
+          initMachine = { ...INITIAL_MACHINE };
         }
         initObjects = parsed.objects;
         initOperations = parsed.operations || [];
@@ -848,6 +853,18 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
       };
       const gcode = get().generatedGcode || get().manualGcode;
       return generateNCFileWithMetadata(exportData, gcode);
+    },
+
+    // Clean G-code for the machine — no embedded "; NCSTUDIO_PROJECT" metadata and no
+    // per-object ";[ID: ...]" comment headers (those stay only in the editor/preview G-code).
+    exportGcode: () => {
+      const gcode = get().generatedGcode || get().manualGcode;
+      return gcode
+        .split('\n')
+        .filter((line) => !/^\s*;\s*\[ID:/i.test(line))
+        .join('\n')
+        .replace(/\n{3,}/g, '\n\n')
+        .trimStart();
     },
 
     undo: () => {

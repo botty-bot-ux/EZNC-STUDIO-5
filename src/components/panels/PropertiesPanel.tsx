@@ -1,7 +1,8 @@
 import React from 'react';
-import { Circle, CircleDot, Compass, Layers, Ruler, Sliders, Square, Trash2, TrendingUp } from 'lucide-react';
+import { Circle, CircleDot, Layers, Ruler, Sliders, Spline, Square, Trash2 } from 'lucide-react';
 import { useProjectStore } from '../../store/useProjectStore';
 import { ArcObject, CircleObject, LineObject, PointHoleObject, RectangleObject } from '../../types';
+import { LineDotRightHorizontal } from '../icons/LineDotRightHorizontal';
 import { ArcProperties } from './properties/ArcProperties';
 import { CircleProperties } from './properties/CircleProperties';
 import { LineProperties } from './properties/LineProperties';
@@ -167,10 +168,10 @@ export const PropertiesPanel: React.FC = () => {
       <div className="flex items-center justify-between pb-3 border-b border-slate-200/80">
         <div className="flex items-center gap-2">
           {selectedObj.type === 'point' && <CircleDot className="w-4 h-4 text-purple-600" />}
-          {selectedObj.type === 'line' && <TrendingUp className="w-4 h-4 text-blue-600" />}
+          {selectedObj.type === 'line' && <LineDotRightHorizontal className="w-4 h-4 text-blue-600" />}
           {selectedObj.type === 'rectangle' && <Square className="w-4 h-4 text-amber-600" />}
           {selectedObj.type === 'circle' && <Circle className="w-4 h-4 text-emerald-600" />}
-          {selectedObj.type === 'arc' && <Compass className="w-4 h-4 text-cyan-600" />}
+          {selectedObj.type === 'arc' && <Spline className="w-4 h-4 text-cyan-600" />}
 
           <span className="font-bold text-sm text-slate-800 truncate">{selectedObj.name}</span>
         </div>

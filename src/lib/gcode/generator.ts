@@ -144,6 +144,37 @@ export function generateGcode(
     currentPos = { ...target };
   };
 
+  // --- Continuous-cut helpers (avoid useless retract/plunge at shared vertices) ---
+  // The cutter may be left DOWN at cut depth between two objects whose junction
+  // coincides, so we don't lift (`G00 Z..`) and re-plunge (`G01 ..Z..`) in the same spot.
+  const EPS_CONNECT = 0.01; // mm tolerance for "same point"
+  let downZ: number | null = null; // cut depth currently cutting at, or null when at safeZ
+
+  const ensureUp = () => {
+    if (downZ !== null) {
+      addRapidMove({ x: currentPos.x, y: currentPos.y, z: safeZ });
+      downZ = null;
+    }
+  };
+
+  // Position the cutter ready to cut at point `s` and depth `cutZ`. If we're already
+  // down at `cutZ` and (nearly) at `s`, continue without lifting — a connected chain.
+  const beginCutAt = (s: Point2D, cutZ: number, plungeFeed: number, objectId: string) => {
+    if (
+      downZ !== null &&
+      downZ === cutZ &&
+      Math.abs(currentPos.x - s.x) < EPS_CONNECT &&
+      Math.abs(currentPos.y - s.y) < EPS_CONNECT
+    ) {
+      currentPos = { x: s.x, y: s.y, z: cutZ }; // snap sub-tolerance delta silently
+      return;
+    }
+    ensureUp();
+    addRapidMove({ x: s.x, y: s.y, z: safeZ });
+    addFeedMove({ x: s.x, y: s.y, z: cutZ }, plungeFeed, undefined, objectId);
+    downZ = cutZ;
+  };
+
   // HEADER GENERATION
   let headerText = templates.header
     .replace(/{safeZ}/g, formatNum(safeZ))
@@ -174,13 +205,11 @@ export function generateGcode(
     const opFeedDrill = machine.feedDrill || linkedOp?.feedDrill || 500;
     // Глубина реза = пресет листа (cutDepth), затем своя глубина фигуры, затем 5.
     // finalDepth устаревших операций НЕ перекрывает выбор листа (иначе Z не меняется при смене режима).
-    const totalDepth = Math.abs(machine.cutDepth ?? obj.depth ?? 5);
-
-    // Single pass directly to total depth (1 проход)
-    const zPasses: number[] = [-totalDepth];
+    const cutZ = -Math.abs(machine.cutDepth ?? obj.depth ?? 5);
 
     // 1. DRILLING / HOLES (11mm & 9mm modes)
     if (obj.type === 'point') {
+      ensureUp(); // holes are isolated spots — always start from a lifted cutter
       const ptObj = obj as PointHoleObject;
       const rawPt = { x: ptObj.x, y: ptObj.y };
       const holePt = getPoint(rawPt);
@@ -388,65 +417,27 @@ export function generateGcode(
         });
         currentPos = { x: startX, y: startY, z: zSafe };
       }
+      downZ = null; // drilling always finishes lifted at safeZ
     }
     // 2. LINE OBJECT
     else if (obj.type === 'line') {
       const p1 = getPoint({ x: obj.startX, y: obj.startY });
       const p2 = getPoint({ x: obj.endX, y: obj.endY });
 
-      addRapidMove({ x: p1.x, y: p1.y, z: safeZ });
-
-      let atP1 = true;
-      for (const targetZ of zPasses) {
-        if (atP1) {
-          addFeedMove({ x: p1.x, y: p1.y, z: targetZ }, opFeedPlunge, undefined, obj.id);
-          addFeedMove({ x: p2.x, y: p2.y, z: targetZ }, opFeedCut, undefined, obj.id);
-          atP1 = false;
-        } else {
-          addFeedMove({ x: p2.x, y: p2.y, z: targetZ }, opFeedPlunge, undefined, obj.id);
-          addFeedMove({ x: p1.x, y: p1.y, z: targetZ }, opFeedCut, undefined, obj.id);
-          atP1 = true;
-        }
-      }
-      const endPos = atP1 ? p1 : p2;
-      addRapidMove({ x: endPos.x, y: endPos.y, z: safeZ });
+      beginCutAt(p1, cutZ, opFeedPlunge, obj.id);
+      addFeedMove({ x: p2.x, y: p2.y, z: cutZ }, opFeedCut, undefined, obj.id);
     }
     // 3. POLYLINE OBJECT
     else if (obj.type === 'polyline') {
       if (!obj.points || obj.points.length < 2) continue;
       const pts = obj.points.map(getPoint);
-      const startPt = pts[0];
 
-      addRapidMove({ x: startPt.x, y: startPt.y, z: safeZ });
-
+      beginCutAt(pts[0], cutZ, opFeedPlunge, obj.id);
+      for (let i = 1; i < pts.length; i++) {
+        addFeedMove({ x: pts[i].x, y: pts[i].y, z: cutZ }, opFeedCut, undefined, obj.id);
+      }
       if (obj.closed) {
-        for (const targetZ of zPasses) {
-          addFeedMove({ x: startPt.x, y: startPt.y, z: targetZ }, opFeedPlunge, undefined, obj.id);
-          for (let i = 1; i < pts.length; i++) {
-            addFeedMove({ x: pts[i].x, y: pts[i].y, z: targetZ }, opFeedCut, undefined, obj.id);
-          }
-          addFeedMove({ x: startPt.x, y: startPt.y, z: targetZ }, opFeedCut, undefined, obj.id);
-        }
-        addRapidMove({ x: startPt.x, y: startPt.y, z: safeZ });
-      } else {
-        let forward = true;
-        for (const targetZ of zPasses) {
-          if (forward) {
-            addFeedMove({ x: pts[0].x, y: pts[0].y, z: targetZ }, opFeedPlunge, undefined, obj.id);
-            for (let i = 1; i < pts.length; i++) {
-              addFeedMove({ x: pts[i].x, y: pts[i].y, z: targetZ }, opFeedCut, undefined, obj.id);
-            }
-            forward = false;
-          } else {
-            const lastIdx = pts.length - 1;
-            addFeedMove({ x: pts[lastIdx].x, y: pts[lastIdx].y, z: targetZ }, opFeedPlunge, undefined, obj.id);
-            for (let i = lastIdx - 1; i >= 0; i--) {
-              addFeedMove({ x: pts[i].x, y: pts[i].y, z: targetZ }, opFeedCut, undefined, obj.id);
-            }
-            forward = true;
-          }
-        }
-        addRapidMove({ x: currentPos.x, y: currentPos.y, z: safeZ });
+        addFeedMove({ x: pts[0].x, y: pts[0].y, z: cutZ }, opFeedCut, undefined, obj.id);
       }
     }
     // 4. RECTANGLE OBJECT
@@ -458,16 +449,11 @@ export function generateGcode(
       const c3 = getPoint({ x: obj.x + w, y: obj.y + h });
       const c4 = getPoint({ x: obj.x, y: obj.y + h });
 
-      addRapidMove({ x: c1.x, y: c1.y, z: safeZ });
-
-      for (const targetZ of zPasses) {
-        addFeedMove({ x: c1.x, y: c1.y, z: targetZ }, opFeedPlunge, undefined, obj.id);
-        addFeedMove({ x: c2.x, y: c2.y, z: targetZ }, opFeedCut, undefined, obj.id);
-        addFeedMove({ x: c3.x, y: c3.y, z: targetZ }, opFeedCut, undefined, obj.id);
-        addFeedMove({ x: c4.x, y: c4.y, z: targetZ }, opFeedCut, undefined, obj.id);
-        addFeedMove({ x: c1.x, y: c1.y, z: targetZ }, opFeedCut, undefined, obj.id);
-      }
-      addRapidMove({ x: c1.x, y: c1.y, z: safeZ });
+      beginCutAt(c1, cutZ, opFeedPlunge, obj.id);
+      addFeedMove({ x: c2.x, y: c2.y, z: cutZ }, opFeedCut, undefined, obj.id);
+      addFeedMove({ x: c3.x, y: c3.y, z: cutZ }, opFeedCut, undefined, obj.id);
+      addFeedMove({ x: c4.x, y: c4.y, z: cutZ }, opFeedCut, undefined, obj.id);
+      addFeedMove({ x: c1.x, y: c1.y, z: cutZ }, opFeedCut, undefined, obj.id);
     }
     // 5. CIRCLE OBJECT
     else if (obj.type === 'circle') {
@@ -475,13 +461,8 @@ export function generateGcode(
       const r = obj.radius;
       const startPt = { x: center.x - r, y: center.y };
 
-      addRapidMove({ x: startPt.x, y: startPt.y, z: safeZ });
-
-      for (const targetZ of zPasses) {
-        addFeedMove({ x: startPt.x, y: startPt.y, z: targetZ }, opFeedPlunge, undefined, obj.id);
-        addArcMove(true, { x: startPt.x, y: startPt.y, z: targetZ }, r, 0, opFeedCut, undefined, obj.id);
-      }
-      addRapidMove({ x: startPt.x, y: startPt.y, z: safeZ });
+      beginCutAt(startPt, cutZ, opFeedPlunge, obj.id);
+      addArcMove(true, { x: startPt.x, y: startPt.y, z: cutZ }, r, 0, opFeedCut, undefined, obj.id);
     }
     // 6. ARC OBJECT
     else if (obj.type === 'arc') {
@@ -492,13 +473,8 @@ export function generateGcode(
       const i = pCenter.x - pStart.x;
       const j = pCenter.y - pStart.y;
 
-      addRapidMove({ x: pStart.x, y: pStart.y, z: safeZ });
-
-      for (const targetZ of zPasses) {
-        addFeedMove({ x: pStart.x, y: pStart.y, z: targetZ }, opFeedPlunge, undefined, obj.id);
-        addArcMove(obj.clockwise, { x: pEnd.x, y: pEnd.y, z: targetZ }, i, j, opFeedCut, undefined, obj.id);
-      }
-      addRapidMove({ x: pEnd.x, y: pEnd.y, z: safeZ });
+      beginCutAt(pStart, cutZ, opFeedPlunge, obj.id);
+      addArcMove(obj.clockwise, { x: pEnd.x, y: pEnd.y, z: cutZ }, i, j, opFeedCut, undefined, obj.id);
     }
   }
 

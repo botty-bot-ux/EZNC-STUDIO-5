@@ -1,4 +1,4 @@
-import { MachineSettings, Point2D } from '../../types';
+import { ArcObject, MachineSettings, Point2D } from '../../types';
 
 /**
  * Transforms program coordinate (x, y) to machine coordinate based on machine settings
@@ -69,6 +69,80 @@ export function constrainAngle(
   return {
     x: from.x + radius * Math.cos(snapped),
     y: from.y + radius * Math.sin(snapped),
+  };
+}
+
+export interface ArcBounds {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+}
+
+/**
+ * Axis-aligned bounding box of an arc in program coordinates. Includes the two
+ * endpoints plus any cardinal extreme point (±X, ±Y) that the sweep actually passes.
+ */
+export function computeArcBounds(arc: ArcObject): ArcBounds {
+  const { centerX: cx, centerY: cy, radius: r } = arc;
+  const TAU = Math.PI * 2;
+  const norm = (x: number) => ((x % TAU) + TAU) % TAU;
+
+  const a0 = Math.atan2(arc.startY - cy, arc.startX - cx);
+  const a1 = Math.atan2(arc.endY - cy, arc.endX - cx);
+
+  // Is a given absolute angle traversed going from a0 to a1 in the arc's direction?
+  const inSweep = (t: number): boolean => {
+    const A0 = norm(a0);
+    const A1 = norm(a1);
+    const T = norm(t);
+    if (arc.clockwise) {
+      // clockwise = decreasing angle
+      const span = norm(A0 - A1);
+      const at = norm(A0 - T);
+      return at <= span + 1e-9;
+    }
+    const span = norm(A1 - A0);
+    const at = norm(T - A0);
+    return at <= span + 1e-9;
+  };
+
+  let minX = Math.min(arc.startX, arc.endX);
+  let maxX = Math.max(arc.startX, arc.endX);
+  let minY = Math.min(arc.startY, arc.endY);
+  let maxY = Math.max(arc.startY, arc.endY);
+
+  if (inSweep(0)) maxX = Math.max(maxX, cx + r); // +X
+  if (inSweep(Math.PI)) minX = Math.min(minX, cx - r); // -X
+  if (inSweep(Math.PI / 2)) maxY = Math.max(maxY, cy + r); // +Y
+  if (inSweep((3 * Math.PI) / 2)) minY = Math.min(minY, cy - r); // -Y
+
+  return { minX, minY, maxX, maxY };
+}
+
+/**
+ * Mirror an arc in place about its own bounding-box center.
+ * 'h' = horizontal flip (reflect X, left↔right); 'v' = vertical flip (reflect Y, up↕down).
+ * Reflection is an isometry, so the radius is preserved; the sweep handedness reverses,
+ * so `clockwise` is toggled. Returns only the fields that change.
+ */
+export function mirrorArc(arc: ArcObject, axis: 'h' | 'v'): Partial<ArcObject> {
+  const b = computeArcBounds(arc);
+  if (axis === 'h') {
+    const cx = (b.minX + b.maxX) / 2;
+    return {
+      startX: 2 * cx - arc.startX,
+      endX: 2 * cx - arc.endX,
+      centerX: 2 * cx - arc.centerX,
+      clockwise: !arc.clockwise,
+    };
+  }
+  const cy = (b.minY + b.maxY) / 2;
+  return {
+    startY: 2 * cy - arc.startY,
+    endY: 2 * cy - arc.endY,
+    centerY: 2 * cy - arc.centerY,
+    clockwise: !arc.clockwise,
   };
 }
 

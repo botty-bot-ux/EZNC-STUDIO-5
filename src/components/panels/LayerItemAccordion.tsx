@@ -4,15 +4,15 @@ import {
   ChevronUp,
   Circle,
   CircleDot,
-  Compass,
   Copy,
   Eye,
   EyeOff,
+  Spline,
   Square,
   Trash2,
-  TrendingUp,
 } from 'lucide-react';
 import { CADObject } from '../../types';
+import { LineDotRightHorizontal } from '../icons/LineDotRightHorizontal';
 
 interface FigureRowProps {
   obj: CADObject;
@@ -43,18 +43,18 @@ export const LayerItemAccordion: React.FC<FigureRowProps> = ({
 }) => {
   const isVisible = obj.visible !== false;
 
-  const TypeIcon =
+  const TypeIcon: React.ComponentType<{ className?: string }> =
     obj.type === 'point'
       ? CircleDot
       : obj.type === 'line'
-      ? TrendingUp
+      ? LineDotRightHorizontal
       : obj.type === 'rectangle'
       ? Square
       : obj.type === 'circle'
       ? Circle
       : obj.type === 'arc'
-      ? Compass
-      : TrendingUp;
+      ? Spline
+      : LineDotRightHorizontal;
 
   const displayName =
     obj.type === 'point'

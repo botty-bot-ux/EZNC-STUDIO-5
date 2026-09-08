@@ -1,5 +1,7 @@
 import React from 'react';
+import { FlipHorizontal2, FlipVertical2 } from 'lucide-react';
 import { ArcObject } from '../../../types';
+import { mirrorArc } from '../../../lib/geometry/transform';
 import { PropertyInput } from './PropertyInput';
 
 interface ArcPropertiesProps {
@@ -78,6 +80,28 @@ export const ArcProperties: React.FC<ArcPropertiesProps> = ({ obj, onUpdate }) =
           }`}
         >
           <span>{obj.clockwise ? '↻ G02 (по час.)' : '↺ G03 (против)'}</span>
+        </button>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <label className="text-[11px] text-slate-500 font-medium shrink-0">Отзеркалить:</label>
+        <button
+          type="button"
+          onClick={() => onUpdate(mirrorArc(obj, 'h'))}
+          title="Отзеркалить по горизонтали (влево↔вправо) на месте"
+          className="flex-1 py-1 px-2 rounded-lg font-semibold text-xs border border-slate-300 bg-white text-slate-700 hover:bg-slate-100 hover:border-slate-400 transition-all flex items-center justify-center gap-1.5 shadow-xs"
+        >
+          <FlipHorizontal2 className="w-3.5 h-3.5" />
+          <span>Горизонт.</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => onUpdate(mirrorArc(obj, 'v'))}
+          title="Отзеркалить по вертикали (вверх↕вниз) на месте"
+          className="flex-1 py-1 px-2 rounded-lg font-semibold text-xs border border-slate-300 bg-white text-slate-700 hover:bg-slate-100 hover:border-slate-400 transition-all flex items-center justify-center gap-1.5 shadow-xs"
+        >
+          <FlipVertical2 className="w-3.5 h-3.5" />
+          <span>Верт.</span>
         </button>
       </div>
     </div>

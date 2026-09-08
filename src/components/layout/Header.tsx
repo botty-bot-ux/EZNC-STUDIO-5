@@ -2,7 +2,7 @@ import React, { useRef, useState } from 'react';
 import {
   AlertTriangle,
   CircleDot,
-  Compass,
+  Download,
   FilePlus,
   FolderOpen,
   MousePointer,
@@ -10,15 +10,15 @@ import {
   Redo,
   Ruler,
   Save,
-  TrendingUp,
+  Spline,
   Undo,
   X,
-  Zap,
 } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useProjectStore } from '../../store/useProjectStore';
 import { saveAs } from 'file-saver';
-import { OptimizationModal } from '../modals/OptimizationModal';
+import { ExportModal } from '../modals/ExportModal';
+import { LineDotRightHorizontal } from '../icons/LineDotRightHorizontal';
 import { useOptimization } from '../../hooks/useOptimization';
 import { useIsMobile } from '../../hooks/useIsMobile';
 
@@ -28,7 +28,9 @@ export const Header: React.FC = () => {
     setProjectName,
     newProject,
     loadProjectNC,
-    exportProjectNC,
+    exportProjectJSON,
+    exportGcode,
+    objects,
     undo,
     redo,
     undoCount,
@@ -45,7 +47,9 @@ export const Header: React.FC = () => {
       setProjectName: s.setProjectName,
       newProject: s.newProject,
       loadProjectNC: s.loadProjectNC,
-      exportProjectNC: s.exportProjectNC,
+      exportProjectJSON: s.exportProjectJSON,
+      exportGcode: s.exportGcode,
+      objects: s.objects,
       undo: s.undo,
       redo: s.redo,
       undoCount: s.historyUndo.length,
@@ -59,67 +63,88 @@ export const Header: React.FC = () => {
     }))
   );
 
-  const { optResult, isOptModalOpen, handleOptimizeClick, closeOptModal } = useOptimization();
+  const {
+    optResult,
+    isExportModalOpen,
+    openExportModal,
+    closeExportModal,
+    runOptimize,
+    undoOptimize,
+  } = useOptimization();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const hasObjects = objects.length > 0;
 
-  const handleSaveAs = async () => {
-    const ncStr = exportProjectNC();
-    const cleanName = projectName.trim().replace(/\s+/g, '_') || 'cnc_project';
+  // Minimal typing for the native File System Access API (not in default DOM lib).
+  interface WritableLike {
+    write: (data: string) => Promise<void>;
+    close: () => Promise<void>;
+  }
+  interface FileHandleLike {
+    name: string;
+    createWritable: () => Promise<WritableLike>;
+  }
+  type PickerWindow = Window & {
+    showSaveFilePicker?: (opts: {
+      suggestedName: string;
+      types: { description: string; accept: Record<string, string[]> }[];
+    }) => Promise<FileHandleLike>;
+  };
 
-    // File System Access API is not in the default DOM lib — type it minimally here.
-    interface WritableLike {
-      write: (data: string) => Promise<void>;
-      close: () => Promise<void>;
-    }
-    interface FileHandleLike {
-      name: string;
-      createWritable: () => Promise<WritableLike>;
-    }
-    type PickerWindow = Window & {
-      showSaveFilePicker?: (opts: {
-        suggestedName: string;
-        types: { description: string; accept: Record<string, string[]> }[];
-      }) => Promise<FileHandleLike>;
-    };
-
-    // Try modern native browser File System Access API (opens standard Windows "Save As" file dialog)
+  // Writes text to disk via the native Save dialog (falls back to a download).
+  // Returns the saved base file name, or null if the user cancelled.
+  const writeToDisk = async (
+    content: string,
+    suggestedName: string,
+    description: string,
+    extensions: string[]
+  ): Promise<string | null> => {
     const pickerWindow = window as PickerWindow;
     if (typeof pickerWindow.showSaveFilePicker === 'function') {
       try {
         const handle = await pickerWindow.showSaveFilePicker({
-          suggestedName: `${cleanName}.nc`,
-          types: [
-            {
-              description: 'Управляющая программа ЧПУ (*.nc)',
-              accept: {
-                'text/plain': ['.nc', '.gcode', '.cnc', '.tap', '.txt'],
-              },
-            },
-          ],
+          suggestedName,
+          types: [{ description, accept: { 'text/plain': extensions } }],
         });
         const writable = await handle.createWritable();
-        await writable.write(ncStr);
+        await writable.write(content);
         await writable.close();
-
-        // Update project name from saved file name
-        const savedName = handle.name.replace(/\.[^/.]+$/, '');
-        if (savedName) {
-          setProjectName(savedName);
-        }
-        return;
+        return handle.name.replace(/\.[^/.]+$/, '');
       } catch (err) {
-        // If user clicked 'Cancel' in Windows dialog, do nothing
-        if (err instanceof DOMException && err.name === 'AbortError') {
-          return;
-        }
-        // Otherwise fall through to fallback
+        if (err instanceof DOMException && err.name === 'AbortError') return null;
+        // Otherwise fall through to the download fallback.
       }
     }
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    saveAs(blob, suggestedName);
+    return suggestedName.replace(/\.[^/.]+$/, '');
+  };
 
-    // Fallback if browser does not support window.showSaveFilePicker
-    const blob = new Blob([ncStr], { type: 'text/plain;charset=utf-8' });
-    saveAs(blob, `${cleanName}.nc`);
+  const cleanProjectName = () => projectName.trim().replace(/\s+/g, '_') || 'cnc_project';
+
+  // Save the editable project (full state) as a .json file for reopening in the editor.
+  const handleSaveProject = async () => {
+    const saved = await writeToDisk(
+      exportProjectJSON(),
+      `${cleanProjectName()}.json`,
+      'Проект ЧПУ (*.json)',
+      ['.json']
+    );
+    if (saved) setProjectName(saved);
+  };
+
+  // Export a clean G-code program (.nc) for the machine — no embedded project JSON.
+  const handleExportGcode = async () => {
+    if (!hasObjects) {
+      alert('Нет объектов для экспорта.');
+      return;
+    }
+    await writeToDisk(
+      exportGcode(),
+      `${cleanProjectName()}.nc`,
+      'Управляющая программа ЧПУ (*.nc)',
+      ['.nc', '.gcode', '.cnc', '.tap', '.txt']
+    );
   };
 
   const handleOpenFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -132,7 +157,7 @@ export const Header: React.FC = () => {
       if (content) {
         const ok = loadProjectNC(content, file.name);
         if (!ok) {
-          alert('Ошибка при чтении файла .nc или .cnc. Проверьте содержимое файла.');
+          alert('Ошибка при чтении файла. Проверьте содержимое файла.');
         }
       }
     };
@@ -145,12 +170,14 @@ export const Header: React.FC = () => {
 
   // Тип листа = выбор фрезы (один инструмент на лист).
   const HEAD_PRESET = {
+    safeZ: 10,
     cutDepth: 17.5,
     spindleSpeed: 18000,
     feedCut: 2000,
     feedPlunge: 700,
     feedDrill: 700,
     toolDiameter: 3.0,
+    toolName: 'Фреза 3мм',
     stockSheet: { enabled: true, preset: 'custom', widthY: 1681, widthX: 1081, color: '#22c55e' },
   };
   const RAIL_PRESET = {
@@ -180,9 +207,9 @@ export const Header: React.FC = () => {
       }`;
     const menuItems = [
       { label: 'Новый проект', Icon: FilePlus, onClick: () => newProject(), color: 'text-blue-600' },
-      { label: 'Открыть (.nc / .cnc)', Icon: FolderOpen, onClick: () => fileInputRef.current?.click(), color: 'text-amber-600' },
-      { label: 'Оптимизация маршрута', Icon: Zap, onClick: () => handleOptimizeClick(), color: 'text-amber-500' },
-      { label: 'Сохранить как (.nc)', Icon: Save, onClick: () => handleSaveAs(), color: 'text-emerald-600' },
+      { label: 'Открыть (.json / .nc)', Icon: FolderOpen, onClick: () => fileInputRef.current?.click(), color: 'text-amber-600' },
+      { label: 'Сохранить проект (.json)', Icon: Save, onClick: () => handleSaveProject(), color: 'text-emerald-600' },
+      { label: 'Экспорт на ЧПУ', Icon: Download, onClick: () => openExportModal(), color: 'text-teal-600' },
     ];
 
     return (
@@ -251,11 +278,11 @@ export const Header: React.FC = () => {
             </button>
           )}
           <button onClick={() => setActiveTool('line')} title="Линия / Отрезок" className={toolBtn(activeTool === 'line')}>
-            <TrendingUp className={`w-4 h-4 ${activeTool === 'line' ? 'text-white' : 'text-blue-600'}`} />
+            <LineDotRightHorizontal className={`w-4 h-4 ${activeTool === 'line' ? 'text-white' : 'text-blue-600'}`} />
           </button>
           {!isRail && (
             <button onClick={() => setActiveTool('arc')} title="Дуга окружности" className={toolBtn(activeTool === 'arc')}>
-              <Compass className={`w-4 h-4 ${activeTool === 'arc' ? 'text-white' : 'text-cyan-600'}`} />
+              <Spline className={`w-4 h-4 ${activeTool === 'arc' ? 'text-white' : 'text-cyan-600'}`} />
             </button>
           )}
           <button onClick={() => setActiveTool('measure')} title="Линейка / Штангенциркуль" className={toolBtn(activeTool === 'measure')}>
@@ -302,7 +329,15 @@ export const Header: React.FC = () => {
           className="hidden"
         />
 
-        <OptimizationModal isOpen={isOptModalOpen} onClose={closeOptModal} result={optResult} />
+        <ExportModal
+          isOpen={isExportModalOpen}
+          onClose={closeExportModal}
+          result={optResult}
+          hasObjects={hasObjects}
+          onOptimize={runOptimize}
+          onExport={handleExportGcode}
+          onUndoOptimize={undoOptimize}
+        />
       </header>
     );
   }
@@ -370,7 +405,7 @@ export const Header: React.FC = () => {
                 : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
             }`}
           >
-            <TrendingUp className={`w-4 h-4 ${activeTool === 'line' ? 'text-white' : 'text-blue-600'}`} />
+            <LineDotRightHorizontal className={`w-4 h-4 ${activeTool === 'line' ? 'text-white' : 'text-blue-600'}`} />
           </button>
 
           {!isRail && (
@@ -383,7 +418,7 @@ export const Header: React.FC = () => {
                   : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
               }`}
             >
-              <Compass className={`w-4 h-4 ${activeTool === 'arc' ? 'text-white' : 'text-cyan-600'}`} />
+              <Spline className={`w-4 h-4 ${activeTool === 'arc' ? 'text-white' : 'text-cyan-600'}`} />
             </button>
           )}
 
@@ -445,7 +480,7 @@ export const Header: React.FC = () => {
 
           <button
             onClick={() => fileInputRef.current?.click()}
-            title="Открыть проект (.nc / .cnc)"
+            title="Открыть проект (.json / .nc)"
             className="p-2 rounded-lg text-slate-600 hover:text-amber-600 hover:bg-white transition-all hover:shadow-sm"
           >
             <FolderOpen className="w-4 h-4 text-amber-600" />
@@ -454,27 +489,28 @@ export const Header: React.FC = () => {
             type="file"
             ref={fileInputRef}
             onChange={handleOpenFile}
-            accept=".nc,.cnc,.gcode,.json,.tap,.txt"
+            accept=".json,.nc,.cnc,.gcode,.tap,.txt"
             className="hidden"
           />
 
           <button
-            onClick={handleOptimizeClick}
-            title="Оптимизация ЧПУ (минимальный холостой ход)"
-            className="p-2 rounded-lg text-amber-600 hover:text-amber-700 hover:bg-amber-50 transition-all hover:shadow-sm"
-          >
-            <Zap className="w-4 h-4 fill-amber-500 text-amber-500" />
-          </button>
-
-          <button
-            onClick={handleSaveAs}
-            title="Сохранить как (.nc)"
+            onClick={handleSaveProject}
+            title="Сохранить проект (.json)"
             className="p-2 rounded-lg text-slate-700 hover:text-emerald-600 hover:bg-white transition-all hover:shadow-sm flex items-center gap-1.5 cursor-pointer"
           >
             <Save className="w-4 h-4 text-emerald-600" />
-          
           </button>
         </div>
+
+        {/* Big export-to-CNC action */}
+        <button
+          onClick={openExportModal}
+          title="Оптимизировать маршрут и выгрузить чистый G-код на станок"
+          className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold text-white bg-gradient-to-b from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 active:from-emerald-600 active:to-teal-700 shadow-lg shadow-emerald-600/25 transition-all cursor-pointer"
+        >
+          <Download className="w-4 h-4" />
+          Экспорт на ЧПУ
+        </button>
 
         {/* Warnings badge button */}
         {(errorCount > 0 || warningCount > 0) && (
@@ -495,10 +531,14 @@ export const Header: React.FC = () => {
         )}
       </div>
 
-      <OptimizationModal
-        isOpen={isOptModalOpen}
-        onClose={closeOptModal}
+      <ExportModal
+        isOpen={isExportModalOpen}
+        onClose={closeExportModal}
         result={optResult}
+        hasObjects={hasObjects}
+        onOptimize={runOptimize}
+        onExport={handleExportGcode}
+        onUndoOptimize={undoOptimize}
       />
     </header>
   );

@@ -2,6 +2,7 @@ import { CADObject, MachineSettings, OperationItem, UnderlayState } from '../typ
 
 export const LOCAL_STORAGE_KEY = 'cnc_studio_project_v1';
 
+// Дефолт = пресет «Изголовье Ø3» (совпадает с HEAD_PRESET в Header.tsx).
 export const INITIAL_MACHINE: MachineSettings = {
   units: 'mm',
   controllerProfile: 'ncstudio',
@@ -16,21 +17,21 @@ export const INITIAL_MACHINE: MachineSettings = {
     preset: 'custom',
     widthX: 1081,
     widthY: 1681,
-    color: '#f59e0b',
+    color: '#22c55e',
   },
   workOffset: {
     x: 0,
     y: 0,
   },
-  safeZ: 20,
-  cutDepth: 5,
+  safeZ: 10,
+  cutDepth: 17.5,
   spindleSpeed: 18000,
   spindleDwell: 3000,
-  feedCut: 1200,
-  feedPlunge: 300,
-  feedDrill: 500,
-  toolDiameter: 3.175,
-  toolName: 'Фреза 3.175мм',
+  feedCut: 2000,
+  feedPlunge: 700,
+  feedDrill: 700,
+  toolDiameter: 3,
+  toolName: 'Фреза 3мм',
   useCannedCycles: true,
 };
 
