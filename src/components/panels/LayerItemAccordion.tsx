@@ -7,12 +7,12 @@ import {
   Copy,
   Eye,
   EyeOff,
+  LineDotRightHorizontal,
   Spline,
   Square,
   Trash2,
 } from 'lucide-react';
 import { CADObject } from '../../types';
-import { LineDotRightHorizontal } from '../icons/LineDotRightHorizontal';
 
 interface FigureRowProps {
   obj: CADObject;

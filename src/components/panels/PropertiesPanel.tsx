@@ -1,8 +1,7 @@
 import React from 'react';
-import { Circle, CircleDot, Layers, Ruler, Sliders, Spline, Square, Trash2 } from 'lucide-react';
+import { Circle, CircleDot, Layers, LineDotRightHorizontal, Ruler, Sliders, Spline, Square, Trash2 } from 'lucide-react';
 import { useProjectStore } from '../../store/useProjectStore';
 import { ArcObject, CircleObject, LineObject, PointHoleObject, RectangleObject } from '../../types';
-import { LineDotRightHorizontal } from '../icons/LineDotRightHorizontal';
 import { ArcProperties } from './properties/ArcProperties';
 import { CircleProperties } from './properties/CircleProperties';
 import { LineProperties } from './properties/LineProperties';

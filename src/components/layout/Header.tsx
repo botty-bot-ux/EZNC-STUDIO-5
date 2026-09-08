@@ -5,6 +5,7 @@ import {
   Download,
   FilePlus,
   FolderOpen,
+  LineDotRightHorizontal,
   MousePointer,
   MoreHorizontal,
   Redo,
@@ -18,7 +19,6 @@ import { useShallow } from 'zustand/react/shallow';
 import { useProjectStore } from '../../store/useProjectStore';
 import { saveAs } from 'file-saver';
 import { ExportModal } from '../modals/ExportModal';
-import { LineDotRightHorizontal } from '../icons/LineDotRightHorizontal';
 import { useOptimization } from '../../hooks/useOptimization';
 import { useIsMobile } from '../../hooks/useIsMobile';
 
