@@ -44,8 +44,8 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     : '';
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/40 dark:bg-slate-100/40 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200 select-none">
-      <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border border-white/80 dark:border-slate-700/80 rounded-2xl max-w-lg w-full p-6 shadow-2xl shadow-slate-500/20 space-y-5 text-slate-800 dark:text-slate-100">
+    <div className="fixed inset-0 z-50 bg-slate-900/40 dark:bg-slate-100/40 flex items-center justify-center p-4 animate-in fade-in duration-200 select-none">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-2xl max-w-lg w-full p-6 shadow-2xl shadow-slate-500/20 space-y-5 text-slate-800 dark:text-slate-100">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-200/80 dark:border-slate-700/80 pb-4">
           <div className="flex items-center gap-3">
@@ -96,7 +96,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
             </div>
 
             <div className="grid grid-cols-2 gap-3 text-xs">
-              <div className="bg-slate-50/80 dark:bg-slate-900/80 border border-slate-200/80 dark:border-slate-700/80 rounded-xl p-3.5 space-y-1 shadow-sm">
+              <div className="bg-slate-50/80 dark:bg-slate-900 border border-slate-200/80 dark:border-slate-700/80 rounded-xl p-3.5 space-y-1 shadow-sm">
                 <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
                   <Clock className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
                   <span>Экономия времени</span>
@@ -105,7 +105,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                 <span className="text-[10px] text-slate-400 dark:text-slate-500 block">Меньше времени на переходы</span>
               </div>
 
-              <div className="bg-slate-50/80 dark:bg-slate-900/80 border border-slate-200/80 dark:border-slate-700/80 rounded-xl p-3.5 space-y-1 shadow-sm">
+              <div className="bg-slate-50/80 dark:bg-slate-900 border border-slate-200/80 dark:border-slate-700/80 rounded-xl p-3.5 space-y-1 shadow-sm">
                 <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
                   <Navigation className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
                   <span>Сэкономлено пути</span>
@@ -115,7 +115,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
               </div>
             </div>
 
-            <div className="bg-slate-50/80 dark:bg-slate-900/80 border border-slate-200/80 dark:border-slate-700/80 rounded-xl p-3.5 text-xs text-slate-700 dark:text-slate-200 space-y-2.5 shadow-sm">
+            <div className="bg-slate-50/80 dark:bg-slate-900 border border-slate-200/80 dark:border-slate-700/80 rounded-xl p-3.5 text-xs text-slate-700 dark:text-slate-200 space-y-2.5 shadow-sm">
               <div className="flex items-start gap-2">
                 <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
                 <p className="text-slate-500 dark:text-slate-400 text-[11px]">
@@ -134,7 +134,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
             </div>
           </div>
         ) : (
-          <div className="rounded-xl border border-dashed border-slate-300 dark:border-slate-600 bg-slate-50/60 dark:bg-slate-900/60 p-4 text-xs text-slate-500 dark:text-slate-400 flex items-start gap-2">
+          <div className="rounded-xl border border-dashed border-slate-300 dark:border-slate-600 bg-slate-50/60 dark:bg-slate-800 p-4 text-xs text-slate-500 dark:text-slate-400 flex items-start gap-2">
             <Zap className="w-4 h-4 text-amber-500 dark:text-amber-400 shrink-0 mt-0.5" />
             <span>
               Маршрут не оптимизирован. Можно сразу выгрузить G-код как есть, либо сначала сократить холостой ход

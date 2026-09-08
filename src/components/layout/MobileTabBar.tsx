@@ -41,7 +41,7 @@ export const MobileTabBar: React.FC = () => {
 
   return (
     <nav
-      className="shrink-0 z-30 flex items-stretch bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl border-t border-slate-200 dark:border-slate-700 shadow-[0_-4px_20px_rgba(15,23,42,0.08)] select-none"
+      className="shrink-0 z-30 flex items-stretch bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 shadow-[0_-4px_20px_rgba(15,23,42,0.08)] select-none"
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
       {TABS.map(({ id, label, Icon }) => {

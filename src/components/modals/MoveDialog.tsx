@@ -65,7 +65,7 @@ export const MoveDialog: React.FC<MoveDialogProps> = ({ isOpen, ids, onClose, on
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-slate-900/30 dark:bg-slate-100/30 backdrop-blur-sm flex items-center justify-center p-4 select-none"
+      className="fixed inset-0 z-50 bg-slate-900/30 dark:bg-slate-100/30 flex items-center justify-center p-4 select-none"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) cancel();
       }}
@@ -79,7 +79,7 @@ export const MoveDialog: React.FC<MoveDialogProps> = ({ isOpen, ids, onClose, on
       <div
         role="dialog"
         aria-modal="true"
-        className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl border border-slate-200/80 dark:border-slate-700/80 rounded-2xl w-full max-w-xs p-5 shadow-2xl shadow-slate-500/20 text-slate-800 dark:text-slate-100"
+        className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl w-full max-w-xs p-5 shadow-2xl shadow-slate-500/20 text-slate-800 dark:text-slate-100"
       >
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-2">

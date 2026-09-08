@@ -133,7 +133,7 @@ export default function App() {
 
           {/* Нижняя шторка с панелью (Фигуры / Свойства / G-код / Станок) */}
           <div
-            className={`absolute inset-x-0 bottom-0 top-[46%] z-30 flex-col bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl border-t border-slate-200 dark:border-slate-700 rounded-t-2xl shadow-[0_-8px_30px_rgba(15,23,42,0.18)] overflow-hidden ${
+            className={`absolute inset-x-0 bottom-0 top-[46%] z-30 flex-col bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 rounded-t-2xl shadow-[0_-8px_30px_rgba(15,23,42,0.18)] overflow-hidden ${
               mobileSheet === 'none' ? 'hidden' : 'flex'
             }`}
           >

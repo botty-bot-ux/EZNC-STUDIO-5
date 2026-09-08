@@ -209,7 +209,7 @@ export const Header: React.FC = () => {
   if (isMobile) {
     const toolBtn = (active: boolean) =>
       `p-2 rounded-lg transition-all shrink-0 ${
-        active ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25' : 'text-slate-600 dark:text-slate-300 hover:bg-white/60 hover:dark:bg-slate-800/60'
+        active ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 hover:dark:bg-slate-800/60'
       }`;
     const menuItems = [
       { label: 'Новый проект', Icon: FilePlus, onClick: () => newProject(), color: 'text-blue-600 dark:text-blue-400' },
@@ -220,12 +220,12 @@ export const Header: React.FC = () => {
 
     return (
       <header
-        className="relative bg-[#f8fafc]/95 dark:bg-[#0f172a]/95 backdrop-blur text-slate-800 dark:text-slate-100 flex flex-col gap-1 px-2 pt-1.5 pb-1 select-none shrink-0 z-20"
+        className="relative bg-[#f8fafc] dark:bg-[#0f172a] text-slate-800 dark:text-slate-100 flex flex-col gap-1 px-2 pt-1.5 pb-1 select-none shrink-0 z-20"
         style={{ paddingTop: 'calc(env(safe-area-inset-top) + 6px)' }}
       >
         {/* Row 1: тип листа, название, меню */}
         <div className="flex items-center gap-1.5 min-w-0">
-          <div className="grid grid-cols-2 gap-0.5 bg-slate-100/90 dark:bg-slate-800/90 p-0.5 rounded-xl border border-slate-200/90 dark:border-slate-700/90 shrink-0">
+          <div className="grid grid-cols-2 gap-0.5 bg-slate-100/90 dark:bg-slate-800/90 p-0.5 rounded-xl border border-slate-200/90 dark:border-slate-700 shrink-0">
             <button
               onClick={() => applySheet(false)}
               className={`px-2 py-1 rounded-lg text-[11px] font-bold whitespace-nowrap ${
@@ -267,7 +267,7 @@ export const Header: React.FC = () => {
           <button
             onClick={toggleTheme}
             title={theme === 'dark' ? 'Светлая тема' : 'Тёмная тема'}
-            className="p-2 rounded-xl bg-slate-100/90 dark:bg-slate-800/90 border border-slate-200/90 dark:border-slate-700/90 text-slate-600 dark:text-slate-300 shrink-0"
+            className="p-2 rounded-xl bg-slate-100/90 dark:bg-slate-800/90 border border-slate-200/90 dark:border-slate-700 text-slate-600 dark:text-slate-300 shrink-0"
           >
             {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
           </button>
@@ -275,14 +275,14 @@ export const Header: React.FC = () => {
           <button
             onClick={() => setMenuOpen((v) => !v)}
             title="Меню проекта"
-            className="p-2 rounded-xl bg-slate-100/90 dark:bg-slate-800/90 border border-slate-200/90 dark:border-slate-700/90 text-slate-600 dark:text-slate-300 shrink-0"
+            className="p-2 rounded-xl bg-slate-100/90 dark:bg-slate-800/90 border border-slate-200/90 dark:border-slate-700 text-slate-600 dark:text-slate-300 shrink-0"
           >
             {menuOpen ? <X className="w-4 h-4" /> : <MoreHorizontal className="w-4 h-4" />}
           </button>
         </div>
 
         {/* Row 2: инструменты черчения + undo/redo */}
-        <div className="flex items-center gap-1 bg-slate-100/90 dark:bg-slate-800/90 px-1 py-0.5 rounded-xl border border-slate-200/90 dark:border-slate-700/90 overflow-x-auto">
+        <div className="flex items-center gap-1 bg-slate-100/90 dark:bg-slate-800/90 px-1 py-0.5 rounded-xl border border-slate-200/90 dark:border-slate-700 overflow-x-auto">
           <button onClick={() => setActiveTool('select')} title="Выбор и перемещение" className={toolBtn(activeTool === 'select')}>
             <MousePointer className="w-4 h-4" />
           </button>
@@ -361,12 +361,12 @@ export const Header: React.FC = () => {
       {/* Left section: Drawing Tools & Undo/Redo */}
       <div className="flex items-center gap-2">
         {/* Тип листа = выбор фрезы (один инструмент на лист) */}
-        <div className="grid grid-cols-2 gap-1 bg-slate-100/90 dark:bg-slate-800/90 p-1 rounded-xl border border-slate-200/90 dark:border-slate-700/90 shadow-inner">
+        <div className="grid grid-cols-2 gap-1 bg-slate-100/90 dark:bg-slate-800/90 p-1 rounded-xl border border-slate-200/90 dark:border-slate-700 shadow-inner">
           <button
             onClick={() => applySheet(false)}
             title="Изголовье — фреза 3 мм (узор)"
             className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
-              !isRail ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:dark:text-slate-100 hover:bg-white/60 hover:dark:bg-slate-800/60'
+              !isRail ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:dark:text-slate-100 hover:bg-slate-50 hover:dark:bg-slate-800/60'
             }`}
           >
             Изголовье Ø3
@@ -375,7 +375,7 @@ export const Header: React.FC = () => {
             onClick={() => applySheet(true)}
             title="Царга боковая — фреза 8 мм"
             className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
-              isRail ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:dark:text-slate-100 hover:bg-white/60 hover:dark:bg-slate-800/60'
+              isRail ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:dark:text-slate-100 hover:bg-slate-50 hover:dark:bg-slate-800/60'
             }`}
           >
             Царга Ø8
@@ -383,14 +383,14 @@ export const Header: React.FC = () => {
         </div>
 
         {/* Drawing Tools Toolbar */}
-        <div className="flex items-center gap-1 bg-slate-100/90 dark:bg-slate-800/90 p-1 rounded-xl border border-slate-200/90 dark:border-slate-700/90 shadow-inner">
+        <div className="flex items-center gap-1 bg-slate-100/90 dark:bg-slate-800/90 p-1 rounded-xl border border-slate-200/90 dark:border-slate-700 shadow-inner">
           <button
             onClick={() => setActiveTool('select')}
             title="Выбор и перемещение (S)"
             className={`p-2 rounded-lg transition-all ${
               activeTool === 'select'
                 ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25'
-                : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:dark:text-slate-100 hover:bg-white/60 hover:dark:bg-slate-800/60'
+                : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:dark:text-slate-100 hover:bg-slate-50 hover:dark:bg-slate-800/60'
             }`}
           >
             <MousePointer className="w-4 h-4" />
@@ -402,7 +402,7 @@ export const Header: React.FC = () => {
             className={`p-2 rounded-lg transition-all ${
               activeTool === 'line'
                 ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25'
-                : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:dark:text-slate-100 hover:bg-white/60 hover:dark:bg-slate-800/60'
+                : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:dark:text-slate-100 hover:bg-slate-50 hover:dark:bg-slate-800/60'
             }`}
           >
             <LineDotRightHorizontal className={`w-4 h-4 ${activeTool === 'line' ? 'text-white' : 'text-blue-600 dark:text-blue-400'}`} />
@@ -415,7 +415,7 @@ export const Header: React.FC = () => {
               className={`p-2 rounded-lg transition-all ${
                 activeTool === 'point'
                   ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25'
-                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:dark:text-slate-100 hover:bg-white/60 hover:dark:bg-slate-800/60'
+                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:dark:text-slate-100 hover:bg-slate-50 hover:dark:bg-slate-800/60'
               }`}
             >
               <CircleDot className={`w-4 h-4 ${activeTool === 'point' ? 'text-white' : 'text-purple-600 dark:text-purple-400'}`} />
@@ -429,7 +429,7 @@ export const Header: React.FC = () => {
               className={`p-2 rounded-lg transition-all ${
                 activeTool === 'arc'
                   ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25'
-                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:dark:text-slate-100 hover:bg-white/60 hover:dark:bg-slate-800/60'
+                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:dark:text-slate-100 hover:bg-slate-50 hover:dark:bg-slate-800/60'
               }`}
             >
               <Spline className={`w-4 h-4 ${activeTool === 'arc' ? 'text-white' : 'text-cyan-600 dark:text-cyan-400'}`} />
@@ -442,7 +442,7 @@ export const Header: React.FC = () => {
             className={`p-2 rounded-lg transition-all ${
               activeTool === 'measure'
                 ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25'
-                : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:dark:text-slate-100 hover:bg-white/60 hover:dark:bg-slate-800/60'
+                : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:dark:text-slate-100 hover:bg-slate-50 hover:dark:bg-slate-800/60'
             }`}
           >
             <Ruler className={`w-4 h-4 ${activeTool === 'measure' ? 'text-white' : 'text-rose-500 dark:text-rose-400'}`} />
@@ -450,7 +450,7 @@ export const Header: React.FC = () => {
         </div>
 
         {/* Undo/Redo right after tools */}
-        <div className="flex items-center gap-0.5 bg-slate-100/90 dark:bg-slate-800/90 p-1 rounded-xl border border-slate-200/90 dark:border-slate-700/90 shadow-inner">
+        <div className="flex items-center gap-0.5 bg-slate-100/90 dark:bg-slate-800/90 p-1 rounded-xl border border-slate-200/90 dark:border-slate-700 shadow-inner">
           <button
             onClick={undo}
             disabled={undoCount === 0}
@@ -483,7 +483,7 @@ export const Header: React.FC = () => {
 
       {/* Right section: Action Icons & Warnings */}
       <div className="flex items-center gap-2">
-        <div className="flex items-center gap-1 bg-slate-100/90 dark:bg-slate-800/90 p-1 rounded-xl border border-slate-200/90 dark:border-slate-700/90 shadow-inner">
+        <div className="flex items-center gap-1 bg-slate-100/90 dark:bg-slate-800/90 p-1 rounded-xl border border-slate-200/90 dark:border-slate-700 shadow-inner">
           <button
             onClick={newProject}
             title="Новый проект"
@@ -517,7 +517,7 @@ export const Header: React.FC = () => {
         </div>
 
         {/* Тема (светлая / тёмная) */}
-        <div className="flex items-center bg-slate-100/90 dark:bg-slate-800/90 p-1 rounded-xl border border-slate-200/90 dark:border-slate-700/90 shadow-inner">
+        <div className="flex items-center bg-slate-100/90 dark:bg-slate-800/90 p-1 rounded-xl border border-slate-200/90 dark:border-slate-700 shadow-inner">
           <button
             onClick={toggleTheme}
             title={theme === 'dark' ? 'Светлая тема' : 'Тёмная тема'}

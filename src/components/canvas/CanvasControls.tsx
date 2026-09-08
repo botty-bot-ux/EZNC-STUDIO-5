@@ -35,7 +35,7 @@ export const CanvasControls: React.FC<CanvasControlsProps> = ({
   return (
     <div
       style={bottomStyle}
-      className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-1.5 bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border border-white/90 dark:border-slate-700/90 p-1.5 rounded-2xl shadow-2xl shadow-slate-900/15 text-slate-700 dark:text-slate-200 z-20 max-w-[95vw] overflow-x-auto"
+      className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-1.5 rounded-2xl shadow-2xl shadow-slate-900/15 text-slate-700 dark:text-slate-200 z-20 max-w-[95vw] overflow-x-auto"
     >
       {/* Координаты курсора на рабочем поле */}
       <div
