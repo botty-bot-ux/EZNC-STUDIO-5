@@ -83,7 +83,7 @@ export const MoveDialog: React.FC<MoveDialogProps> = ({ isOpen, ids, onClose, on
             <Move className="w-4 h-4 text-sky-600 dark:text-sky-400" />
             <h3 className="font-semibold text-sm">Переместить</h3>
             {ids.length > 1 && (
-              <span className="text-[11px] text-slate-400 dark:text-slate-500">· {ids.length} фигур</span>
+              <span className="text-[13px] text-slate-400 dark:text-slate-500">· {ids.length} фигур</span>
             )}
           </div>
           <button
@@ -97,7 +97,7 @@ export const MoveDialog: React.FC<MoveDialogProps> = ({ isOpen, ids, onClose, on
 
         <div className="grid grid-cols-2 gap-3">
           <label className="block">
-            <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">X, мм</span>
+            <span className="text-[13px] font-medium text-slate-500 dark:text-slate-400">X, мм</span>
             <input
               type="text"
               inputMode="decimal"
@@ -115,7 +115,7 @@ export const MoveDialog: React.FC<MoveDialogProps> = ({ isOpen, ids, onClose, on
             />
           </label>
           <label className="block">
-            <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">Y, мм</span>
+            <span className="text-[13px] font-medium text-slate-500 dark:text-slate-400">Y, мм</span>
             <input
               type="text"
               inputMode="decimal"

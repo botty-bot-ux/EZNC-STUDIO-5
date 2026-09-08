@@ -308,7 +308,7 @@ export function drawGrid(
 
   // 7. Dimension labels with "мм" spaced out along grid axes
   if (zoom > 0.1) {
-    ctx.font = '500 11px tabular-nums, sans-serif';
+    ctx.font = '500 13px tabular-nums, sans-serif';
 
     // Dimension labels along Y axis (Horizontal axis at bottom)
     const yLabelCanvasY = Math.min(Math.max(bottom + 16, 22), height - 22);
@@ -394,7 +394,7 @@ export function drawMachineBoundsAndStock(
   ctx.setLineDash([]);
 
   // Boundary text labels
-  ctx.font = '500 11px tabular-nums, sans-serif';
+  ctx.font = '500 13px tabular-nums, sans-serif';
 
   // Label at Top Boundary (xMin)
   const xMinText = `${minX} мм`;
@@ -436,7 +436,7 @@ export function drawMachineBoundsAndStock(
     ctx.setLineDash([]);
 
     ctx.fillStyle = stockColor;
-    ctx.font = 'bold 11px monospace';
+    ctx.font = 'bold 13px monospace';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
     ctx.fillText(`Заготовка: ${stock.widthX}×${stock.widthY} мм`, sX + 8, sY + 8);
@@ -485,14 +485,14 @@ export function drawAxisOrigin(
   //    each label is colored to match the line it describes.
   // -X (Вверх) in green, along the vertical (X) axis
   ctx.fillStyle = '#22c55e';
-  ctx.font = 'bold 11px system-ui, sans-serif';
+  ctx.font = 'bold 13px system-ui, sans-serif';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
   ctx.fillText('-X (Вверх)', right + 10, bottom - 30);
 
   // -Y (Влево) in red, below the horizontal (Y) axis
   ctx.fillStyle = '#ef4444';
-  ctx.font = 'bold 11px system-ui, sans-serif';
+  ctx.font = 'bold 13px system-ui, sans-serif';
   ctx.textAlign = 'right';
   ctx.textBaseline = 'top';
   ctx.fillText('-Y (Влево)', right - 12, bottom + 8);
@@ -677,7 +677,7 @@ export function drawCADObjects(
 
       if (isSelected) {
         ctx.fillStyle = palette.labelTextStrong;
-        ctx.font = 'bold 11px system-ui, sans-serif';
+        ctx.font = 'bold 13px system-ui, sans-serif';
         ctx.fillText(`${obj.name} (Ø${obj.diameter})`, cp.x + rPx + 6, cp.y - 4);
       }
     } else if (obj.type === 'line') {
@@ -695,7 +695,7 @@ export function drawCADObjects(
 
       if (isSelected || isHoveredObj) {
         ctx.fillStyle = isSelected ? palette.labelTextStrong : '#3b82f6';
-        ctx.font = 'bold 11px system-ui, sans-serif';
+        ctx.font = 'bold 13px system-ui, sans-serif';
         ctx.fillText(`${lineLen.toFixed(1)} мм`, midPx.x + 8, midPx.y - 8);
       }
 
@@ -729,7 +729,7 @@ export function drawCADObjects(
 
         if (isSelected || isStartHovered || isStartActive) {
           ctx.fillStyle = '#ffffff';
-          ctx.font = 'bold 9px monospace';
+          ctx.font = 'bold 11px monospace';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
           ctx.fillText('1', p1.x, p1.y);
@@ -759,7 +759,7 @@ export function drawCADObjects(
 
         if (isSelected || isEndHovered || isEndActive) {
           ctx.fillStyle = '#ffffff';
-          ctx.font = 'bold 9px monospace';
+          ctx.font = 'bold 11px monospace';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
           ctx.fillText('2', p2.x, p2.y);
@@ -1204,7 +1204,7 @@ export function drawMeasurementTool(
   ctx.restore();
   ctx.save();
 
-  ctx.font = 'bold 12px monospace';
+  ctx.font = 'bold 14px monospace';
   const labelText = `${distance.toFixed(3)} мм · ${angleDeg.toFixed(1)}°`;
   const textWidth = ctx.measureText(labelText).width;
   const badgeW = textWidth + 14;
@@ -1233,7 +1233,7 @@ export function drawMeasurementTool(
   ctx.fillText(labelText, midX, midY);
 
   // 5. Secondary delta dX, dY floating mini badges near their lines
-  ctx.font = 'bold 10px monospace';
+  ctx.font = 'bold 12px monospace';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
 

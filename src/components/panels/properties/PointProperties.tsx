@@ -24,7 +24,7 @@ export const PointProperties: React.FC<PointPropertiesProps> = ({ obj, onUpdate 
     <div className="space-y-2">
       {/* 3 Buttons for Drill Mode */}
       <div className="flex items-center gap-2">
-        <label className="text-[11px] text-slate-500 dark:text-slate-400 font-medium shrink-0">Сверление:</label>
+        <label className="text-[13px] text-slate-500 dark:text-slate-400 font-medium shrink-0">Сверление:</label>
         <div className="grid grid-cols-3 gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl flex-1">
           <button
             type="button"

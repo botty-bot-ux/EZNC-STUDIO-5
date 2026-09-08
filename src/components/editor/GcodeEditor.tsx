@@ -47,7 +47,7 @@ export const GcodeEditor: React.FC = () => {
     <div className="flex flex-col h-full w-full bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 overflow-hidden">
       {/* Editor toolbar */}
       <div className="py-2 px-3 bg-slate-100/90 dark:bg-slate-800/90 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between gap-2 shrink-0 select-none shadow-sm">
-        <div className="flex items-center gap-1.5 text-[11px] font-mono text-slate-600 dark:text-slate-300 font-semibold truncate">
+        <div className="flex items-center gap-1.5 text-[13px] font-mono text-slate-600 dark:text-slate-300 font-semibold truncate">
           <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
           <span className="truncate">NcStudio (*.NC)</span>
         </div>
@@ -59,7 +59,7 @@ export const GcodeEditor: React.FC = () => {
             className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
           >
             <RefreshCw className="w-3.5 h-3.5 shrink-0" />
-            <span className="text-[11px]">Обновить графический редактор</span>
+            <span className="text-[13px]">Обновить графический редактор</span>
           </button>
         </div>
       </div>
@@ -75,7 +75,7 @@ export const GcodeEditor: React.FC = () => {
           onChange={(value) => updateManualGcode(value || '')}
           onMount={handleEditorDidMount}
           options={{
-            fontSize: 12,
+            fontSize: 14,
             fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
             minimap: { enabled: false },
             lineNumbers: 'on',

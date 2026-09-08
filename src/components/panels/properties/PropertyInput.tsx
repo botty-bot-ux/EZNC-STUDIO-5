@@ -20,7 +20,7 @@ export const PropertyInput: React.FC<PropertyInputProps> = ({
   return (
     <div className="flex items-center gap-1.5 w-full">
       <label
-        className="text-[11px] text-slate-500 dark:text-slate-400 font-medium whitespace-nowrap shrink-0 min-w-[32px]"
+        className="text-[13px] text-slate-500 dark:text-slate-400 font-medium whitespace-nowrap shrink-0 min-w-[32px]"
         title={label}
       >
         {label}

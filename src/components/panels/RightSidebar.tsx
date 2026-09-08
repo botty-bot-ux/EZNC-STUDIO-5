@@ -66,7 +66,7 @@ export const RightSidebar: React.FC = () => {
       </div>
 
       {/* Tabs bar */}
-      <div className="grid grid-cols-3 bg-slate-100/80 dark:bg-slate-800/80 border-b border-slate-200/80 dark:border-slate-700/80 p-1 gap-1 text-[11px] font-semibold shrink-0">
+      <div className="grid grid-cols-3 bg-slate-100/80 dark:bg-slate-800/80 border-b border-slate-200/80 dark:border-slate-700/80 p-1 gap-1 text-[13px] font-semibold shrink-0">
         <button
           onClick={() => setActiveTab('properties')}
           title="Свойства выбранной фигуры"

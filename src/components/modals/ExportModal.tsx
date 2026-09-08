@@ -77,12 +77,12 @@ export const ExportModal: React.FC<ExportModalProps> = ({
             </div>
 
             <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-3">
-              <span className="text-[11px] text-slate-400 dark:text-slate-500">
+              <span className="text-[13px] text-slate-400 dark:text-slate-500">
                 {result.reorderedCount}/{result.optimizedObjects.length} переставлено · {result.flippedCount} развёрнуто
               </span>
               <button
                 onClick={onUndoOptimize}
-                className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500 dark:text-slate-400 hover:text-rose-600 hover:dark:text-rose-400 transition-colors shrink-0"
+                className="inline-flex items-center gap-1 text-[13px] font-semibold text-slate-500 dark:text-slate-400 hover:text-rose-600 hover:dark:text-rose-400 transition-colors shrink-0"
               >
                 <Undo2 className="w-3.5 h-3.5" />
                 Отменить

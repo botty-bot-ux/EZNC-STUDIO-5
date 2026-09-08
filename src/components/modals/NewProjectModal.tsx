@@ -99,7 +99,7 @@ export const NewProjectModal: React.FC<NewProjectModalProps> = ({
               </div>
               <div className="min-w-0">
                 <div className="font-bold text-sm text-slate-900 dark:text-slate-100">{title}</div>
-                <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">{subtitle}</div>
+                <div className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">{subtitle}</div>
               </div>
             </button>
           ))}

@@ -30,7 +30,7 @@ export const LeftToolbar: React.FC = () => {
         >
           <Shapes className="w-5 h-5 text-blue-600 dark:text-blue-400" />
           {objects.length > 0 && (
-            <span className="absolute -top-1 -right-1 bg-blue-600 text-white text-[10px] font-bold px-1.5 py-0.2 rounded-full min-w-[18px] text-center border-2 border-white dark:border-slate-700 shadow-sm">
+            <span className="absolute -top-1 -right-1 bg-blue-600 text-white text-[12px] font-bold px-1.5 py-0.2 rounded-full min-w-[18px] text-center border-2 border-white dark:border-slate-700 shadow-sm">
               {objects.length}
             </span>
           )}
@@ -46,7 +46,7 @@ export const LeftToolbar: React.FC = () => {
         <div className="flex items-center gap-1.5 min-w-0">
           <Shapes className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
           <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Фигуры</span>
-          <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500">{objects.length}</span>
+          <span className="text-[12px] font-bold text-slate-400 dark:text-slate-500">{objects.length}</span>
         </div>
 
         <button

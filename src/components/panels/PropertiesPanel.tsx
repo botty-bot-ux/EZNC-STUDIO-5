@@ -46,12 +46,12 @@ export const PropertiesPanel: React.FC = () => {
     let body: React.ReactNode;
     if (liveMeasure) {
       body = (
-        <p className="text-[11px] text-slate-400 dark:text-slate-500">
+        <p className="text-[13px] text-slate-400 dark:text-slate-500">
           Длина, смещения dX/dY и угол показываются на холсте.
         </p>
       );
     } else {
-      body = <p className="text-[11px] text-slate-400 dark:text-slate-500">Укажите первую точку линейки на холсте.</p>;
+      body = <p className="text-[13px] text-slate-400 dark:text-slate-500">Укажите первую точку линейки на холсте.</p>;
     }
 
     return (
@@ -80,7 +80,7 @@ export const PropertiesPanel: React.FC = () => {
             </div>
             <div>
               <span className="font-bold text-sm text-slate-800 dark:text-slate-100 block">Группа объектов</span>
-              <span className="text-[11px] text-slate-500 dark:text-slate-400">Выбрано: {selectedObjectIds.length}</span>
+              <span className="text-[13px] text-slate-500 dark:text-slate-400">Выбрано: {selectedObjectIds.length}</span>
             </div>
           </div>
 
@@ -132,7 +132,7 @@ export const PropertiesPanel: React.FC = () => {
               {selectedObjs.map((o) => (
                 <div
                   key={o.id}
-                  className="flex items-center justify-between text-[11px] p-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-700/60"
+                  className="flex items-center justify-between text-[13px] p-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-700/60"
                 >
                   <span className="font-medium text-slate-700 dark:text-slate-200 truncate">{o.name}</span>
                   <span className="text-slate-400 dark:text-slate-500 text-xs">{o.type}</span>

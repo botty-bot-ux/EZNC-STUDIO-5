@@ -114,7 +114,7 @@ export const MachineSettingsPanel: React.FC = () => {
         {stockSheet.enabled && (
           <div className="grid grid-cols-2 gap-2 pt-1">
             <div>
-              <label className="text-[10px] text-slate-500 dark:text-slate-400 block mb-0.5 font-medium">
+              <label className="text-[12px] text-slate-500 dark:text-slate-400 block mb-0.5 font-medium">
                 Ширина (Y, мм)
               </label>
               <select
@@ -142,7 +142,7 @@ export const MachineSettingsPanel: React.FC = () => {
             </div>
 
             <div>
-              <label className="text-[10px] text-slate-500 dark:text-slate-400 block mb-0.5 font-medium">
+              <label className="text-[12px] text-slate-500 dark:text-slate-400 block mb-0.5 font-medium">
                 Высота (X, мм)
               </label>
               <select
@@ -181,7 +181,7 @@ export const MachineSettingsPanel: React.FC = () => {
 
         {/* Диаметр фрезы */}
         <div className="pt-1">
-          <label className="text-[10px] text-slate-500 dark:text-slate-400 block mb-0.5 font-medium">
+          <label className="text-[12px] text-slate-500 dark:text-slate-400 block mb-0.5 font-medium">
             Диаметр фрезы (мм)
           </label>
           <div className="flex items-center gap-1.5">
@@ -204,7 +204,7 @@ export const MachineSettingsPanel: React.FC = () => {
         {/* Spindle & Feeds */}
         <div className="space-y-2 pt-1">
           <div>
-            <label className="text-[10px] text-slate-500 dark:text-slate-400 block mb-0.5 font-medium">
+            <label className="text-[12px] text-slate-500 dark:text-slate-400 block mb-0.5 font-medium">
               Обороты (об/мин)
             </label>
             <input
@@ -217,7 +217,7 @@ export const MachineSettingsPanel: React.FC = () => {
 
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="text-[10px] text-slate-500 dark:text-slate-400 block mb-0.5 font-medium">
+              <label className="text-[12px] text-slate-500 dark:text-slate-400 block mb-0.5 font-medium">
                 Подача (F cut)
               </label>
               <input
@@ -229,7 +229,7 @@ export const MachineSettingsPanel: React.FC = () => {
             </div>
 
             <div>
-              <label className="text-[10px] text-slate-500 dark:text-slate-400 block mb-0.5 font-medium">
+              <label className="text-[12px] text-slate-500 dark:text-slate-400 block mb-0.5 font-medium">
                 Врезание (F plunge)
               </label>
               <input
@@ -247,7 +247,7 @@ export const MachineSettingsPanel: React.FC = () => {
           {/* Высоты Z */}
           <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
             <div>
-              <label className="text-[10px] text-slate-500 dark:text-slate-400 block mb-0.5 font-medium">
+              <label className="text-[12px] text-slate-500 dark:text-slate-400 block mb-0.5 font-medium">
                 Безопасная Z (мм)
               </label>
               <input
@@ -259,7 +259,7 @@ export const MachineSettingsPanel: React.FC = () => {
             </div>
 
             <div>
-              <label className="text-[10px] text-slate-500 dark:text-slate-400 block mb-0.5 font-medium">
+              <label className="text-[12px] text-slate-500 dark:text-slate-400 block mb-0.5 font-medium">
                 Глубина реза Z (мм)
               </label>
               <input
@@ -283,7 +283,7 @@ export const MachineSettingsPanel: React.FC = () => {
 
         <div className="grid grid-cols-2 gap-2">
           <div>
-            <label className="text-[10px] text-slate-500 dark:text-slate-400 block mb-0.5 font-medium">
+            <label className="text-[12px] text-slate-500 dark:text-slate-400 block mb-0.5 font-medium">
               Ось X (мин..макс)
             </label>
             <div className="flex items-center gap-1">
@@ -295,7 +295,7 @@ export const MachineSettingsPanel: React.FC = () => {
                     bounds: { ...machine.bounds, xMin: parseFloat(e.target.value) || -1200 },
                   })
                 }
-                className="w-full bg-slate-100/80 dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/90 rounded-lg px-1.5 py-1 font-mono text-[11px] text-slate-800 dark:text-slate-100 font-bold focus:bg-white focus:dark:bg-slate-800 focus:outline-none transition-all text-center"
+                className="w-full bg-slate-100/80 dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/90 rounded-lg px-1.5 py-1 font-mono text-[13px] text-slate-800 dark:text-slate-100 font-bold focus:bg-white focus:dark:bg-slate-800 focus:outline-none transition-all text-center"
               />
               <span className="text-slate-300 dark:text-slate-600 font-bold">..</span>
               <input
@@ -306,13 +306,13 @@ export const MachineSettingsPanel: React.FC = () => {
                     bounds: { ...machine.bounds, xMax: parseFloat(e.target.value) || 0 },
                   })
                 }
-                className="w-full bg-slate-100/80 dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/90 rounded-lg px-1.5 py-1 font-mono text-[11px] text-slate-800 dark:text-slate-100 font-bold focus:bg-white focus:dark:bg-slate-800 focus:outline-none transition-all text-center"
+                className="w-full bg-slate-100/80 dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/90 rounded-lg px-1.5 py-1 font-mono text-[13px] text-slate-800 dark:text-slate-100 font-bold focus:bg-white focus:dark:bg-slate-800 focus:outline-none transition-all text-center"
               />
             </div>
           </div>
 
           <div>
-            <label className="text-[10px] text-slate-500 dark:text-slate-400 block mb-0.5 font-medium">
+            <label className="text-[12px] text-slate-500 dark:text-slate-400 block mb-0.5 font-medium">
               Ось Y (мин..макс)
             </label>
             <div className="flex items-center gap-1">
@@ -324,7 +324,7 @@ export const MachineSettingsPanel: React.FC = () => {
                     bounds: { ...machine.bounds, yMin: parseFloat(e.target.value) || -900 },
                   })
                 }
-                className="w-full bg-slate-100/80 dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/90 rounded-lg px-1.5 py-1 font-mono text-[11px] text-slate-800 dark:text-slate-100 font-bold focus:bg-white focus:dark:bg-slate-800 focus:outline-none transition-all text-center"
+                className="w-full bg-slate-100/80 dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/90 rounded-lg px-1.5 py-1 font-mono text-[13px] text-slate-800 dark:text-slate-100 font-bold focus:bg-white focus:dark:bg-slate-800 focus:outline-none transition-all text-center"
               />
               <span className="text-slate-300 dark:text-slate-600 font-bold">..</span>
               <input
@@ -335,7 +335,7 @@ export const MachineSettingsPanel: React.FC = () => {
                     bounds: { ...machine.bounds, yMax: parseFloat(e.target.value) || 0 },
                   })
                 }
-                className="w-full bg-slate-100/80 dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/90 rounded-lg px-1.5 py-1 font-mono text-[11px] text-slate-800 dark:text-slate-100 font-bold focus:bg-white focus:dark:bg-slate-800 focus:outline-none transition-all text-center"
+                className="w-full bg-slate-100/80 dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/90 rounded-lg px-1.5 py-1 font-mono text-[13px] text-slate-800 dark:text-slate-100 font-bold focus:bg-white focus:dark:bg-slate-800 focus:outline-none transition-all text-center"
               />
             </div>
           </div>
@@ -353,32 +353,32 @@ export const MachineSettingsPanel: React.FC = () => {
             <button
               type="button"
               onClick={clearUnderlay}
-              className="text-[10px] flex items-center gap-1 text-rose-600 dark:text-rose-400 hover:text-rose-700 hover:dark:text-rose-400 font-bold transition-colors"
+              className="text-[12px] flex items-center gap-1 text-rose-600 dark:text-rose-400 hover:text-rose-700 hover:dark:text-rose-400 font-bold transition-colors"
             >
               <Trash2 className="w-3 h-3" /> Убрать
             </button>
           )}
         </div>
 
-        <p className="text-[10px] text-slate-400 dark:text-slate-500 leading-snug">
+        <p className="text-[12px] text-slate-400 dark:text-slate-500 leading-snug">
           Фоновая картинка-чертёж для обводки. Двигается и растягивается за угол на холсте.
           Видна только в этой сессии и не влияет на G-код.
         </p>
 
         <label className="block">
-          <span className="text-[10px] text-slate-500 dark:text-slate-400 block mb-1 font-medium">Изображение</span>
+          <span className="text-[12px] text-slate-500 dark:text-slate-400 block mb-1 font-medium">Изображение</span>
           <input
             type="file"
             accept="image/*"
             onChange={handleUnderlayFile}
-            className="w-full text-[11px] text-slate-600 dark:text-slate-300 file:mr-2 file:rounded-lg file:border-0 file:bg-sky-50 file:dark:bg-sky-500/15 file:px-2 file:py-1.5 file:text-[11px] file:font-bold file:text-sky-700 file:dark:text-sky-400 hover:file:bg-sky-100 hover:file:dark:bg-sky-500/20 file:transition-colors"
+            className="w-full text-[13px] text-slate-600 dark:text-slate-300 file:mr-2 file:rounded-lg file:border-0 file:bg-sky-50 file:dark:bg-sky-500/15 file:px-2 file:py-1.5 file:text-[13px] file:font-bold file:text-sky-700 file:dark:text-sky-400 hover:file:bg-sky-100 hover:file:dark:bg-sky-500/20 file:transition-colors"
           />
         </label>
 
         {underlay.src && (
           <>
             <div>
-              <label className="text-[10px] text-slate-500 dark:text-slate-400 block mb-1 font-medium flex items-center justify-between">
+              <label className="text-[12px] text-slate-500 dark:text-slate-400 block mb-1 font-medium flex items-center justify-between">
                 <span>Прозрачность</span>
                 <span className="font-mono text-slate-700 dark:text-slate-200">{Math.round(underlay.opacity * 100)}%</span>
               </label>
@@ -397,13 +397,13 @@ export const MachineSettingsPanel: React.FC = () => {
             <button
               type="button"
               onClick={fitUnderlayToSheet}
-              className="w-full flex items-center justify-center gap-1.5 text-[11px] font-bold text-sky-700 dark:text-sky-400 bg-sky-50 dark:bg-sky-500/15 hover:bg-sky-100 hover:dark:bg-sky-500/20 border border-sky-200 rounded-lg px-2 py-1.5 transition-colors"
+              className="w-full flex items-center justify-center gap-1.5 text-[13px] font-bold text-sky-700 dark:text-sky-400 bg-sky-50 dark:bg-sky-500/15 hover:bg-sky-100 hover:dark:bg-sky-500/20 border border-sky-200 rounded-lg px-2 py-1.5 transition-colors"
             >
               <Maximize className="w-3.5 h-3.5" /> Разместить по листу
             </button>
 
             <div className="flex items-center justify-between pt-1">
-              <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium flex items-center gap-1">
+              <span className="text-[12px] text-slate-500 dark:text-slate-400 font-medium flex items-center gap-1">
                 {underlay.visible ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
                 Показывать
               </span>
@@ -419,7 +419,7 @@ export const MachineSettingsPanel: React.FC = () => {
             </div>
 
             <div className="flex items-center justify-between">
-              <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium flex items-center gap-1">
+              <span className="text-[12px] text-slate-500 dark:text-slate-400 font-medium flex items-center gap-1">
                 {underlay.frozen ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
                 Заморозить
               </span>
@@ -435,7 +435,7 @@ export const MachineSettingsPanel: React.FC = () => {
             </div>
 
             {underlay.frozen && (
-              <p className="text-[10px] text-slate-400 dark:text-slate-500 leading-snug">
+              <p className="text-[12px] text-slate-400 dark:text-slate-500 leading-snug">
                 Заморожена — картинку нельзя сдвинуть или растянуть на холсте.
               </p>
             )}
@@ -458,7 +458,7 @@ export const MachineSettingsPanel: React.FC = () => {
               <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
               <span>Все проверки пройдены</span>
             </div>
-            <p className="text-[10px] text-emerald-600/90 dark:text-emerald-400/90">
+            <p className="text-[12px] text-emerald-600/90 dark:text-emerald-400/90">
               Ошибок и выходов за пределы рабочей зоны станка не обнаружено.
             </p>
           </div>
@@ -480,13 +480,13 @@ export const MachineSettingsPanel: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => setSelectedObjectId(item.objectId || null)}
-                      className="text-[10px] bg-rose-100 dark:bg-rose-500/15 hover:bg-rose-200 hover:dark:bg-rose-500/20 text-rose-800 dark:text-rose-400 px-2 py-0.5 rounded font-medium transition-colors shrink-0"
+                      className="text-[12px] bg-rose-100 dark:bg-rose-500/15 hover:bg-rose-200 hover:dark:bg-rose-500/20 text-rose-800 dark:text-rose-400 px-2 py-0.5 rounded font-medium transition-colors shrink-0"
                     >
                       Перейти
                     </button>
                   )}
                 </div>
-                <p className="text-[10px] text-rose-800/90 dark:text-rose-400/90 leading-relaxed">{item.message}</p>
+                <p className="text-[12px] text-rose-800/90 dark:text-rose-400/90 leading-relaxed">{item.message}</p>
               </div>
             ))}
 
@@ -506,13 +506,13 @@ export const MachineSettingsPanel: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => setSelectedObjectId(item.objectId || null)}
-                      className="text-[10px] bg-amber-100 dark:bg-amber-500/15 hover:bg-amber-200 hover:dark:bg-amber-500/20 text-amber-800 dark:text-amber-400 px-2 py-0.5 rounded font-medium transition-colors shrink-0"
+                      className="text-[12px] bg-amber-100 dark:bg-amber-500/15 hover:bg-amber-200 hover:dark:bg-amber-500/20 text-amber-800 dark:text-amber-400 px-2 py-0.5 rounded font-medium transition-colors shrink-0"
                     >
                       Перейти
                     </button>
                   )}
                 </div>
-                <p className="text-[10px] text-amber-800/90 dark:text-amber-400/90 leading-relaxed">{item.message}</p>
+                <p className="text-[12px] text-amber-800/90 dark:text-amber-400/90 leading-relaxed">{item.message}</p>
               </div>
             ))}
 
@@ -526,7 +526,7 @@ export const MachineSettingsPanel: React.FC = () => {
                   <Info className="w-3.5 h-3.5 shrink-0" />
                   <span>{item.title}</span>
                 </div>
-                <p className="text-[10px] text-blue-800/90 dark:text-blue-400/90 leading-relaxed">{item.message}</p>
+                <p className="text-[12px] text-blue-800/90 dark:text-blue-400/90 leading-relaxed">{item.message}</p>
               </div>
             ))}
           </div>

@@ -69,7 +69,7 @@ export const ArcProperties: React.FC<ArcPropertiesProps> = ({ obj, onUpdate }) =
       </div>
 
       <div className="flex items-center gap-2">
-        <label className="text-[11px] text-slate-500 dark:text-slate-400 font-medium shrink-0">Дуга:</label>
+        <label className="text-[13px] text-slate-500 dark:text-slate-400 font-medium shrink-0">Дуга:</label>
         <button
           type="button"
           onClick={() => onUpdate({ clockwise: !obj.clockwise })}
@@ -84,7 +84,7 @@ export const ArcProperties: React.FC<ArcPropertiesProps> = ({ obj, onUpdate }) =
       </div>
 
       <div className="flex items-center gap-2">
-        <label className="text-[11px] text-slate-500 dark:text-slate-400 font-medium shrink-0">Отзеркалить:</label>
+        <label className="text-[13px] text-slate-500 dark:text-slate-400 font-medium shrink-0">Отзеркалить:</label>
         <button
           type="button"
           onClick={() => onUpdate(mirrorArc(obj, 'h'))}

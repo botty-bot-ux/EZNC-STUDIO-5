@@ -138,7 +138,7 @@ export const CanvasHud: React.FC<CanvasHudProps> = ({
             {lineLengthInput}
           </span>
           <span className="text-sm text-slate-400 dark:text-slate-500">мм</span>
-          <span className="ml-1 text-[10px] text-slate-500 dark:text-slate-400 border border-slate-600 rounded px-1.5 py-0.5">
+          <span className="ml-1 text-[12px] text-slate-500 dark:text-slate-400 border border-slate-600 rounded px-1.5 py-0.5">
             Enter
           </span>
         </div>
@@ -154,7 +154,7 @@ export const CanvasHud: React.FC<CanvasHudProps> = ({
           <span>{instruction}</span>
           <button
             onClick={onCancelDraw}
-            className="bg-white/20 dark:bg-slate-900/20 hover:bg-white/30 hover:dark:bg-slate-800/30 px-2 py-0.5 rounded-lg text-[11px] transition-colors"
+            className="bg-white/20 dark:bg-slate-900/20 hover:bg-white/30 hover:dark:bg-slate-800/30 px-2 py-0.5 rounded-lg text-[13px] transition-colors"
           >
             ESC
           </button>
