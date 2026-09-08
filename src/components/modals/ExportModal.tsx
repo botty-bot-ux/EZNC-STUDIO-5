@@ -6,7 +6,6 @@ import {
   Cpu,
   Download,
   Navigation,
-  Sparkles,
   TrendingDown,
   Undo2,
   X,
@@ -73,9 +72,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
                   <TrendingDown className="w-4 h-4" />
-                  <span className="flex items-center gap-1">
-                    Маршрут оптимизирован <Sparkles className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400" />
-                  </span>
+                  <span>Маршрут оптимизирован</span>
                 </span>
                 <span className="text-2xl font-black text-emerald-700 dark:text-emerald-400 bg-emerald-100/80 dark:bg-emerald-500/15 px-3 py-0.5 rounded-lg border border-emerald-200">
                   -{result.savedPercentage.toFixed(1)}%
