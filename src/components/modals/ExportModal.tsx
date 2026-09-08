@@ -66,7 +66,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
         {/* Optimization result or a hint to optimize */}
         {result ? (
           <div className="space-y-4">
-            <div className="bg-gradient-to-r from-emerald-50 via-white to-emerald-50 dark:from-emerald-500/10 dark:via-slate-900 dark:to-emerald-500/10 border border-emerald-200 dark:border-emerald-500/30 rounded-xl p-4 space-y-3 shadow-sm">
+            <div className="bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/30 rounded-xl p-4 space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
                   <TrendingDown className="w-4 h-4" />
