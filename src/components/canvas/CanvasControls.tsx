@@ -1,5 +1,5 @@
 import React from 'react';
-import { Eye, Magnet, Move } from 'lucide-react';
+import { Eye, Grid3x3, Magnet } from 'lucide-react';
 import { Point2D } from '../../types';
 
 interface CanvasControlsProps {
@@ -75,7 +75,7 @@ export const CanvasControls: React.FC<CanvasControlsProps> = ({
             : 'hover:bg-slate-100 hover:dark:bg-slate-700 text-slate-600 dark:text-slate-300'
         }`}
       >
-        <Move className="w-4 h-4" />
+        <Grid3x3 className="w-4 h-4" />
       </button>
 
       <button
