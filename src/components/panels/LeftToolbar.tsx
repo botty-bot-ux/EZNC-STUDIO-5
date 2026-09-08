@@ -22,7 +22,7 @@ export const LeftToolbar: React.FC = () => {
 
   if (!leftPanelOpen) {
     return (
-      <div className="absolute left-4 top-4 z-20 flex items-center select-none pointer-events-auto">
+      <div className="absolute left-4 top-20 z-20 flex items-center select-none pointer-events-auto">
         <button
           onClick={toggleLeftPanel}
           title="Показать список фигур"

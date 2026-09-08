@@ -220,7 +220,7 @@ export const Header: React.FC = () => {
 
     return (
       <header
-        className="relative bg-transparent text-slate-800 dark:text-slate-100 flex flex-col gap-1 px-2 pt-1.5 pb-1 select-none shrink-0 z-20"
+        className="absolute inset-x-0 top-0 bg-transparent text-slate-800 dark:text-slate-100 flex flex-col gap-1 px-2 pt-1.5 pb-1 select-none z-20"
         style={{ paddingTop: 'calc(env(safe-area-inset-top) + 6px)' }}
       >
         {/* Row 1: тип листа, название, меню */}
@@ -357,7 +357,7 @@ export const Header: React.FC = () => {
   }
 
   return (
-    <header className="h-16 bg-transparent text-slate-800 dark:text-slate-100 flex items-center justify-between px-4 select-none shrink-0 z-20 gap-2">
+    <header className="absolute inset-x-0 top-0 h-16 bg-transparent text-slate-800 dark:text-slate-100 flex items-center justify-between px-4 select-none z-20 gap-2">
       {/* Left section: Drawing Tools & Undo/Redo */}
       <div className="flex items-center gap-2">
         {/* Тип листа = выбор фрезы (один инструмент на лист) */}
