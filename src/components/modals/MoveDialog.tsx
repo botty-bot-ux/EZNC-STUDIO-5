@@ -65,7 +65,7 @@ export const MoveDialog: React.FC<MoveDialogProps> = ({ isOpen, ids, onClose, on
 
   return (
     <div
-      className="fixed right-4 top-20 z-40 w-72 select-none"
+      className="fixed bottom-20 left-1/2 -translate-x-1/2 z-40 w-72 select-none"
       onKeyDown={(e) => {
         if (e.key === 'Escape') {
           e.stopPropagation();
