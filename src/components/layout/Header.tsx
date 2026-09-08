@@ -323,10 +323,56 @@ export const Header: React.FC = () => {
   }
 
   return (
-    <header className="absolute inset-x-0 top-0 h-16 bg-transparent text-slate-800 dark:text-slate-100 flex items-center justify-between px-4 select-none z-20 gap-2">
-      {/* Left section: Drawing Tools & Undo/Redo */}
-      <div className="flex items-center gap-2">
-        {/* Drawing Tools Toolbar */}
+    <header className="absolute inset-x-0 top-0 h-16 bg-transparent text-slate-800 dark:text-slate-100 flex items-center px-4 select-none z-20 gap-2">
+      {/* Left section: File actions & Theme */}
+      <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-1 bg-slate-100/90 dark:bg-slate-800/90 p-1 rounded-xl border border-slate-200/90 dark:border-slate-700 shadow-inner">
+          <button
+            onClick={() => setNewProjectOpen(true)}
+            title="Новый проект"
+            className="p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:text-blue-600 hover:dark:text-blue-400 hover:bg-white hover:dark:bg-slate-800 transition-all hover:shadow-sm"
+          >
+            <FilePlus className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+          </button>
+
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            title="Открыть проект (.json / .nc)"
+            className="p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:text-amber-600 hover:dark:text-amber-400 hover:bg-white hover:dark:bg-slate-800 transition-all hover:shadow-sm"
+          >
+            <FolderOpen className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+          </button>
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleOpenFile}
+            accept=".json,.nc,.cnc,.gcode,.tap,.txt"
+            className="hidden"
+          />
+
+          <button
+            onClick={handleSaveProject}
+            title="Сохранить проект (.json)"
+            className="p-2 rounded-lg text-slate-700 dark:text-slate-200 hover:text-emerald-600 hover:dark:text-emerald-400 hover:bg-white hover:dark:bg-slate-800 transition-all hover:shadow-sm flex items-center gap-1.5 cursor-pointer"
+          >
+            <Save className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+          </button>
+        </div>
+
+        {/* Тема (светлая / тёмная) */}
+        <div className="flex items-center bg-slate-100/90 dark:bg-slate-800/90 p-1 rounded-xl border border-slate-200/90 dark:border-slate-700 shadow-inner">
+          <button
+            onClick={toggleTheme}
+            title={theme === 'dark' ? 'Светлая тема' : 'Тёмная тема'}
+            className="p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:text-amber-500 hover:dark:text-amber-400 hover:bg-white hover:dark:bg-slate-800 transition-all cursor-pointer"
+          >
+            {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+          </button>
+        </div>
+      </div>
+
+      {/* Middle section: Drawing Tools Toolbar */}
+      <div className="flex-1 flex items-center justify-center">
         <div className="flex items-center gap-1 bg-slate-100/90 dark:bg-slate-800/90 p-1 rounded-xl border border-slate-200/90 dark:border-slate-700 shadow-inner">
           <button
             onClick={() => setActiveTool('select')}
@@ -392,85 +438,10 @@ export const Header: React.FC = () => {
             <Ruler className={`w-4 h-4 ${activeTool === 'measure' ? 'text-white' : 'text-rose-500 dark:text-rose-400'}`} />
           </button>
         </div>
-
-        {/* Undo/Redo right after tools */}
-        <div className="flex items-center gap-0.5 bg-slate-100/90 dark:bg-slate-800/90 p-1 rounded-xl border border-slate-200/90 dark:border-slate-700 shadow-inner">
-          <button
-            onClick={undo}
-            disabled={undoCount === 0}
-            title="Отменить (Ctrl+Z)"
-            className="p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:dark:text-slate-100 disabled:opacity-30 disabled:hover:text-slate-600 disabled:hover:dark:text-slate-300 hover:bg-white hover:dark:bg-slate-800 transition-all"
-          >
-            <Undo className="w-4 h-4" />
-          </button>
-          <button
-            onClick={redo}
-            disabled={redoCount === 0}
-            title="Повторить (Ctrl+Y)"
-            className="p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:dark:text-slate-100 disabled:opacity-30 disabled:hover:text-slate-600 disabled:hover:dark:text-slate-300 hover:bg-white hover:dark:bg-slate-800 transition-all"
-          >
-            <Redo className="w-4 h-4" />
-          </button>
-        </div>
       </div>
 
-      {/* Middle section: Project Name */}
-      <div className="flex-1 flex items-center justify-center max-w-xs md:max-w-md mx-2">
-        <input
-          type="text"
-          value={projectName}
-          onChange={(e) => setProjectName(e.target.value)}
-          className="bg-slate-100/80 dark:bg-slate-800/80 text-slate-800 dark:text-slate-100 text-sm font-semibold px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-slate-300 hover:dark:border-slate-600 focus:border-blue-500 focus:bg-white focus:dark:bg-slate-800 focus:outline-none w-full text-center transition-all shadow-inner"
-          placeholder="Название проекта"
-        />
-      </div>
-
-      {/* Right section: Action Icons & Warnings */}
-      <div className="flex items-center gap-2">
-        <div className="flex items-center gap-1 bg-slate-100/90 dark:bg-slate-800/90 p-1 rounded-xl border border-slate-200/90 dark:border-slate-700 shadow-inner">
-          <button
-            onClick={() => setNewProjectOpen(true)}
-            title="Новый проект"
-            className="p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:text-blue-600 hover:dark:text-blue-400 hover:bg-white hover:dark:bg-slate-800 transition-all hover:shadow-sm"
-          >
-            <FilePlus className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-          </button>
-
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            title="Открыть проект (.json / .nc)"
-            className="p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:text-amber-600 hover:dark:text-amber-400 hover:bg-white hover:dark:bg-slate-800 transition-all hover:shadow-sm"
-          >
-            <FolderOpen className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-          </button>
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleOpenFile}
-            accept=".json,.nc,.cnc,.gcode,.tap,.txt"
-            className="hidden"
-          />
-
-          <button
-            onClick={handleSaveProject}
-            title="Сохранить проект (.json)"
-            className="p-2 rounded-lg text-slate-700 dark:text-slate-200 hover:text-emerald-600 hover:dark:text-emerald-400 hover:bg-white hover:dark:bg-slate-800 transition-all hover:shadow-sm flex items-center gap-1.5 cursor-pointer"
-          >
-            <Save className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-          </button>
-        </div>
-
-        {/* Тема (светлая / тёмная) */}
-        <div className="flex items-center bg-slate-100/90 dark:bg-slate-800/90 p-1 rounded-xl border border-slate-200/90 dark:border-slate-700 shadow-inner">
-          <button
-            onClick={toggleTheme}
-            title={theme === 'dark' ? 'Светлая тема' : 'Тёмная тема'}
-            className="p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:text-amber-500 hover:dark:text-amber-400 hover:bg-white hover:dark:bg-slate-800 transition-all cursor-pointer"
-          >
-            {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-          </button>
-        </div>
-
+      {/* Right section: Export action & Warnings */}
+      <div className="flex items-center gap-2 shrink-0">
         {/* Big export-to-CNC action */}
         <button
           onClick={openExportModal}
