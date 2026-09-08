@@ -29,6 +29,7 @@ import {
   HoveredHandle,
   SnapPointInfo,
   canvasToWorld,
+  worldToCanvas,
   getArcFrom3Points,
 } from './canvasUtils';
 import { paletteForTheme } from './canvasPalette';
@@ -1259,6 +1260,17 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
   const controlsBottomStyle =
     isMobile && mobileSheet !== 'none' ? { bottom: 'calc(54% + 10px)' } : undefined;
 
+  // Экранная точка конца текущего отрезка/хорды — чтобы модуль длины висел у самого отрезка.
+  const dynAnchorPx =
+    currentMouseProgPt &&
+    (activeTool === 'line'
+      ? !!drawStartPt
+      : activeTool === 'arc'
+      ? !!drawArcStartPt && !drawArcEndPt
+      : false)
+      ? worldToCanvas(currentMouseProgPt.x, currentMouseProgPt.y, pan, zoom)
+      : null;
+
   return (
     <div
       ref={containerRef}
@@ -1288,6 +1300,7 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
         measureStartPt={measureStartPt}
         measureEndPt={measureEndPt}
         lineLengthInput={lineLengthInput}
+        dynAnchorPx={dynAnchorPx}
         onCancelDraw={cancelDrawing}
         isMobile={isMobile}
         onLineLengthChange={setLineLengthInput}

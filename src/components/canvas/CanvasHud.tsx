@@ -9,6 +9,8 @@ interface CanvasHudProps {
   measureStartPt?: Point2D | null;
   measureEndPt?: Point2D | null;
   lineLengthInput?: string;
+  /** Экранные пиксели конца текущего отрезка/хорды — куда прилепить модуль длины. */
+  dynAnchorPx?: Point2D | null;
   onCancelDraw: () => void;
   // Мобильный DYN-ввод: экранная клавиатура вместо физических клавиш.
   isMobile?: boolean;
@@ -26,6 +28,7 @@ export const CanvasHud: React.FC<CanvasHudProps> = ({
   measureStartPt,
   measureEndPt,
   lineLengthInput,
+  dynAnchorPx,
   onCancelDraw,
   isMobile,
   onLineLengthChange,
@@ -128,19 +131,19 @@ export const CanvasHud: React.FC<CanvasHudProps> = ({
         </div>
       )}
 
-      {/* Dynamic distance readout (DYN) while typing a line / arc-chord length (desktop) */}
-      {dynReadoutActive && !isMobile && (
-        <div className="absolute top-20 left-1/2 -translate-x-1/2 z-30 bg-slate-900 dark:bg-slate-100 text-white border border-amber-500/50 px-5 py-2.5 rounded-2xl shadow-md flex items-center gap-2">
-          <span className="text-xs text-slate-400 dark:text-slate-500 font-semibold">
+      {/* Модуль длины у конца отрезка/хорды (desktop) — чистый чип, следует за точкой */}
+      {dynReadoutActive && !isMobile && dynAnchorPx && (
+        <div
+          className="absolute z-30 flex items-baseline gap-1 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-md px-2 py-1 shadow-sm pointer-events-none"
+          style={{ left: dynAnchorPx.x, top: dynAnchorPx.y, transform: 'translate(12px, -50%)' }}
+        >
+          <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">
             {activeTool === 'arc' ? 'Хорда' : 'Длина'}
           </span>
-          <span className="font-mono text-2xl font-bold text-amber-400 tabular-nums">
+          <span className="font-mono text-sm font-semibold text-slate-900 dark:text-slate-100 tabular-nums">
             {lineLengthInput}
           </span>
-          <span className="text-sm text-slate-400 dark:text-slate-500">мм</span>
-          <span className="ml-1 text-[12px] text-slate-500 dark:text-slate-400 border border-slate-600 rounded px-1.5 py-0.5">
-            Enter
-          </span>
+          <span className="text-[10px] text-slate-400 dark:text-slate-500">мм</span>
         </div>
       )}
 
