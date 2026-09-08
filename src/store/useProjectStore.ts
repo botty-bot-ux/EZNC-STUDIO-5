@@ -34,6 +34,30 @@ interface HistoryState {
   machine: MachineSettings;
 }
 
+export type Theme = 'light' | 'dark';
+
+const THEME_STORAGE_KEY = 'cnc_theme';
+
+// Тема — вне проекта (не попадает в экспорт/автосейв). Читаем сохранённую, иначе — системную.
+function readStoredTheme(): Theme {
+  try {
+    const t = localStorage.getItem(THEME_STORAGE_KEY);
+    if (t === 'dark' || t === 'light') return t;
+    if (window.matchMedia('(prefers-color-scheme: dark)').matches) return 'dark';
+  } catch {
+    // ignore
+  }
+  return 'light';
+}
+
+function applyThemeClass(theme: Theme) {
+  try {
+    document.documentElement.classList.toggle('dark', theme === 'dark');
+  } catch {
+    // ignore
+  }
+}
+
 interface ProjectStore {
   projectName: string;
   machine: MachineSettings;
@@ -55,6 +79,8 @@ interface ProjectStore {
   activeTool: ActiveTool;
   activeTab: ActiveTab;
   viewMode: ViewMode;
+
+  theme: Theme;
 
   snapToGrid: boolean;
   gridStep: number;
@@ -84,6 +110,8 @@ interface ProjectStore {
   setActiveTool: (tool: ActiveTool) => void;
   setActiveTab: (tab: ActiveTab) => void;
   setViewMode: (mode: ViewMode) => void;
+  setTheme: (theme: Theme) => void;
+  toggleTheme: () => void;
   setSnapToGrid: (snap: boolean) => void;
   setGridStep: (step: number) => void;
   setSelectedObjectId: (id: string | null) => void;
@@ -232,6 +260,9 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
   const initialGen = generateGcode(initObjects, initOperations, initMachine, initTemplates);
   const initialWarns = analyzeProjectWarnings(initObjects, initOperations, initMachine);
 
+  const initialTheme = readStoredTheme();
+  applyThemeClass(initialTheme);
+
   return {
     projectName: initName,
     machine: initMachine,
@@ -249,6 +280,8 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
     activeTool: 'select',
     activeTab: 'gcode',
     viewMode: 'edit',
+
+    theme: initialTheme,
 
     snapToGrid: true,
     gridStep: 1,
@@ -294,6 +327,18 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
       })),
     setSnapToGrid: (snap: boolean) => set({ snapToGrid: snap }),
     setGridStep: (step: number) => set({ gridStep: step }),
+
+    // Тема — отдельный локальный ключ, вне истории/автосейва проекта.
+    setTheme: (theme: Theme) => {
+      applyThemeClass(theme);
+      try {
+        localStorage.setItem(THEME_STORAGE_KEY, theme);
+      } catch {
+        // ignore
+      }
+      set({ theme });
+    },
+    toggleTheme: () => get().setTheme(get().theme === 'dark' ? 'light' : 'dark'),
 
     setSelectedObjectId: (id: string | null) =>
       set((state) => ({

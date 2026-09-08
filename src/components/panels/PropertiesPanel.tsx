@@ -47,26 +47,26 @@ export const PropertiesPanel: React.FC = () => {
       body = (
         <div className="space-y-3">
           <div>
-            <span className="text-[10px] uppercase tracking-wide font-bold text-slate-400">Расстояние</span>
-            <div className="font-mono text-3xl font-bold text-slate-800">
-              {len.toFixed(3)} <span className="text-sm font-normal text-slate-400">мм</span>
+            <span className="text-[10px] uppercase tracking-wide font-bold text-slate-400 dark:text-slate-500">Расстояние</span>
+            <div className="font-mono text-3xl font-bold text-slate-800 dark:text-slate-100">
+              {len.toFixed(3)} <span className="text-sm font-normal text-slate-400 dark:text-slate-500">мм</span>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-2">
-            <div className="bg-slate-100/70 border border-slate-200/80 rounded-lg px-2.5 py-1.5">
-              <span className="text-[10px] uppercase tracking-wide text-slate-400 block">dX</span>
-              <span className="font-mono text-sm font-bold text-slate-700">{dx >= 0 ? '+' : ''}{dx.toFixed(2)}</span>
+            <div className="bg-slate-100/70 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700/80 rounded-lg px-2.5 py-1.5">
+              <span className="text-[10px] uppercase tracking-wide text-slate-400 dark:text-slate-500 block">dX</span>
+              <span className="font-mono text-sm font-bold text-slate-700 dark:text-slate-200">{dx >= 0 ? '+' : ''}{dx.toFixed(2)}</span>
             </div>
-            <div className="bg-slate-100/70 border border-slate-200/80 rounded-lg px-2.5 py-1.5">
-              <span className="text-[10px] uppercase tracking-wide text-slate-400 block">dY</span>
-              <span className="font-mono text-sm font-bold text-slate-700">{dy >= 0 ? '+' : ''}{dy.toFixed(2)}</span>
+            <div className="bg-slate-100/70 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700/80 rounded-lg px-2.5 py-1.5">
+              <span className="text-[10px] uppercase tracking-wide text-slate-400 dark:text-slate-500 block">dY</span>
+              <span className="font-mono text-sm font-bold text-slate-700 dark:text-slate-200">{dy >= 0 ? '+' : ''}{dy.toFixed(2)}</span>
             </div>
           </div>
-          <div className="flex items-center justify-between bg-slate-100/70 border border-slate-200/80 rounded-lg px-2.5 py-1.5">
-            <span className="text-[10px] uppercase tracking-wide text-slate-400">Угол</span>
-            <span className="font-mono text-sm font-bold text-slate-700">{angleDeg.toFixed(1)}°</span>
+          <div className="flex items-center justify-between bg-slate-100/70 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700/80 rounded-lg px-2.5 py-1.5">
+            <span className="text-[10px] uppercase tracking-wide text-slate-400 dark:text-slate-500">Угол</span>
+            <span className="font-mono text-sm font-bold text-slate-700 dark:text-slate-200">{angleDeg.toFixed(1)}°</span>
           </div>
-          <p className="text-[11px] text-slate-400">
+          <p className="text-[11px] text-slate-400 dark:text-slate-500">
             {liveMeasure.end.x === liveMeasure.start.x && liveMeasure.end.y === liveMeasure.start.y
               ? 'Укажите вторую точку на холсте.'
               : 'Значения обновляются на лету.'}
@@ -74,14 +74,14 @@ export const PropertiesPanel: React.FC = () => {
         </div>
       );
     } else {
-      body = <p className="text-[11px] text-slate-400">Укажите первую точку линейки на холсте.</p>;
+      body = <p className="text-[11px] text-slate-400 dark:text-slate-500">Укажите первую точку линейки на холсте.</p>;
     }
 
     return (
-      <div className="p-4 space-y-3 text-xs text-slate-800 overflow-y-auto h-full select-none">
-        <div className="flex items-center gap-2 pb-2 border-b border-slate-200/80">
-          <Ruler className="w-4 h-4 text-blue-600" />
-          <span className="font-bold text-sm text-slate-800">Линейка</span>
+      <div className="p-4 space-y-3 text-xs text-slate-800 dark:text-slate-100 overflow-y-auto h-full select-none">
+        <div className="flex items-center gap-2 pb-2 border-b border-slate-200/80 dark:border-slate-700/80">
+          <Ruler className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+          <span className="font-bold text-sm text-slate-800 dark:text-slate-100">Линейка</span>
         </div>
         {body}
       </div>
@@ -94,51 +94,51 @@ export const PropertiesPanel: React.FC = () => {
     const allVisible = selectedObjs.every((o) => o.visible !== false);
 
     return (
-      <div className="p-4 space-y-4 text-xs text-slate-800 overflow-y-auto h-full select-none">
-        <div className="flex items-center justify-between pb-3 border-b border-slate-200/80">
+      <div className="p-4 space-y-4 text-xs text-slate-800 dark:text-slate-100 overflow-y-auto h-full select-none">
+        <div className="flex items-center justify-between pb-3 border-b border-slate-200/80 dark:border-slate-700/80">
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600 font-bold">
+            <div className="w-7 h-7 rounded-lg bg-blue-100 dark:bg-blue-500/15 flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold">
               <Layers className="w-4 h-4" />
             </div>
             <div>
-              <span className="font-bold text-sm text-slate-800 block">Группа объектов</span>
-              <span className="text-[11px] text-slate-500">Выбрано: {selectedObjectIds.length}</span>
+              <span className="font-bold text-sm text-slate-800 dark:text-slate-100 block">Группа объектов</span>
+              <span className="text-[11px] text-slate-500 dark:text-slate-400">Выбрано: {selectedObjectIds.length}</span>
             </div>
           </div>
 
           <button
             onClick={deleteSelectedObjects}
             title="Удалить выбранные объекты"
-            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-all"
+            className="p-1.5 rounded-lg text-slate-400 dark:text-slate-500 hover:text-rose-600 hover:dark:text-rose-400 hover:bg-rose-50 hover:dark:bg-rose-500/20 transition-all"
           >
             <Trash2 className="w-4 h-4" />
           </button>
         </div>
 
         <div className="space-y-3">
-          <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-100/70 border border-slate-200/80 shadow-sm">
-            <span className="text-slate-700 font-medium">Отображать на схеме</span>
+          <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-100/70 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700/80 shadow-sm">
+            <span className="text-slate-700 dark:text-slate-200 font-medium">Отображать на схеме</span>
             <input
               type="checkbox"
               checked={allVisible}
               onChange={(e) => updateSelectedObjects({ visible: e.target.checked })}
-              className="rounded border-slate-300 bg-white text-blue-600 focus:ring-0 cursor-pointer w-4 h-4"
+              className="rounded border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 focus:ring-0 cursor-pointer w-4 h-4"
             />
           </div>
 
           {/* Group summary */}
-          <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl space-y-2">
-            <span className="text-slate-500 font-medium block text-[11px] uppercase tracking-wider">
+          <div className="p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200/80 dark:border-slate-700/80 rounded-xl space-y-2">
+            <span className="text-slate-500 dark:text-slate-400 font-medium block text-[11px] uppercase tracking-wider">
               Состав выделения:
             </span>
             <div className="space-y-1 max-h-48 overflow-y-auto pr-1 custom-scrollbar">
               {selectedObjs.map((o) => (
                 <div
                   key={o.id}
-                  className="flex items-center justify-between text-[11px] p-1.5 rounded-lg bg-white border border-slate-200/60"
+                  className="flex items-center justify-between text-[11px] p-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-700/60"
                 >
-                  <span className="font-medium text-slate-700 truncate">{o.name}</span>
-                  <span className="text-slate-400 uppercase text-[10px]">{o.type}</span>
+                  <span className="font-medium text-slate-700 dark:text-slate-200 truncate">{o.name}</span>
+                  <span className="text-slate-400 dark:text-slate-500 uppercase text-[10px]">{o.type}</span>
                 </div>
               ))}
             </div>
@@ -152,8 +152,8 @@ export const PropertiesPanel: React.FC = () => {
 
   if (!committedObj) {
     return (
-      <div className="p-6 text-center text-slate-500 text-xs flex flex-col items-center justify-center h-full gap-2 select-none">
-        <Sliders className="w-8 h-8 opacity-40 text-slate-400" />
+      <div className="p-6 text-center text-slate-500 dark:text-slate-400 text-xs flex flex-col items-center justify-center h-full gap-2 select-none">
+        <Sliders className="w-8 h-8 opacity-40 text-slate-400 dark:text-slate-500" />
         <p>Выберите объект на холсте или рамкой выделения для просмотра и редактирования его свойств.</p>
       </div>
     );
@@ -177,22 +177,22 @@ export const PropertiesPanel: React.FC = () => {
       : null;
 
   return (
-    <div className="p-4 space-y-4 text-xs text-slate-800 overflow-y-auto h-full select-none">
-      <div className="flex items-center justify-between pb-3 border-b border-slate-200/80">
+    <div className="p-4 space-y-4 text-xs text-slate-800 dark:text-slate-100 overflow-y-auto h-full select-none">
+      <div className="flex items-center justify-between pb-3 border-b border-slate-200/80 dark:border-slate-700/80">
         <div className="flex items-center gap-2">
-          {selectedObj.type === 'point' && <CircleDot className="w-4 h-4 text-purple-600" />}
-          {selectedObj.type === 'line' && <LineDotRightHorizontal className="w-4 h-4 text-blue-600" />}
-          {selectedObj.type === 'rectangle' && <Square className="w-4 h-4 text-amber-600" />}
-          {selectedObj.type === 'circle' && <Circle className="w-4 h-4 text-emerald-600" />}
-          {selectedObj.type === 'arc' && <Spline className="w-4 h-4 text-cyan-600" />}
+          {selectedObj.type === 'point' && <CircleDot className="w-4 h-4 text-purple-600 dark:text-purple-400" />}
+          {selectedObj.type === 'line' && <LineDotRightHorizontal className="w-4 h-4 text-blue-600 dark:text-blue-400" />}
+          {selectedObj.type === 'rectangle' && <Square className="w-4 h-4 text-amber-600 dark:text-amber-400" />}
+          {selectedObj.type === 'circle' && <Circle className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />}
+          {selectedObj.type === 'arc' && <Spline className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />}
 
-          <span className="font-bold text-sm text-slate-800 truncate">{selectedObj.name}</span>
+          <span className="font-bold text-sm text-slate-800 dark:text-slate-100 truncate">{selectedObj.name}</span>
         </div>
 
         <button
           onClick={() => deleteObject(selectedObj.id)}
           title="Удалить объект"
-          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-all"
+          className="p-1.5 rounded-lg text-slate-400 dark:text-slate-500 hover:text-rose-600 hover:dark:text-rose-400 hover:bg-rose-50 hover:dark:bg-rose-500/20 transition-all"
         >
           <Trash2 className="w-4 h-4" />
         </button>
@@ -201,33 +201,33 @@ export const PropertiesPanel: React.FC = () => {
       {/* Common properties */}
       <div className="space-y-3">
         <div>
-          <label className="text-slate-500 block mb-1 font-medium">Название объекта</label>
+          <label className="text-slate-500 dark:text-slate-400 block mb-1 font-medium">Название объекта</label>
           <input
             type="text"
             value={selectedObj.name}
             onChange={(e) => updateObject(selectedObj.id, { name: e.target.value })}
-            className="w-full bg-slate-100/80 border border-slate-200 rounded-lg px-2.5 py-1.5 text-slate-800 focus:border-blue-500 focus:bg-white focus:outline-none transition-all"
+            className="w-full bg-slate-100/80 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-800 dark:text-slate-100 focus:border-blue-500 focus:bg-white focus:dark:bg-slate-800 focus:outline-none transition-all"
           />
         </div>
 
-        <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-100/70 border border-slate-200/80 shadow-sm">
-          <span className="text-slate-700 font-medium">Отображать на схеме</span>
+        <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-100/70 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700/80 shadow-sm">
+          <span className="text-slate-700 dark:text-slate-200 font-medium">Отображать на схеме</span>
           <input
             type="checkbox"
             checked={selectedObj.visible !== false}
             onChange={(e) => updateObject(selectedObj.id, { visible: e.target.checked })}
-            className="rounded border-slate-300 bg-white text-blue-600 focus:ring-0 cursor-pointer w-4 h-4"
+            className="rounded border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 focus:ring-0 cursor-pointer w-4 h-4"
           />
         </div>
 
         {/* Live length / angle readout for a segment */}
         {lineInfo && (
-          <div className="flex items-center justify-between p-2.5 rounded-xl bg-amber-50/70 border border-amber-200/80 font-mono text-xs">
-            <span className="text-slate-500">Длина</span>
-            <span className="font-bold text-amber-700">{lineInfo.len.toFixed(2)} мм</span>
-            <span className="text-slate-300">|</span>
-            <span className="text-slate-500">Угол</span>
-            <span className="font-bold text-sky-700">{lineInfo.angleDeg.toFixed(1)}°</span>
+          <div className="flex items-center justify-between p-2.5 rounded-xl bg-amber-50/70 dark:bg-amber-500/15 border border-amber-200/80 font-mono text-xs">
+            <span className="text-slate-500 dark:text-slate-400">Длина</span>
+            <span className="font-bold text-amber-700 dark:text-amber-400">{lineInfo.len.toFixed(2)} мм</span>
+            <span className="text-slate-300 dark:text-slate-600">|</span>
+            <span className="text-slate-500 dark:text-slate-400">Угол</span>
+            <span className="font-bold text-sky-700 dark:text-sky-400">{lineInfo.angleDeg.toFixed(1)}°</span>
           </div>
         )}
 

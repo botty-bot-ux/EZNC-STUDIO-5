@@ -24,15 +24,15 @@ export const PointProperties: React.FC<PointPropertiesProps> = ({ obj, onUpdate 
     <div className="space-y-2">
       {/* 3 Buttons for Drill Mode */}
       <div className="flex items-center gap-2">
-        <label className="text-[11px] text-slate-500 font-medium shrink-0">Сверление:</label>
-        <div className="grid grid-cols-3 gap-1 bg-slate-100 p-1 rounded-xl flex-1">
+        <label className="text-[11px] text-slate-500 dark:text-slate-400 font-medium shrink-0">Сверление:</label>
+        <div className="grid grid-cols-3 gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl flex-1">
           <button
             type="button"
             onClick={() => setDrillMode('11mm')}
             className={`py-0.5 px-1.5 text-xs font-semibold rounded-lg transition-all ${
               currentMode === '11mm'
                 ? 'bg-purple-600 text-white shadow-sm font-bold'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:dark:text-slate-100 hover:bg-slate-200/60 hover:dark:bg-slate-600/60'
             }`}
           >
             11 мм
@@ -43,7 +43,7 @@ export const PointProperties: React.FC<PointPropertiesProps> = ({ obj, onUpdate 
             className={`py-0.5 px-1.5 text-xs font-semibold rounded-lg transition-all ${
               currentMode === '9mm'
                 ? 'bg-purple-600 text-white shadow-sm font-bold'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:dark:text-slate-100 hover:bg-slate-200/60 hover:dark:bg-slate-600/60'
             }`}
           >
             9 мм
@@ -54,7 +54,7 @@ export const PointProperties: React.FC<PointPropertiesProps> = ({ obj, onUpdate 
             className={`py-0.5 px-1.5 text-xs font-semibold rounded-lg transition-all ${
               currentMode === '3mm'
                 ? 'bg-purple-600 text-white shadow-sm font-bold'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:dark:text-slate-100 hover:bg-slate-200/60 hover:dark:bg-slate-600/60'
             }`}
           >
             3 мм

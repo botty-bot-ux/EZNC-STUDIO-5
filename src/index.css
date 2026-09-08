@@ -1,6 +1,15 @@
 @import "tailwindcss";
 
+/* Тёмная тема включаем классом .dark на <html> (а не только по системной настройке). */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @layer base {
+  html {
+    color-scheme: light;
+  }
+  html.dark {
+    color-scheme: dark;
+  }
   html,
   body {
     /* телефонам запрещаем «pull-to-refresh» и системный зум страницы — жестикулирует холст */
@@ -11,6 +20,8 @@
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
     -webkit-tap-highlight-color: transparent;
     touch-action: manipulation;
+    /* Мягкая смена фона/текста при переключении темы (холст перекрашивается сам). */
+    transition: background-color 0.2s ease, color 0.2s ease;
   }
 }
 

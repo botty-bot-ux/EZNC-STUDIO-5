@@ -31,6 +31,7 @@ import {
   canvasToWorld,
   getArcFrom3Points,
 } from './canvasUtils';
+import { paletteForTheme } from './canvasPalette';
 import { constrainAngle } from '../../lib/geometry/transform';
 import { useIsMobile } from '../../hooks/useIsMobile';
 
@@ -150,6 +151,7 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
     underlay,
     updateUnderlay,
     mobileSheet,
+    theme,
   } = useProjectStore(
     useShallow((s) => ({
       objects: s.objects,
@@ -176,12 +178,16 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
       underlay: s.underlay,
       updateUnderlay: s.updateUnderlay,
       mobileSheet: s.mobileSheet,
+      theme: s.theme,
     }))
   );
 
   // Canvas Pan & Zoom
   const [pan, setPan] = useState<Point2D>({ x: 350, y: 350 });
   const [zoom, setZoom] = useState<number>(1.2);
+
+  // Палитра холста следует за темой приложения (светлая/тёмная).
+  const palette = useMemo(() => paletteForTheme(theme), [theme]);
 
   // Перерисовка/ресайз канваса при изменении размера окна (телефон: адресная строка, поворот)
   const [viewportVer, setViewportVer] = useState(0);
@@ -523,16 +529,16 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
     ctx.clearRect(0, 0, width, height);
 
     // 1. Grid with Work Area Mask & Fade
-    drawGrid(ctx, width, height, pan, zoom, gridStep, machine);
+    drawGrid(ctx, width, height, pan, zoom, gridStep, machine, palette);
 
     // 1b. Подложка — фоновая референсная картинка (поверх фона, под остальными слоями)
     drawUnderlay(ctx, underlayImgRef.current, underlay, pan, zoom);
 
     // 2. Machine Bounds & Stock
-    drawMachineBoundsAndStock(ctx, machine, pan, zoom);
+    drawMachineBoundsAndStock(ctx, machine, pan, zoom, palette);
 
     // 3. Axis Origin & Work Zero
-    drawAxisOrigin(ctx, machine, pan, zoom);
+    drawAxisOrigin(ctx, machine, pan, zoom, palette);
 
     // 4. G-Code Toolpaths (in Preview or Gcode mode)
     if (viewMode === 'preview' || viewMode === 'gcode') {
@@ -540,7 +546,7 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
     }
 
     // 5. CAD Objects
-    drawCADObjects(ctx, displayObjects, selectedObjectIds, hoveredHandle, dragMode, pan, zoom, machine.toolDiameter);
+    drawCADObjects(ctx, displayObjects, selectedObjectIds, hoveredHandle, dragMode, pan, zoom, machine.toolDiameter, palette);
 
     // 5b. Selection Box Marquee
     if (dragMode === 'selection_box' && selectionBoxStart && selectionBoxCurrent) {
@@ -568,7 +574,8 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
         measureEndPt,
         currentMouseProgPt,
         pan,
-        zoom
+        zoom,
+        palette
       );
     }
 
@@ -599,6 +606,7 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
     selectionBoxStart,
     selectionBoxCurrent,
     machine,
+    palette,
     underlay,
     underlayImgVer,
   ]);
@@ -1226,7 +1234,7 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
   return (
     <div
       ref={containerRef}
-      className="relative w-full h-full bg-[#f1f5f9] overflow-hidden select-none"
+      className="relative w-full h-full bg-[#f1f5f9] dark:bg-[#0f172a] overflow-hidden select-none"
       onContextMenu={(e) => e.preventDefault()}
     >
       <canvas

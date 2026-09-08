@@ -6,12 +6,14 @@ import {
   FilePlus,
   FolderOpen,
   LineDotRightHorizontal,
+  Moon,
   MousePointer,
   MoreHorizontal,
   Redo,
   Ruler,
   Save,
   Spline,
+  Sun,
   Undo,
   X,
 } from 'lucide-react';
@@ -41,6 +43,8 @@ export const Header: React.FC = () => {
     setActiveTool,
     machine,
     updateMachine,
+    theme,
+    toggleTheme,
   } = useProjectStore(
     useShallow((s) => ({
       projectName: s.projectName,
@@ -60,6 +64,8 @@ export const Header: React.FC = () => {
       setActiveTool: s.setActiveTool,
       machine: s.machine,
       updateMachine: s.updateMachine,
+      theme: s.theme,
+      toggleTheme: s.toggleTheme,
     }))
   );
 
@@ -203,27 +209,27 @@ export const Header: React.FC = () => {
   if (isMobile) {
     const toolBtn = (active: boolean) =>
       `p-2 rounded-lg transition-all shrink-0 ${
-        active ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25' : 'text-slate-600 hover:bg-white/60'
+        active ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25' : 'text-slate-600 dark:text-slate-300 hover:bg-white/60 hover:dark:bg-slate-800/60'
       }`;
     const menuItems = [
-      { label: 'Новый проект', Icon: FilePlus, onClick: () => newProject(), color: 'text-blue-600' },
-      { label: 'Открыть (.json / .nc)', Icon: FolderOpen, onClick: () => fileInputRef.current?.click(), color: 'text-amber-600' },
-      { label: 'Сохранить проект (.json)', Icon: Save, onClick: () => handleSaveProject(), color: 'text-emerald-600' },
-      { label: 'Экспорт на ЧПУ', Icon: Download, onClick: () => openExportModal(), color: 'text-teal-600' },
+      { label: 'Новый проект', Icon: FilePlus, onClick: () => newProject(), color: 'text-blue-600 dark:text-blue-400' },
+      { label: 'Открыть (.json / .nc)', Icon: FolderOpen, onClick: () => fileInputRef.current?.click(), color: 'text-amber-600 dark:text-amber-400' },
+      { label: 'Сохранить проект (.json)', Icon: Save, onClick: () => handleSaveProject(), color: 'text-emerald-600 dark:text-emerald-400' },
+      { label: 'Экспорт на ЧПУ', Icon: Download, onClick: () => openExportModal(), color: 'text-teal-600 dark:text-teal-400' },
     ];
 
     return (
       <header
-        className="relative bg-[#f8fafc]/95 backdrop-blur text-slate-800 flex flex-col gap-1 px-2 pt-1.5 pb-1 select-none shrink-0 z-20"
+        className="relative bg-[#f8fafc]/95 dark:bg-[#0f172a]/95 backdrop-blur text-slate-800 dark:text-slate-100 flex flex-col gap-1 px-2 pt-1.5 pb-1 select-none shrink-0 z-20"
         style={{ paddingTop: 'calc(env(safe-area-inset-top) + 6px)' }}
       >
         {/* Row 1: тип листа, название, меню */}
         <div className="flex items-center gap-1.5 min-w-0">
-          <div className="grid grid-cols-2 gap-0.5 bg-slate-100/90 p-0.5 rounded-xl border border-slate-200/90 shrink-0">
+          <div className="grid grid-cols-2 gap-0.5 bg-slate-100/90 dark:bg-slate-800/90 p-0.5 rounded-xl border border-slate-200/90 dark:border-slate-700/90 shrink-0">
             <button
               onClick={() => applySheet(false)}
               className={`px-2 py-1 rounded-lg text-[11px] font-bold whitespace-nowrap ${
-                !isRail ? 'bg-blue-600 text-white' : 'text-slate-600'
+                !isRail ? 'bg-blue-600 text-white' : 'text-slate-600 dark:text-slate-300'
               }`}
             >
               Изг. Ø3
@@ -231,7 +237,7 @@ export const Header: React.FC = () => {
             <button
               onClick={() => applySheet(true)}
               className={`px-2 py-1 rounded-lg text-[11px] font-bold whitespace-nowrap ${
-                isRail ? 'bg-blue-600 text-white' : 'text-slate-600'
+                isRail ? 'bg-blue-600 text-white' : 'text-slate-600 dark:text-slate-300'
               }`}
             >
               Царг. Ø8
@@ -242,7 +248,7 @@ export const Header: React.FC = () => {
             type="text"
             value={projectName}
             onChange={(e) => setProjectName(e.target.value)}
-            className="bg-slate-100/80 text-slate-800 text-sm font-semibold px-2 py-1 rounded-xl border border-slate-200 focus:border-blue-500 focus:bg-white focus:outline-none flex-1 min-w-0 text-center"
+            className="bg-slate-100/80 dark:bg-slate-800/80 text-slate-800 dark:text-slate-100 text-sm font-semibold px-2 py-1 rounded-xl border border-slate-200 dark:border-slate-700 focus:border-blue-500 focus:bg-white focus:dark:bg-slate-800 focus:outline-none flex-1 min-w-0 text-center"
             placeholder="Проект"
           />
 
@@ -250,7 +256,7 @@ export const Header: React.FC = () => {
             <button
               onClick={() => setActiveTab('machine')}
               className={`flex items-center gap-1 px-2 py-1.5 rounded-xl text-xs font-bold shrink-0 ${
-                errorCount > 0 ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-700'
+                errorCount > 0 ? 'bg-rose-50 dark:bg-rose-500/15 text-rose-600 dark:text-rose-400' : 'bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-400'
               }`}
             >
               <AlertTriangle className="w-4 h-4 shrink-0" />
@@ -259,42 +265,50 @@ export const Header: React.FC = () => {
           )}
 
           <button
+            onClick={toggleTheme}
+            title={theme === 'dark' ? 'Светлая тема' : 'Тёмная тема'}
+            className="p-2 rounded-xl bg-slate-100/90 dark:bg-slate-800/90 border border-slate-200/90 dark:border-slate-700/90 text-slate-600 dark:text-slate-300 shrink-0"
+          >
+            {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+          </button>
+
+          <button
             onClick={() => setMenuOpen((v) => !v)}
             title="Меню проекта"
-            className="p-2 rounded-xl bg-slate-100/90 border border-slate-200/90 text-slate-600 shrink-0"
+            className="p-2 rounded-xl bg-slate-100/90 dark:bg-slate-800/90 border border-slate-200/90 dark:border-slate-700/90 text-slate-600 dark:text-slate-300 shrink-0"
           >
             {menuOpen ? <X className="w-4 h-4" /> : <MoreHorizontal className="w-4 h-4" />}
           </button>
         </div>
 
         {/* Row 2: инструменты черчения + undo/redo */}
-        <div className="flex items-center gap-1 bg-slate-100/90 px-1 py-0.5 rounded-xl border border-slate-200/90 overflow-x-auto">
+        <div className="flex items-center gap-1 bg-slate-100/90 dark:bg-slate-800/90 px-1 py-0.5 rounded-xl border border-slate-200/90 dark:border-slate-700/90 overflow-x-auto">
           <button onClick={() => setActiveTool('select')} title="Выбор и перемещение" className={toolBtn(activeTool === 'select')}>
             <MousePointer className="w-4 h-4" />
           </button>
           <button onClick={() => setActiveTool('line')} title="Линия / Отрезок" className={toolBtn(activeTool === 'line')}>
-            <LineDotRightHorizontal className={`w-4 h-4 ${activeTool === 'line' ? 'text-white' : 'text-blue-600'}`} />
+            <LineDotRightHorizontal className={`w-4 h-4 ${activeTool === 'line' ? 'text-white' : 'text-blue-600 dark:text-blue-400'}`} />
           </button>
           {isRail && (
             <button onClick={() => setActiveTool('point')} title="Отверстие / Точка" className={toolBtn(activeTool === 'point')}>
-              <CircleDot className={`w-4 h-4 ${activeTool === 'point' ? 'text-white' : 'text-purple-600'}`} />
+              <CircleDot className={`w-4 h-4 ${activeTool === 'point' ? 'text-white' : 'text-purple-600 dark:text-purple-400'}`} />
             </button>
           )}
           {!isRail && (
             <button onClick={() => setActiveTool('arc')} title="Дуга окружности" className={toolBtn(activeTool === 'arc')}>
-              <Spline className={`w-4 h-4 ${activeTool === 'arc' ? 'text-white' : 'text-cyan-600'}`} />
+              <Spline className={`w-4 h-4 ${activeTool === 'arc' ? 'text-white' : 'text-cyan-600 dark:text-cyan-400'}`} />
             </button>
           )}
           <button onClick={() => setActiveTool('measure')} title="Линейка / Штангенциркуль" className={toolBtn(activeTool === 'measure')}>
-            <Ruler className={`w-4 h-4 ${activeTool === 'measure' ? 'text-white' : 'text-rose-500'}`} />
+            <Ruler className={`w-4 h-4 ${activeTool === 'measure' ? 'text-white' : 'text-rose-500 dark:text-rose-400'}`} />
           </button>
 
-          <div className="w-px h-5 bg-slate-200 mx-0.5 shrink-0" />
+          <div className="w-px h-5 bg-slate-200 dark:bg-slate-700 mx-0.5 shrink-0" />
 
-          <button onClick={undo} disabled={undoCount === 0} title="Отменить" className="p-2 rounded-lg text-slate-600 disabled:opacity-30 hover:bg-white transition-all shrink-0">
+          <button onClick={undo} disabled={undoCount === 0} title="Отменить" className="p-2 rounded-lg text-slate-600 dark:text-slate-300 disabled:opacity-30 hover:bg-white hover:dark:bg-slate-800 transition-all shrink-0">
             <Undo className="w-4 h-4" />
           </button>
-          <button onClick={redo} disabled={redoCount === 0} title="Повторить" className="p-2 rounded-lg text-slate-600 disabled:opacity-30 hover:bg-white transition-all shrink-0">
+          <button onClick={redo} disabled={redoCount === 0} title="Повторить" className="p-2 rounded-lg text-slate-600 dark:text-slate-300 disabled:opacity-30 hover:bg-white hover:dark:bg-slate-800 transition-all shrink-0">
             <Redo className="w-4 h-4" />
           </button>
         </div>
@@ -303,7 +317,7 @@ export const Header: React.FC = () => {
         {menuOpen && (
           <>
             <div className="fixed inset-0 z-30" onClick={() => setMenuOpen(false)} />
-            <div className="absolute right-2 top-full mt-1 z-40 w-56 bg-white rounded-2xl border border-slate-200 shadow-2xl p-1.5 flex flex-col gap-0.5">
+            <div className="absolute right-2 top-full mt-1 z-40 w-56 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-2xl p-1.5 flex flex-col gap-0.5">
               {menuItems.map(({ label, Icon, onClick, color }) => (
                 <button
                   key={label}
@@ -311,7 +325,7 @@ export const Header: React.FC = () => {
                     setMenuOpen(false);
                     onClick();
                   }}
-                  className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-semibold text-slate-700 hover:bg-slate-100 active:bg-slate-200 transition-colors text-left"
+                  className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 hover:dark:bg-slate-700 active:bg-slate-200 active:dark:bg-slate-600 transition-colors text-left"
                 >
                   <Icon className={`w-4 h-4 shrink-0 ${color}`} />
                   <span>{label}</span>
@@ -343,16 +357,16 @@ export const Header: React.FC = () => {
   }
 
   return (
-    <header className="h-16 bg-gradient-to-b from-[#f8fafc] via-[#f8fafc]/95 via-70% to-transparent text-slate-800 flex items-center justify-between px-4 select-none shrink-0 z-20 gap-2">
+    <header className="h-16 bg-gradient-to-b from-[#f8fafc] via-[#f8fafc]/95 via-70% to-transparent text-slate-800 dark:text-slate-100 flex items-center justify-between px-4 select-none shrink-0 z-20 gap-2">
       {/* Left section: Drawing Tools & Undo/Redo */}
       <div className="flex items-center gap-2">
         {/* Тип листа = выбор фрезы (один инструмент на лист) */}
-        <div className="grid grid-cols-2 gap-1 bg-slate-100/90 p-1 rounded-xl border border-slate-200/90 shadow-inner">
+        <div className="grid grid-cols-2 gap-1 bg-slate-100/90 dark:bg-slate-800/90 p-1 rounded-xl border border-slate-200/90 dark:border-slate-700/90 shadow-inner">
           <button
             onClick={() => applySheet(false)}
             title="Изголовье — фреза 3 мм (узор)"
             className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
-              !isRail ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25' : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+              !isRail ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:dark:text-slate-100 hover:bg-white/60 hover:dark:bg-slate-800/60'
             }`}
           >
             Изголовье Ø3
@@ -361,7 +375,7 @@ export const Header: React.FC = () => {
             onClick={() => applySheet(true)}
             title="Царга боковая — фреза 8 мм"
             className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
-              isRail ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25' : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+              isRail ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:dark:text-slate-100 hover:bg-white/60 hover:dark:bg-slate-800/60'
             }`}
           >
             Царга Ø8
@@ -369,14 +383,14 @@ export const Header: React.FC = () => {
         </div>
 
         {/* Drawing Tools Toolbar */}
-        <div className="flex items-center gap-1 bg-slate-100/90 p-1 rounded-xl border border-slate-200/90 shadow-inner">
+        <div className="flex items-center gap-1 bg-slate-100/90 dark:bg-slate-800/90 p-1 rounded-xl border border-slate-200/90 dark:border-slate-700/90 shadow-inner">
           <button
             onClick={() => setActiveTool('select')}
             title="Выбор и перемещение (S)"
             className={`p-2 rounded-lg transition-all ${
               activeTool === 'select'
                 ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+                : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:dark:text-slate-100 hover:bg-white/60 hover:dark:bg-slate-800/60'
             }`}
           >
             <MousePointer className="w-4 h-4" />
@@ -388,10 +402,10 @@ export const Header: React.FC = () => {
             className={`p-2 rounded-lg transition-all ${
               activeTool === 'line'
                 ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+                : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:dark:text-slate-100 hover:bg-white/60 hover:dark:bg-slate-800/60'
             }`}
           >
-            <LineDotRightHorizontal className={`w-4 h-4 ${activeTool === 'line' ? 'text-white' : 'text-blue-600'}`} />
+            <LineDotRightHorizontal className={`w-4 h-4 ${activeTool === 'line' ? 'text-white' : 'text-blue-600 dark:text-blue-400'}`} />
           </button>
 
           {isRail && (
@@ -401,10 +415,10 @@ export const Header: React.FC = () => {
               className={`p-2 rounded-lg transition-all ${
                 activeTool === 'point'
                   ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:dark:text-slate-100 hover:bg-white/60 hover:dark:bg-slate-800/60'
               }`}
             >
-              <CircleDot className={`w-4 h-4 ${activeTool === 'point' ? 'text-white' : 'text-purple-600'}`} />
+              <CircleDot className={`w-4 h-4 ${activeTool === 'point' ? 'text-white' : 'text-purple-600 dark:text-purple-400'}`} />
             </button>
           )}
 
@@ -415,10 +429,10 @@ export const Header: React.FC = () => {
               className={`p-2 rounded-lg transition-all ${
                 activeTool === 'arc'
                   ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:dark:text-slate-100 hover:bg-white/60 hover:dark:bg-slate-800/60'
               }`}
             >
-              <Spline className={`w-4 h-4 ${activeTool === 'arc' ? 'text-white' : 'text-cyan-600'}`} />
+              <Spline className={`w-4 h-4 ${activeTool === 'arc' ? 'text-white' : 'text-cyan-600 dark:text-cyan-400'}`} />
             </button>
           )}
 
@@ -428,20 +442,20 @@ export const Header: React.FC = () => {
             className={`p-2 rounded-lg transition-all ${
               activeTool === 'measure'
                 ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+                : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:dark:text-slate-100 hover:bg-white/60 hover:dark:bg-slate-800/60'
             }`}
           >
-            <Ruler className={`w-4 h-4 ${activeTool === 'measure' ? 'text-white' : 'text-rose-500'}`} />
+            <Ruler className={`w-4 h-4 ${activeTool === 'measure' ? 'text-white' : 'text-rose-500 dark:text-rose-400'}`} />
           </button>
         </div>
 
         {/* Undo/Redo right after tools */}
-        <div className="flex items-center gap-0.5 bg-slate-100/90 p-1 rounded-xl border border-slate-200/90 shadow-inner">
+        <div className="flex items-center gap-0.5 bg-slate-100/90 dark:bg-slate-800/90 p-1 rounded-xl border border-slate-200/90 dark:border-slate-700/90 shadow-inner">
           <button
             onClick={undo}
             disabled={undoCount === 0}
             title="Отменить (Ctrl+Z)"
-            className="p-2 rounded-lg text-slate-600 hover:text-slate-900 disabled:opacity-30 disabled:hover:text-slate-600 hover:bg-white transition-all"
+            className="p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:dark:text-slate-100 disabled:opacity-30 disabled:hover:text-slate-600 disabled:hover:dark:text-slate-300 hover:bg-white hover:dark:bg-slate-800 transition-all"
           >
             <Undo className="w-4 h-4" />
           </button>
@@ -449,7 +463,7 @@ export const Header: React.FC = () => {
             onClick={redo}
             disabled={redoCount === 0}
             title="Повторить (Ctrl+Y)"
-            className="p-2 rounded-lg text-slate-600 hover:text-slate-900 disabled:opacity-30 disabled:hover:text-slate-600 hover:bg-white transition-all"
+            className="p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:dark:text-slate-100 disabled:opacity-30 disabled:hover:text-slate-600 disabled:hover:dark:text-slate-300 hover:bg-white hover:dark:bg-slate-800 transition-all"
           >
             <Redo className="w-4 h-4" />
           </button>
@@ -462,28 +476,28 @@ export const Header: React.FC = () => {
           type="text"
           value={projectName}
           onChange={(e) => setProjectName(e.target.value)}
-          className="bg-slate-100/80 text-slate-800 text-sm font-semibold px-3 py-1.5 rounded-xl border border-slate-200 hover:border-slate-300 focus:border-blue-500 focus:bg-white focus:outline-none w-full text-center transition-all shadow-inner"
+          className="bg-slate-100/80 dark:bg-slate-800/80 text-slate-800 dark:text-slate-100 text-sm font-semibold px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-slate-300 hover:dark:border-slate-600 focus:border-blue-500 focus:bg-white focus:dark:bg-slate-800 focus:outline-none w-full text-center transition-all shadow-inner"
           placeholder="Название проекта"
         />
       </div>
 
       {/* Right section: Action Icons & Warnings */}
       <div className="flex items-center gap-2">
-        <div className="flex items-center gap-1 bg-slate-100/90 p-1 rounded-xl border border-slate-200/90 shadow-inner">
+        <div className="flex items-center gap-1 bg-slate-100/90 dark:bg-slate-800/90 p-1 rounded-xl border border-slate-200/90 dark:border-slate-700/90 shadow-inner">
           <button
             onClick={newProject}
             title="Новый проект"
-            className="p-2 rounded-lg text-slate-600 hover:text-blue-600 hover:bg-white transition-all hover:shadow-sm"
+            className="p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:text-blue-600 hover:dark:text-blue-400 hover:bg-white hover:dark:bg-slate-800 transition-all hover:shadow-sm"
           >
-            <FilePlus className="w-4 h-4 text-blue-600" />
+            <FilePlus className="w-4 h-4 text-blue-600 dark:text-blue-400" />
           </button>
 
           <button
             onClick={() => fileInputRef.current?.click()}
             title="Открыть проект (.json / .nc)"
-            className="p-2 rounded-lg text-slate-600 hover:text-amber-600 hover:bg-white transition-all hover:shadow-sm"
+            className="p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:text-amber-600 hover:dark:text-amber-400 hover:bg-white hover:dark:bg-slate-800 transition-all hover:shadow-sm"
           >
-            <FolderOpen className="w-4 h-4 text-amber-600" />
+            <FolderOpen className="w-4 h-4 text-amber-600 dark:text-amber-400" />
           </button>
           <input
             type="file"
@@ -496,9 +510,20 @@ export const Header: React.FC = () => {
           <button
             onClick={handleSaveProject}
             title="Сохранить проект (.json)"
-            className="p-2 rounded-lg text-slate-700 hover:text-emerald-600 hover:bg-white transition-all hover:shadow-sm flex items-center gap-1.5 cursor-pointer"
+            className="p-2 rounded-lg text-slate-700 dark:text-slate-200 hover:text-emerald-600 hover:dark:text-emerald-400 hover:bg-white hover:dark:bg-slate-800 transition-all hover:shadow-sm flex items-center gap-1.5 cursor-pointer"
           >
-            <Save className="w-4 h-4 text-emerald-600" />
+            <Save className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+          </button>
+        </div>
+
+        {/* Тема (светлая / тёмная) */}
+        <div className="flex items-center bg-slate-100/90 dark:bg-slate-800/90 p-1 rounded-xl border border-slate-200/90 dark:border-slate-700/90 shadow-inner">
+          <button
+            onClick={toggleTheme}
+            title={theme === 'dark' ? 'Светлая тема' : 'Тёмная тема'}
+            className="p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:text-amber-500 hover:dark:text-amber-400 hover:bg-white hover:dark:bg-slate-800 transition-all cursor-pointer"
+          >
+            {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
           </button>
         </div>
 
@@ -519,8 +544,8 @@ export const Header: React.FC = () => {
             title={errorCount > 0 ? `${errorCount} ошибок` : `${warningCount} предупреждений`}
             className={`flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-xs font-medium border transition-all ${
               errorCount > 0
-                ? 'bg-rose-50 border-rose-200 text-rose-600 hover:bg-rose-100 shadow-sm'
-                : 'bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100 shadow-sm'
+                ? 'bg-rose-50 dark:bg-rose-500/15 border-rose-200 text-rose-600 dark:text-rose-400 hover:bg-rose-100 hover:dark:bg-rose-500/20 shadow-sm'
+                : 'bg-amber-50 dark:bg-amber-500/15 border-amber-200 text-amber-700 dark:text-amber-400 hover:bg-amber-100 hover:dark:bg-amber-500/20 shadow-sm'
             }`}
           >
             <AlertTriangle className="w-4 h-4 shrink-0" />

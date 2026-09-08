@@ -26,11 +26,11 @@ export const LeftToolbar: React.FC = () => {
         <button
           onClick={toggleLeftPanel}
           title="Показать список фигур"
-          className="relative w-11 h-11 bg-white/90 backdrop-blur-2xl border border-white/90 rounded-2xl shadow-2xl shadow-slate-900/15 flex items-center justify-center cursor-pointer hover:bg-white text-slate-700 hover:text-blue-600 hover:scale-105 active:scale-95 transition-all"
+          className="relative w-11 h-11 bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border border-white/90 dark:border-slate-700/90 rounded-2xl shadow-2xl shadow-slate-900/15 flex items-center justify-center cursor-pointer hover:bg-white hover:dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:text-blue-600 hover:dark:text-blue-400 hover:scale-105 active:scale-95 transition-all"
         >
-          <Shapes className="w-5 h-5 text-blue-600" />
+          <Shapes className="w-5 h-5 text-blue-600 dark:text-blue-400" />
           {objects.length > 0 && (
-            <span className="absolute -top-1 -right-1 bg-blue-600 text-white text-[10px] font-bold px-1.5 py-0.2 rounded-full min-w-[18px] text-center border-2 border-white shadow-sm">
+            <span className="absolute -top-1 -right-1 bg-blue-600 text-white text-[10px] font-bold px-1.5 py-0.2 rounded-full min-w-[18px] text-center border-2 border-white dark:border-slate-700 shadow-sm">
               {objects.length}
             </span>
           )}
@@ -40,19 +40,19 @@ export const LeftToolbar: React.FC = () => {
   }
 
   return (
-    <aside className="absolute left-4 top-4 bottom-4 w-72 flex flex-col bg-transparent text-slate-800 z-20 select-none overflow-hidden transition-all duration-200">
+    <aside className="absolute left-4 top-4 bottom-4 w-72 flex flex-col bg-transparent text-slate-800 dark:text-slate-100 z-20 select-none overflow-hidden transition-all duration-200">
       {/* Header */}
       <div className="px-1.5 py-1 flex items-center justify-between gap-2 shrink-0">
         <div className="flex items-center gap-1.5 min-w-0">
-          <Shapes className="w-4 h-4 text-blue-600 shrink-0" />
-          <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Фигуры</span>
-          <span className="text-[10px] font-bold text-slate-400">{objects.length}</span>
+          <Shapes className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
+          <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Фигуры</span>
+          <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500">{objects.length}</span>
         </div>
 
         <button
           onClick={toggleLeftPanel}
           title="Свернуть панель"
-          className="p-1 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-500/10 transition-colors shrink-0"
+          className="p-1 rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-900 hover:dark:text-slate-100 hover:bg-slate-500/10 hover:dark:bg-slate-500/10 transition-colors shrink-0"
         >
           <ChevronLeft className="w-4 h-4" />
         </button>

@@ -65,11 +65,11 @@ export const LayerItemAccordion: React.FC<FigureRowProps> = ({
     <div
       onClick={onSelect}
       className={`group flex items-center gap-1.5 px-1.5 py-1 rounded-md cursor-pointer select-none transition-colors ${
-        isSelected ? 'bg-blue-500/10' : 'hover:bg-slate-500/5'
+        isSelected ? 'bg-blue-500/10' : 'hover:bg-slate-500/5 hover:dark:bg-slate-500/5'
       }`}
     >
       <TypeIcon
-        className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-blue-600' : 'text-slate-400'} ${
+        className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400 dark:text-slate-500'} ${
           isVisible ? '' : 'opacity-40'
         }`}
       />
@@ -78,10 +78,10 @@ export const LayerItemAccordion: React.FC<FigureRowProps> = ({
         title={obj.name}
         className={`flex-1 min-w-0 truncate text-xs ${
           isSelected
-            ? 'text-blue-600 font-semibold'
+            ? 'text-blue-600 dark:text-blue-400 font-semibold'
             : isVisible
-            ? 'text-slate-700'
-            : 'text-slate-400 line-through'
+            ? 'text-slate-700 dark:text-slate-200'
+            : 'text-slate-400 dark:text-slate-500 line-through'
         }`}
       >
         {displayName || obj.name}
@@ -97,7 +97,7 @@ export const LayerItemAccordion: React.FC<FigureRowProps> = ({
           onClick={onMoveUp}
           disabled={index === 0}
           title="Выше"
-          className="p-0.5 rounded text-slate-400 hover:text-blue-600 disabled:opacity-0"
+          className="p-0.5 rounded text-slate-400 dark:text-slate-500 hover:text-blue-600 hover:dark:text-blue-400 disabled:opacity-0"
         >
           <ChevronUp className="w-3.5 h-3.5" />
         </button>
@@ -106,7 +106,7 @@ export const LayerItemAccordion: React.FC<FigureRowProps> = ({
           onClick={onMoveDown}
           disabled={index === totalCount - 1}
           title="Ниже"
-          className="p-0.5 rounded text-slate-400 hover:text-blue-600 disabled:opacity-0"
+          className="p-0.5 rounded text-slate-400 dark:text-slate-500 hover:text-blue-600 hover:dark:text-blue-400 disabled:opacity-0"
         >
           <ChevronDown className="w-3.5 h-3.5" />
         </button>
@@ -114,7 +114,7 @@ export const LayerItemAccordion: React.FC<FigureRowProps> = ({
           type="button"
           onClick={() => onUpdate({ visible: !isVisible })}
           title={isVisible ? 'Скрыть' : 'Показать'}
-          className="p-0.5 rounded text-slate-400 hover:text-blue-600"
+          className="p-0.5 rounded text-slate-400 dark:text-slate-500 hover:text-blue-600 hover:dark:text-blue-400"
         >
           {isVisible ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
         </button>
@@ -122,7 +122,7 @@ export const LayerItemAccordion: React.FC<FigureRowProps> = ({
           type="button"
           onClick={onDuplicate}
           title="Дублировать"
-          className="p-0.5 rounded text-slate-400 hover:text-amber-600"
+          className="p-0.5 rounded text-slate-400 dark:text-slate-500 hover:text-amber-600 hover:dark:text-amber-400"
         >
           <Copy className="w-3.5 h-3.5" />
         </button>
@@ -130,7 +130,7 @@ export const LayerItemAccordion: React.FC<FigureRowProps> = ({
           type="button"
           onClick={onDelete}
           title="Удалить"
-          className="p-0.5 rounded text-slate-400 hover:text-rose-600"
+          className="p-0.5 rounded text-slate-400 dark:text-slate-500 hover:text-rose-600 hover:dark:text-rose-400"
         >
           <Trash2 className="w-3.5 h-3.5" />
         </button>

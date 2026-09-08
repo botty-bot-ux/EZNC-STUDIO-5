@@ -20,14 +20,14 @@ export const RectangleProperties: React.FC<RectanglePropertiesProps> = ({ obj, o
           label="W, мм"
           value={obj.width}
           onChange={(width) => onUpdate({ width })}
-          className="text-amber-700 font-bold"
+          className="text-amber-700 dark:text-amber-400 font-bold"
           fallbackValue={1}
         />
         <PropertyInput
           label="H, мм"
           value={obj.height}
           onChange={(height) => onUpdate({ height })}
-          className="text-amber-700 font-bold"
+          className="text-amber-700 dark:text-amber-400 font-bold"
           fallbackValue={1}
         />
       </div>

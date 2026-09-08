@@ -123,28 +123,28 @@ export default function App() {
   // ───────────────────── Мобильная раскладка (телефон) ─────────────────────
   if (isMobile) {
     return (
-      <div className="flex flex-col h-dvh w-screen bg-[#f8fafc] text-slate-800 overflow-hidden font-sans">
+      <div className="flex flex-col h-dvh w-screen bg-[#f8fafc] dark:bg-[#0f172a] text-slate-800 dark:text-slate-100 overflow-hidden font-sans">
         <Header />
 
-        <div className="flex-1 relative min-h-0 overflow-hidden bg-[#f8fafc]">
-          <main className="absolute inset-0 bg-[#f8fafc] overflow-hidden">
+        <div className="flex-1 relative min-h-0 overflow-hidden bg-[#f8fafc] dark:bg-[#0f172a]">
+          <main className="absolute inset-0 bg-[#f8fafc] dark:bg-[#0f172a] overflow-hidden">
             <SceneCanvas />
           </main>
 
           {/* Нижняя шторка с панелью (Фигуры / Свойства / G-код / Станок) */}
           <div
-            className={`absolute inset-x-0 bottom-0 top-[46%] z-30 flex-col bg-white/95 backdrop-blur-2xl border-t border-slate-200 rounded-t-2xl shadow-[0_-8px_30px_rgba(15,23,42,0.18)] overflow-hidden ${
+            className={`absolute inset-x-0 bottom-0 top-[46%] z-30 flex-col bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl border-t border-slate-200 dark:border-slate-700 rounded-t-2xl shadow-[0_-8px_30px_rgba(15,23,42,0.18)] overflow-hidden ${
               mobileSheet === 'none' ? 'hidden' : 'flex'
             }`}
           >
-            <div className="flex items-center justify-between px-3 py-2 border-b border-slate-200/80 shrink-0 select-none">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+            <div className="flex items-center justify-between px-3 py-2 border-b border-slate-200/80 dark:border-slate-700/80 shrink-0 select-none">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                 {sheetTitle}
               </span>
               <button
                 onClick={() => setMobileSheet('none')}
                 title="Закрыть"
-                className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-200/60 transition-colors"
+                className="p-1.5 rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-900 hover:dark:text-slate-100 hover:bg-slate-200/60 hover:dark:bg-slate-600/60 transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -169,14 +169,14 @@ export default function App() {
 
   // ───────────────────── Десктопная раскладка ─────────────────────
   return (
-    <div className="flex flex-col h-dvh w-screen bg-[#f8fafc] text-slate-800 overflow-hidden font-sans">
+    <div className="flex flex-col h-dvh w-screen bg-[#f8fafc] dark:bg-[#0f172a] text-slate-800 dark:text-slate-100 overflow-hidden font-sans">
       {/* Top Header */}
       <Header />
 
       {/* Main Workspace with Floating Overlays */}
-      <div className="flex-1 relative min-h-0 overflow-hidden bg-[#f8fafc]">
+      <div className="flex-1 relative min-h-0 overflow-hidden bg-[#f8fafc] dark:bg-[#0f172a]">
         {/* Center Workspace (SceneCanvas) filling full screen edge-to-edge */}
-        <main className="absolute inset-0 bg-[#f8fafc] overflow-hidden">
+        <main className="absolute inset-0 bg-[#f8fafc] dark:bg-[#0f172a] overflow-hidden">
           <SceneCanvas />
         </main>
 

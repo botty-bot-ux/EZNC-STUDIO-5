@@ -41,7 +41,7 @@ export const MobileTabBar: React.FC = () => {
 
   return (
     <nav
-      className="shrink-0 z-30 flex items-stretch bg-white/95 backdrop-blur-2xl border-t border-slate-200 shadow-[0_-4px_20px_rgba(15,23,42,0.08)] select-none"
+      className="shrink-0 z-30 flex items-stretch bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl border-t border-slate-200 dark:border-slate-700 shadow-[0_-4px_20px_rgba(15,23,42,0.08)] select-none"
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
       {TABS.map(({ id, label, Icon }) => {
@@ -51,13 +51,13 @@ export const MobileTabBar: React.FC = () => {
             key={id}
             onClick={() => openTab(id)}
             className={`relative flex-1 flex flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-bold transition-colors ${
-              active ? 'text-blue-600' : 'text-slate-500'
+              active ? 'text-blue-600 dark:text-blue-400' : 'text-slate-500 dark:text-slate-400'
             }`}
           >
             <Icon className="w-5 h-5" />
             <span>{label}</span>
             {id === 'figures' && objects.length > 0 && (
-              <span className="absolute top-1 right-[22%] bg-blue-600 text-white text-[9px] font-bold px-1 rounded-full min-w-[15px] text-center border border-white">
+              <span className="absolute top-1 right-[22%] bg-blue-600 text-white text-[9px] font-bold px-1 rounded-full min-w-[15px] text-center border border-white dark:border-slate-700">
                 {objects.length}
               </span>
             )}

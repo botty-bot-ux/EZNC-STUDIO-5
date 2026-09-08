@@ -7,6 +7,7 @@ export const GcodeEditor: React.FC = () => {
   const manualGcode = useProjectStore((s) => s.manualGcode);
   const updateManualGcode = useProjectStore((s) => s.updateManualGcode);
   const parseManualGcode = useProjectStore((s) => s.parseManualGcode);
+  const theme = useProjectStore((s) => s.theme);
 
   const handleEditorDidMount: OnMount = (editor) => {
     editor.onDidChangeCursorPosition((e) => {
@@ -37,10 +38,10 @@ export const GcodeEditor: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-full w-full bg-white text-slate-800 overflow-hidden">
+    <div className="flex flex-col h-full w-full bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 overflow-hidden">
       {/* Editor toolbar */}
-      <div className="py-2 px-3 bg-slate-100/90 border-b border-slate-200 flex items-center justify-between gap-2 shrink-0 select-none shadow-sm">
-        <div className="flex items-center gap-1.5 text-[11px] font-mono text-slate-600 font-semibold truncate">
+      <div className="py-2 px-3 bg-slate-100/90 dark:bg-slate-800/90 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between gap-2 shrink-0 select-none shadow-sm">
+        <div className="flex items-center gap-1.5 text-[11px] font-mono text-slate-600 dark:text-slate-300 font-semibold truncate">
           <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
           <span className="truncate">NcStudio (*.NC)</span>
         </div>
@@ -58,12 +59,12 @@ export const GcodeEditor: React.FC = () => {
       </div>
 
       {/* Monaco text editor */}
-      <div className="flex-1 min-h-0 bg-white">
+      <div className="flex-1 min-h-0 bg-white dark:bg-slate-900">
         <Editor
           height="100%"
           defaultLanguage="gcode"
           language="gcode"
-          theme="vs"
+          theme={theme === 'dark' ? 'vs-dark' : 'vs'}
           value={manualGcode}
           onChange={(value) => updateManualGcode(value || '')}
           onMount={handleEditorDidMount}

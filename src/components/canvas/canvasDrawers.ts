@@ -1,6 +1,7 @@
 import { ActiveTool, CADObject, MachineSettings, Point2D, ToolpathSegment, UnderlayState, ViewMode } from '../../types';
 import { DragMode } from './canvasHitTest';
 import { HoveredHandle, SnapPointInfo, getArcFrom3Points, worldToCanvas } from './canvasUtils';
+import { CanvasPalette, LIGHT_PALETTE } from './canvasPalette';
 
 export interface DrawOptions {
   ctx: CanvasRenderingContext2D;
@@ -92,13 +93,14 @@ export function drawWorkAreaGradientFade(
   top: number,
   right: number,
   bottom: number,
-  fadeDist: number = 50
+  fadeDist: number = 50,
+  palette: CanvasPalette = LIGHT_PALETTE
 ) {
   ctx.save();
 
-  const bgColor = '#f8fafc';
-  const transparentBg = 'rgba(248, 250, 252, 0)';
-  const solidBg = 'rgba(248, 250, 252, 1)';
+  const bgColor = palette.bg;
+  const transparentBg = palette.bgFade0;
+  const solidBg = palette.bgFade1;
 
   // 1. Solid background outside the extended boundary [left - fadeDist, top - fadeDist, right + fadeDist, bottom + fadeDist]
   ctx.fillStyle = bgColor;
@@ -202,12 +204,13 @@ export function drawGrid(
   pan: Point2D,
   zoom: number,
   gridStep: number,
-  machine: MachineSettings
+  machine: MachineSettings,
+  palette: CanvasPalette = LIGHT_PALETTE
 ) {
   ctx.save();
 
   // 1. Clean uniform light background
-  ctx.fillStyle = '#f8fafc';
+  ctx.fillStyle = palette.bg;
   ctx.fillRect(0, 0, width, height);
 
   // 2. Machine Bounds in World and Canvas space
@@ -247,7 +250,7 @@ export function drawGrid(
 
   // 4. Minor Grid Lines (Slate 300)
   ctx.beginPath();
-  ctx.strokeStyle = '#cbd5e1';
+  ctx.strokeStyle = palette.gridMinor;
   ctx.lineWidth = 0.8;
 
   // Vertical minor lines (World Y)
@@ -273,7 +276,7 @@ export function drawGrid(
 
   // 5. Major Grid Lines (Slate 400)
   ctx.beginPath();
-  ctx.strokeStyle = '#94a3b8';
+  ctx.strokeStyle = palette.gridMajor;
   ctx.lineWidth = 1.2;
 
   const startMajorWy = Math.floor(minY / majorStep) * majorStep;
@@ -301,7 +304,7 @@ export function drawGrid(
   ctx.stroke();
 
   // 6. Smooth Vanishing Gradient Mask
-  drawWorkAreaGradientFade(ctx, width, height, left, top, right, bottom, fadeDist);
+  drawWorkAreaGradientFade(ctx, width, height, left, top, right, bottom, fadeDist, palette);
 
   // 7. Dimension labels with "мм" spaced out along grid axes
   if (zoom > 0.1) {
@@ -316,11 +319,11 @@ export function drawGrid(
       if (cx >= left - 10 && cx <= right + 10 && cx >= 35 && cx <= width - 35) {
         const labelText = `${wy} мм`;
 
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.92)';
+        ctx.fillStyle = palette.labelChip;
         const textWidth = ctx.measureText(labelText).width;
         ctx.fillRect(cx - textWidth / 2 - 3, yLabelCanvasY - 9, textWidth + 6, 14);
 
-        ctx.fillStyle = '#475569';
+        ctx.fillStyle = palette.labelText;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(labelText, cx, yLabelCanvasY - 2);
@@ -336,11 +339,11 @@ export function drawGrid(
       if (cy >= top - 10 && cy <= bottom + 10 && cy >= 25 && cy <= height - 22) {
         const labelText = `${wx} мм`;
 
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.92)';
+        ctx.fillStyle = palette.labelChip;
         const textWidth = ctx.measureText(labelText).width;
         ctx.fillRect(xLabelCanvasX - 2, cy - 7, textWidth + 6, 14);
 
-        ctx.fillStyle = '#475569';
+        ctx.fillStyle = palette.labelText;
         ctx.textAlign = 'left';
         ctx.textBaseline = 'middle';
         ctx.fillText(labelText, xLabelCanvasX + 1, cy);
@@ -355,7 +358,8 @@ export function drawMachineBoundsAndStock(
   ctx: CanvasRenderingContext2D,
   machine: MachineSettings,
   pan: Point2D,
-  zoom: number
+  zoom: number,
+  palette: CanvasPalette = LIGHT_PALETTE
 ) {
   const bounds = machine.bounds;
   const minX = Math.min(bounds.xMin, bounds.xMax);
@@ -371,7 +375,7 @@ export function drawMachineBoundsAndStock(
   ctx.save();
 
   // 1. Dashed Frame for Top (X = minX) and Left (Y = minY) Machine Boundaries
-  ctx.strokeStyle = '#64748b'; // Slate 500
+  ctx.strokeStyle = palette.frameLine; // Slate 500
   ctx.lineWidth = 1.8;
   ctx.setLineDash([6, 4]);
 
@@ -394,20 +398,20 @@ export function drawMachineBoundsAndStock(
 
   // Label at Top Boundary (xMin)
   const xMinText = `${minX} мм`;
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+  ctx.fillStyle = palette.labelChip;
   const xMinW = ctx.measureText(xMinText).width;
   ctx.fillRect(right - xMinW - 12, top - 8, xMinW + 8, 16);
-  ctx.fillStyle = '#475569';
+  ctx.fillStyle = palette.labelText;
   ctx.textAlign = 'right';
   ctx.textBaseline = 'middle';
   ctx.fillText(xMinText, right - 8, top);
 
   // Label at Left Boundary (yMin)
   const yMinText = `${minY} мм`;
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+  ctx.fillStyle = palette.labelChip;
   const yMinW = ctx.measureText(yMinText).width;
   ctx.fillRect(left - 4, bottom + 8, yMinW + 8, 16);
-  ctx.fillStyle = '#475569';
+  ctx.fillStyle = palette.labelText;
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
   ctx.fillText(yMinText, left, bottom + 16);
@@ -445,7 +449,8 @@ export function drawAxisOrigin(
   ctx: CanvasRenderingContext2D,
   machine: MachineSettings,
   pan: Point2D,
-  zoom: number
+  zoom: number,
+  palette: CanvasPalette = LIGHT_PALETTE
 ) {
   const bounds = machine.bounds;
   const minX = Math.min(bounds.xMin, bounds.xMax);
@@ -500,13 +505,13 @@ export function drawAxisOrigin(
   ctx.fill();
 
   // Badge (0,0)
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.94)';
+  ctx.fillStyle = palette.labelChip;
   ctx.fillRect(right + 6, bottom + 6, 36, 16);
-  ctx.strokeStyle = '#cbd5e1';
+  ctx.strokeStyle = palette.chipBorder;
   ctx.lineWidth = 1;
   ctx.strokeRect(right + 6, bottom + 6, 36, 16);
 
-  ctx.fillStyle = '#1e293b';
+  ctx.fillStyle = palette.labelTextStrong;
   ctx.font = 'bold 10px tabular-nums, sans-serif';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
@@ -565,7 +570,8 @@ export function drawCADObjects(
   dragMode: DragMode,
   pan: Point2D,
   zoom: number,
-  toolDiameter?: number
+  toolDiameter?: number,
+  palette: CanvasPalette = LIGHT_PALETTE
 ) {
   const selArray = Array.isArray(selectedObjectIds)
     ? selectedObjectIds
@@ -657,7 +663,7 @@ export function drawCADObjects(
     const isHoveredObj = hoveredHandle?.objectId === obj.id;
 
     ctx.lineWidth = isSelected ? 2.8 : isHoveredObj ? 2.5 : 2;
-    ctx.strokeStyle = isSelected ? '#2563eb' : isHoveredObj ? '#3b82f6' : '#0f172a';
+    ctx.strokeStyle = isSelected ? '#2563eb' : isHoveredObj ? '#3b82f6' : palette.objectIdle;
 
     if (obj.type === 'point') {
       const cp = wToC(obj.x, obj.y);
@@ -667,7 +673,7 @@ export function drawCADObjects(
       ctx.arc(cp.x, cp.y, rPx, 0, Math.PI * 2);
       ctx.stroke();
 
-      ctx.strokeStyle = isSelected ? '#2563eb' : '#0f172a';
+      ctx.strokeStyle = isSelected ? '#2563eb' : palette.objectIdle;
       ctx.beginPath();
       ctx.moveTo(cp.x - rPx - 4, cp.y);
       ctx.lineTo(cp.x + rPx + 4, cp.y);
@@ -676,13 +682,13 @@ export function drawCADObjects(
       ctx.stroke();
 
       // Vertex center dot
-      ctx.fillStyle = isSelected ? '#2563eb' : '#0f172a';
+      ctx.fillStyle = isSelected ? '#2563eb' : palette.objectIdle;
       ctx.beginPath();
       ctx.arc(cp.x, cp.y, 3.5, 0, Math.PI * 2);
       ctx.fill();
 
       if (isSelected) {
-        ctx.fillStyle = '#1e293b';
+        ctx.fillStyle = palette.labelTextStrong;
         ctx.font = 'bold 11px system-ui, sans-serif';
         ctx.fillText(`${obj.name} (Ø${obj.diameter})`, cp.x + rPx + 6, cp.y - 4);
       }
@@ -700,14 +706,14 @@ export function drawCADObjects(
       const midPx = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
 
       if (isSelected || isHoveredObj) {
-        ctx.fillStyle = isSelected ? '#1e293b' : '#3b82f6';
+        ctx.fillStyle = isSelected ? palette.labelTextStrong : '#3b82f6';
         ctx.font = 'bold 11px system-ui, sans-serif';
         ctx.fillText(`${lineLen.toFixed(1)} мм`, midPx.x + 8, midPx.y - 8);
       }
 
       // Vertex dots at endpoints (crisp black dots as in reference image)
       if (!isSelected && !isHoveredObj) {
-        ctx.fillStyle = '#0f172a';
+        ctx.fillStyle = palette.objectIdle;
         ctx.beginPath();
         ctx.arc(p1.x, p1.y, 3.5, 0, Math.PI * 2);
         ctx.arc(p2.x, p2.y, 3.5, 0, Math.PI * 2);
@@ -725,7 +731,7 @@ export function drawCADObjects(
           ctx.fill();
         }
 
-        ctx.fillStyle = isStartActive ? '#4ade80' : isStartHovered ? '#22c55e' : isSelected ? '#2563eb' : '#0f172a';
+        ctx.fillStyle = isStartActive ? '#4ade80' : isStartHovered ? '#22c55e' : isSelected ? '#2563eb' : palette.objectIdle;
         ctx.strokeStyle = '#ffffff';
         ctx.lineWidth = 1.5;
         ctx.beginPath();
@@ -786,7 +792,7 @@ export function drawCADObjects(
 
         pts.forEach((pt, idx) => {
           const isPtHovered = isHoveredObj && hoveredHandle?.type === 'polyline_point' && hoveredHandle.pointIndex === idx;
-          ctx.fillStyle = isPtHovered ? '#f59e0b' : isSelected ? '#2563eb' : '#0f172a';
+          ctx.fillStyle = isPtHovered ? '#f59e0b' : isSelected ? '#2563eb' : palette.objectIdle;
           ctx.beginPath();
           ctx.arc(pt.x, pt.y, 3.5, 0, Math.PI * 2);
           ctx.fill();
@@ -809,7 +815,7 @@ export function drawCADObjects(
       }
 
       // Vertex dots at 4 corners
-      ctx.fillStyle = isSelected ? '#2563eb' : '#0f172a';
+      ctx.fillStyle = isSelected ? '#2563eb' : palette.objectIdle;
       ctx.beginPath();
       ctx.arc(minX, minY, 3.5, 0, Math.PI * 2);
       ctx.arc(minX + wPx, minY, 3.5, 0, Math.PI * 2);
@@ -825,7 +831,7 @@ export function drawCADObjects(
       ctx.stroke();
 
       // Center dot
-      ctx.fillStyle = isSelected ? '#2563eb' : '#0f172a';
+      ctx.fillStyle = isSelected ? '#2563eb' : palette.objectIdle;
       ctx.beginPath();
       ctx.arc(cp.x, cp.y, 3.5, 0, Math.PI * 2);
       ctx.fill();
@@ -850,7 +856,7 @@ export function drawCADObjects(
       ctx.stroke();
 
       // Endpoints & center dots
-      ctx.fillStyle = isSelected ? '#2563eb' : '#0f172a';
+      ctx.fillStyle = isSelected ? '#2563eb' : palette.objectIdle;
       ctx.beginPath();
       ctx.arc(pStart.x, pStart.y, 3.5, 0, Math.PI * 2);
       ctx.arc(pEnd.x, pEnd.y, 3.5, 0, Math.PI * 2);
@@ -1092,7 +1098,8 @@ export function drawMeasurementTool(
   measureEndPt: Point2D | null,
   currentMouseProgPt: Point2D | null,
   pan: Point2D,
-  zoom: number
+  zoom: number,
+  palette: CanvasPalette = LIGHT_PALETTE
 ) {
   if (!measureStartPt) return;
 
@@ -1188,7 +1195,7 @@ export function drawMeasurementTool(
   const badgeH = 22;
 
   // Background box for the main distance text
-  ctx.fillStyle = '#0f172a'; // Deep Slate-900
+  ctx.fillStyle = palette.measureBadgeBg; // Deep Slate-900
   ctx.strokeStyle = '#f43f5e';
   ctx.lineWidth = 1;
   ctx.shadowColor = 'rgba(15, 23, 42, 0.25)';
@@ -1220,7 +1227,7 @@ export function drawMeasurementTool(
     const dXMidY = p1.y - 12; // slightly above
     const dxText = `dX: ${Math.abs(dx).toFixed(2)}`;
     const dxW = ctx.measureText(dxText).width + 8;
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+    ctx.fillStyle = palette.labelChip;
     ctx.strokeStyle = 'rgba(100, 116, 139, 0.4)';
     ctx.lineWidth = 1;
     ctx.beginPath();
@@ -1231,7 +1238,7 @@ export function drawMeasurementTool(
     }
     ctx.fill();
     ctx.stroke();
-    ctx.fillStyle = '#475569';
+    ctx.fillStyle = palette.labelText;
     ctx.fillText(dxText, dXMidX, dXMidY);
   }
 
@@ -1241,7 +1248,7 @@ export function drawMeasurementTool(
     const dYMidY = (cornerPt.y + p2.y) / 2;
     const dyText = `dY: ${Math.abs(dy).toFixed(2)}`;
     const dyW = ctx.measureText(dyText).width + 8;
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+    ctx.fillStyle = palette.labelChip;
     ctx.strokeStyle = 'rgba(100, 116, 139, 0.4)';
     ctx.lineWidth = 1;
     ctx.beginPath();
@@ -1252,7 +1259,7 @@ export function drawMeasurementTool(
     }
     ctx.fill();
     ctx.stroke();
-    ctx.fillStyle = '#475569';
+    ctx.fillStyle = palette.labelText;
     ctx.fillText(dyText, dYMidX, dYMidY);
   }
 

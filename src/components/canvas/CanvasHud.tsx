@@ -96,8 +96,8 @@ export const CanvasHud: React.FC<CanvasHudProps> = ({
     <>
       {/* Мобильный DYN-ввод длины с экранной клавиатуры */}
       {mobileDynActive && (
-        <div className="absolute top-2 left-1/2 -translate-x-1/2 z-40 flex items-center gap-1.5 bg-slate-900/95 backdrop-blur-md border border-amber-500/40 px-2 py-1.5 rounded-2xl shadow-2xl">
-          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider ml-1">
+        <div className="absolute top-2 left-1/2 -translate-x-1/2 z-40 flex items-center gap-1.5 bg-slate-900/95 dark:bg-slate-100/95 backdrop-blur-md border border-amber-500/40 px-2 py-1.5 rounded-2xl shadow-2xl">
+          <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider ml-1">
             {activeTool === 'arc' ? 'Хорда' : 'Длина'}
           </span>
           <input
@@ -118,7 +118,7 @@ export const CanvasHud: React.FC<CanvasHudProps> = ({
             placeholder="0"
             className="w-20 bg-slate-800 border border-slate-600 rounded-lg px-2 py-1 text-right font-mono text-xl font-bold text-amber-400 tabular-nums focus:outline-none focus:border-amber-500"
           />
-          <span className="text-xs text-slate-400 shrink-0">мм</span>
+          <span className="text-xs text-slate-400 dark:text-slate-500 shrink-0">мм</span>
           <button
             onClick={() => onDynCommit?.()}
             className="bg-blue-600 active:bg-blue-500 text-white text-xs font-bold px-3 py-2 rounded-lg shrink-0"
@@ -130,15 +130,15 @@ export const CanvasHud: React.FC<CanvasHudProps> = ({
 
       {/* Dynamic distance readout (DYN) while typing a line / arc-chord length (desktop) */}
       {dynReadoutActive && !isMobile && (
-        <div className="absolute top-16 left-1/2 -translate-x-1/2 z-30 bg-slate-900/95 backdrop-blur-md text-white border border-amber-500/50 px-5 py-2.5 rounded-2xl shadow-2xl flex items-center gap-2 animate-in fade-in slide-in-from-top-2 duration-150">
-          <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider">
+        <div className="absolute top-16 left-1/2 -translate-x-1/2 z-30 bg-slate-900/95 dark:bg-slate-100/95 backdrop-blur-md text-white border border-amber-500/50 px-5 py-2.5 rounded-2xl shadow-2xl flex items-center gap-2 animate-in fade-in slide-in-from-top-2 duration-150">
+          <span className="text-xs text-slate-400 dark:text-slate-500 font-semibold uppercase tracking-wider">
             {activeTool === 'arc' ? 'Хорда' : 'Длина'}
           </span>
           <span className="font-mono text-2xl font-bold text-amber-400 tabular-nums">
             {lineLengthInput}
           </span>
-          <span className="text-sm text-slate-400">мм</span>
-          <span className="ml-1 text-[10px] text-slate-500 border border-slate-600 rounded px-1.5 py-0.5">
+          <span className="text-sm text-slate-400 dark:text-slate-500">мм</span>
+          <span className="ml-1 text-[10px] text-slate-500 dark:text-slate-400 border border-slate-600 rounded px-1.5 py-0.5">
             Enter
           </span>
         </div>
@@ -154,7 +154,7 @@ export const CanvasHud: React.FC<CanvasHudProps> = ({
           <span>{instruction}</span>
           <button
             onClick={onCancelDraw}
-            className="bg-white/20 hover:bg-white/30 px-2 py-0.5 rounded-lg text-[11px] transition-colors"
+            className="bg-white/20 dark:bg-slate-900/20 hover:bg-white/30 hover:dark:bg-slate-800/30 px-2 py-0.5 rounded-lg text-[11px] transition-colors"
           >
             ESC
           </button>

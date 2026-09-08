@@ -49,7 +49,7 @@ export const FiguresList: React.FC = () => {
 
   if (objects.length === 0) {
     return (
-      <div className="px-3 py-3 text-xs text-slate-500">
+      <div className="px-3 py-3 text-xs text-slate-500 dark:text-slate-400">
         Фигур нет. Добавьте с верхней панели или импортируйте DXF/G-код.
       </div>
     );
