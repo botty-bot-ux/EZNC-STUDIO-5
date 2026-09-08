@@ -1142,6 +1142,7 @@ export function drawMeasurementTool(
   const dy = targetPt.y - measureStartPt.y;
   const distance = Math.sqrt(dx * dx + dy * dy);
   const angleRad = Math.atan2(dy, dx);
+  const angleDeg = ((angleRad * 180) / Math.PI + 360) % 360;
 
   ctx.save();
 
@@ -1216,7 +1217,7 @@ export function drawMeasurementTool(
   ctx.save();
 
   ctx.font = 'bold 12px monospace';
-  const labelText = `${distance.toFixed(3)} мм`;
+  const labelText = `${distance.toFixed(3)} мм · ${angleDeg.toFixed(1)}°`;
   const textWidth = ctx.measureText(labelText).width;
   const badgeW = textWidth + 14;
   const badgeH = 22;

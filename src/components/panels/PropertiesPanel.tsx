@@ -45,19 +45,10 @@ export const PropertiesPanel: React.FC = () => {
   if (activeTool === 'measure') {
     let body: React.ReactNode;
     if (liveMeasure) {
-      const dx = liveMeasure.end.x - liveMeasure.start.x;
-      const dy = liveMeasure.end.y - liveMeasure.start.y;
-      const angleDeg = ((Math.atan2(dy, dx) * 180) / Math.PI + 360) % 360;
       body = (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between bg-slate-100/70 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700/80 rounded-lg px-2.5 py-1.5">
-            <span className="text-xs text-slate-400 dark:text-slate-500">Угол</span>
-            <span className="font-mono text-sm font-bold text-slate-700 dark:text-slate-200">{angleDeg.toFixed(1)}°</span>
-          </div>
-          <p className="text-[11px] text-slate-400 dark:text-slate-500">
-            Длину и смещения dX/dY смотри на холсте.
-          </p>
-        </div>
+        <p className="text-[11px] text-slate-400 dark:text-slate-500">
+          Длина, смещения dX/dY и угол показываются на холсте.
+        </p>
       );
     } else {
       body = <p className="text-[11px] text-slate-400 dark:text-slate-500">Укажите первую точку линейки на холсте.</p>;
