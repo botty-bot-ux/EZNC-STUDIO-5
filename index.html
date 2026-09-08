@@ -11,12 +11,24 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="G-code CAD/CAM" />
-    <script type="module" crossorigin src="./assets/index-Gi2oLOl1.js"></script>
+    <script>
+      // Применяем сохранённую/системную тему до первой отрисовки — без «белой вспышки».
+      (function () {
+        try {
+          var t = localStorage.getItem('cnc_theme');
+          if (t !== 'dark' && t !== 'light') {
+            t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+          }
+          if (t === 'dark') document.documentElement.classList.add('dark');
+        } catch (e) {}
+      })();
+    </script>
+    <script type="module" crossorigin src="./assets/index-BYDjuAqs.js"></script>
     <link rel="modulepreload" crossorigin href="./assets/rolldown-runtime-CbXtAM7H.js">
     <link rel="modulepreload" crossorigin href="./assets/vendor-monaco-G4sktHSV.js">
     <link rel="modulepreload" crossorigin href="./assets/vendor-react-CQijXFct.js">
     <link rel="modulepreload" crossorigin href="./assets/vendor-zustand-BuITSR3F.js">
-    <link rel="stylesheet" crossorigin href="./assets/index-4qcjWe50.css">
+    <link rel="stylesheet" crossorigin href="./assets/index-DOrwEBNi.css">
   </head>
   <body>
     <div id="root"></div>
