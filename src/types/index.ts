@@ -21,6 +21,7 @@ export interface BaseShape {
   depth: number; // Positive number representing cutting depth in mm (e.g. 5 means Z = -5)
   operationType: OperationType;
   visible?: boolean; // Visibility flag for canvas and G-code generation
+  frozen?: boolean; // Заморозка — фигуру нельзя случайно сдвинуть/отредактировать на холсте
 }
 
 export interface PointHoleObject extends BaseShape {

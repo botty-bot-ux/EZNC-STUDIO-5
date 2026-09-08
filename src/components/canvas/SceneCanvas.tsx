@@ -137,6 +137,8 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
     updateObject,
     updateObjectsBulk,
     deleteSelectedObjects,
+    copySelectedObjects,
+    pasteClipboard,
     machine,
     toolpathSegments,
     viewMode,
@@ -148,6 +150,7 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
     gridStep,
     setLiveEdit,
     setLiveMeasure,
+    liveMove,
     underlay,
     updateUnderlay,
     mobileSheet,
@@ -164,6 +167,8 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
       updateObject: s.updateObject,
       updateObjectsBulk: s.updateObjectsBulk,
       deleteSelectedObjects: s.deleteSelectedObjects,
+      copySelectedObjects: s.copySelectedObjects,
+      pasteClipboard: s.pasteClipboard,
       machine: s.machine,
       toolpathSegments: s.toolpathSegments,
       viewMode: s.viewMode,
@@ -175,6 +180,7 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
       gridStep: s.gridStep,
       setLiveEdit: s.setLiveEdit,
       setLiveMeasure: s.setLiveMeasure,
+      liveMove: s.liveMove,
       underlay: s.underlay,
       updateUnderlay: s.updateUnderlay,
       mobileSheet: s.mobileSheet,
@@ -370,8 +376,15 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
         o.id === liveDrag.id ? ({ ...o, ...liveDrag.patch } as CADObject) : o
       );
     }
+    // Живое превью из модуля «Переместить» (до подтверждения): сдвигаем выбранную группу.
+    if (liveMove && liveMove.ids.length > 0 && (liveMove.dx !== 0 || liveMove.dy !== 0)) {
+      const idset = new Set(liveMove.ids);
+      return objects.map((o) =>
+        idset.has(o.id) ? translateObjectFull(o, liveMove.dx, liveMove.dy) : o
+      );
+    }
     return objects;
-  }, [objects, liveDrag]);
+  }, [objects, liveDrag, liveMove]);
 
   // Auto-fit canvas view
   const fitView = () => {
@@ -425,6 +438,20 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
 
       const key = e.key.toLowerCase();
       const code = e.code;
+
+      // ---- Групповое копирование / вставка выделенных фигур (Ctrl+C / Ctrl+V) ----
+      if ((e.ctrlKey || e.metaKey) && code === 'KeyC') {
+        if (selectedObjectIds.length > 0) {
+          e.preventDefault();
+          copySelectedObjects();
+        }
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && code === 'KeyV') {
+        e.preventDefault();
+        pasteClipboard();
+        return;
+      }
 
       // ---- Dynamic distance input while a line / arc chord's first point is placed ----
       const ds = drawStateRef.current;
@@ -491,7 +518,7 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedObjectIds, activeTool, setActiveTool, setSelectedObjectId, setSelectedObjectIds, deleteSelectedObjects]);
+  }, [selectedObjectIds, activeTool, setActiveTool, setSelectedObjectId, setSelectedObjectIds, deleteSelectedObjects, copySelectedObjects, pasteClipboard]);
 
   const cancelDrawing = () => {
     setDrawStartPt(null);
@@ -808,13 +835,14 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
           }
         }
 
-        // Body drag = pure translation of the selected set. Record which ids are being
-        // dragged; the store stays untouched until mouseup (live overlay drives redraw).
+        // Body drag = pure translation of the selected set. Frozen figures stay
+        // selectable (to be unfrozen from Свойства) but never move: exclude them here.
+        const frozenIds = new Set(objects.filter((o) => o.frozen).map((o) => o.id));
         setDragMode('object');
         setDragStartCanvasPt(mousePx);
         setDragStartWorldPt(rawWorldPt);
         setDragObjInitial(null);
-        setDragIds(currentSelectedIds);
+        setDragIds(currentSelectedIds.filter((id) => !frozenIds.has(id)));
         setLiveDrag({ mode: 'none' });
       } else if (underlay.src && underlay.visible && !underlay.frozen) {
         // 3. Подложка (фоновая картинка): сначала угол-ручка изменения размера, потом тело

@@ -882,6 +882,60 @@ export function drawCADObjects(
         ctx.fill();
       }
     }
+
+    // Замороженная фигура: значок-замок, чтобы было видно, что её нельзя двигать на холсте.
+    if (obj.frozen) {
+      let ax = 0;
+      let ay = 0;
+      if (obj.type === 'point') {
+        ax = obj.x;
+        ay = obj.y;
+      } else if (obj.type === 'line') {
+        ax = (obj.startX + obj.endX) / 2;
+        ay = (obj.startY + obj.endY) / 2;
+      } else if (obj.type === 'rectangle') {
+        ax = obj.x + obj.width / 2;
+        ay = obj.y + obj.height / 2;
+      } else if (obj.type === 'circle') {
+        ax = obj.centerX;
+        ay = obj.centerY;
+      } else if (obj.type === 'arc') {
+        ax = (obj.startX + obj.endX) / 2;
+        ay = (obj.startY + obj.endY) / 2;
+      } else if (obj.type === 'polyline' && obj.points && obj.points.length > 0) {
+        ax = obj.points[0].x;
+        ay = obj.points[0].y;
+      }
+      const bp = wToC(ax, ay);
+
+      // Компактный значок-замок без надписи: синий кружок с белым замком.
+      ctx.save();
+      const r = 9;
+      ctx.beginPath();
+      ctx.arc(bp.x, bp.y, r, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(37, 99, 235, 0.92)';
+      ctx.fill();
+      ctx.lineWidth = 1.2;
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+      ctx.stroke();
+
+      ctx.strokeStyle = '#ffffff';
+      ctx.fillStyle = '#ffffff';
+      ctx.lineWidth = 1.4;
+      // Дужка замка
+      ctx.beginPath();
+      ctx.arc(bp.x, bp.y - 1.5, 3, Math.PI, 0);
+      ctx.stroke();
+      // Корпус замка
+      ctx.beginPath();
+      if (typeof ctx.roundRect === 'function') {
+        ctx.roundRect(bp.x - 4, bp.y - 1.5, 8, 6.5, 1.5);
+      } else {
+        ctx.rect(bp.x - 4, bp.y - 1.5, 8, 6.5);
+      }
+      ctx.fill();
+      ctx.restore();
+    }
   }
 }
 

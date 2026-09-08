@@ -35,7 +35,7 @@ export function findHandleHit(
   // 1. Prioritize selected object
   if (selectedObjectId) {
     const selObj = objects.find((o) => o.id === selectedObjectId);
-    if (selObj && selObj.visible !== false) {
+    if (selObj && selObj.visible !== false && !selObj.frozen) {
       if (selObj.type === 'line') {
         const p1 = wToC(selObj.startX, selObj.startY);
         const p2 = wToC(selObj.endX, selObj.endY);
@@ -66,7 +66,7 @@ export function findHandleHit(
 
   // 2. Check all visible objects
   for (const obj of objects) {
-    if (obj.visible === false) continue;
+    if (obj.visible === false || obj.frozen) continue;
     if (obj.type === 'line') {
       const p1 = wToC(obj.startX, obj.startY);
       const p2 = wToC(obj.endX, obj.endY);

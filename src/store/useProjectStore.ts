@@ -20,6 +20,7 @@ import { extractProjectDataFromNC, parseGcodeToCadObjects, parseGcodeToSegments 
 import { DEFAULT_TEMPLATES } from '../lib/postprocessor/templates';
 import { analyzeProjectWarnings } from '../lib/utils/warnings';
 import { optimizeCADObjects, OptimizationResult } from '../lib/geometry/optimizer';
+import { translateCADObject } from '../lib/geometry/transform';
 import {
   INITIAL_MACHINE,
   INITIAL_OBJECTS,
@@ -74,6 +75,9 @@ interface ProjectStore {
   // Kept out of `objects` so it never triggers history, autosave or G-code regen.
   liveEdit: { id: string; patch: Partial<CADObject> } | null;
   liveMeasure: { start: Point2D; end: Point2D } | null;
+  // Живое превью перемещения группы (модуль «Переместить»): смещение выбранных фигур на
+  // холсте до подтверждения. Только отрисовка — не трогает objects/историю/G-код.
+  liveMove: { ids: string[]; dx: number; dy: number } | null;
   // Session-only background reference image («подложка»). Never persisted, never affects G-code.
   underlay: UnderlayState;
   activeTool: ActiveTool;
@@ -92,6 +96,12 @@ interface ProjectStore {
   manualGcodeDirty: boolean;
   toolpathSegments: ToolpathSegment[];
   warnings: WarningItem[];
+
+  // Транзиентный буфер группового копирования (Ctrl+C / Ctrl+V). Копии фигур вместе с
+  // их взаимным расположением; seq увеличивает смещение при повторных вставках.
+  // Не входит в историю и не сохраняется в localStorage / экспорт проекта.
+  clipboard: CADObject[];
+  clipboardSeq: number;
 
   historyUndo: HistoryState[];
   historyRedo: HistoryState[];
@@ -122,6 +132,7 @@ interface ProjectStore {
   setInspectorTarget: (target: 'object' | 'operation' | 'tool') => void;
   setLiveEdit: (v: { id: string; patch: Partial<CADObject> } | null) => void;
   setLiveMeasure: (v: { start: Point2D; end: Point2D } | null) => void;
+  setLiveMove: (v: { ids: string[]; dx: number; dy: number } | null) => void;
 
   // Подложка (фоновая референсная картинка) — только на сессию.
   setUnderlayImage: (src: string) => void;
@@ -141,6 +152,12 @@ interface ProjectStore {
   deleteObject: (id: string) => void;
   deleteSelectedObjects: () => void;
   duplicateObject: (id: string) => void;
+
+  // Групповое копирование выделенных фигур (Ctrl+C) и вставка копии (Ctrl+V).
+  copySelectedObjects: () => void;
+  pasteClipboard: () => void;
+  // Точное перемещение выделения на относительный сдвиг (dx, dy) в мм.
+  moveSelectedObjectsBy: (dx: number, dy: number) => void;
 
   addOperation: (op: OperationItem) => void;
   updateOperation: (id: string, partial: Partial<OperationItem>) => void;
@@ -276,6 +293,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
     inspectorTarget: 'object',
     liveEdit: null,
     liveMeasure: null,
+    liveMove: null,
     underlay: DEFAULT_UNDERLAY,
     activeTool: 'select',
     activeTab: 'gcode',
@@ -291,6 +309,9 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
     manualGcodeDirty: false,
     toolpathSegments: initialGen.segments,
     warnings: initialWarns,
+
+    clipboard: [],
+    clipboardSeq: 0,
 
     historyUndo: [],
     historyRedo: [],
@@ -397,6 +418,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
 
     setLiveEdit: (v) => set({ liveEdit: v }),
     setLiveMeasure: (v) => set({ liveMeasure: v }),
+    setLiveMove: (v) => set({ liveMove: v }),
 
     // Подложка — только на сессию: plain set, без истории/автосейва/генерации G-кода.
     setUnderlayImage: (src) => {
@@ -638,6 +660,70 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
         selectedObjectId: copy.id,
         selectedObjectIds: [copy.id],
       });
+    },
+
+    // Ctrl+C — запомнить ГЛУБОКИЕ копии всех выделенных фигур в транзиентный буфер.
+    // Обычный set: не пишет историю и не триггерит генерацию G-кода/автосейв.
+    copySelectedObjects: () => {
+      const ids = new Set(get().selectedObjectIds);
+      if (ids.size === 0) return;
+      const snapshot = get()
+        .objects.filter((o) => ids.has(o.id))
+        .map((o) => structuredClone(o));
+      set({ clipboard: snapshot, clipboardSeq: 0 });
+    },
+
+    // Ctrl+V — вставить копию группы. Каждая последующая вставка смещается дальше,
+    // чтобы копии не ложились друг на друга. Вставленные фигуры разблокированы
+    // (frozen=false), получают новые id и связываются с теми же операциями, что и оригиналы.
+    pasteClipboard: () => {
+      const clip = get().clipboard;
+      if (!clip || clip.length === 0) return;
+
+      const seq = get().clipboardSeq + 1;
+      const off = 15 * seq;
+      const ts = Date.now();
+      const idMap = new Map<string, string>();
+      const newObjs: CADObject[] = clip.map((src, i) => {
+        const copy = translateCADObject(src, off, off);
+        const newId = `obj_${ts}_${Math.random().toString(36).substring(2, 7)}_${i}`;
+        idMap.set(src.id, newId);
+        copy.id = newId;
+        copy.name = `${src.name} (копия)`;
+        copy.frozen = false;
+        return copy;
+      });
+
+      const newOps = get().operations.map((op) => {
+        const additions = op.linkedObjectIds
+          .filter((lid) => idMap.has(lid))
+          .map((lid) => idMap.get(lid)!);
+        if (additions.length === 0) return op;
+        return { ...op, linkedObjectIds: [...op.linkedObjectIds, ...additions] };
+      });
+
+      pushHistory();
+      syncAndSave({
+        objects: [...get().objects, ...newObjs],
+        operations: newOps,
+        clipboardSeq: seq,
+        selectedObjectId: newObjs[newObjs.length - 1]?.id ?? null,
+        selectedObjectIds: newObjs.map((o) => o.id),
+      });
+    },
+
+    // Точное перемещение всего выделения на сдвиг (dx, dy) мм относительно текущего
+    // положения. id сохраняются — фигуры просто едут; одна запись истории, пересчёт G-кода.
+    moveSelectedObjectsBy: (dx: number, dy: number) => {
+      const movable = new Set(
+        get().objects.filter((o) => o.frozen !== true).map((o) => o.id)
+      );
+      const ids = new Set(get().selectedObjectIds.filter((id) => movable.has(id)));
+      if (ids.size === 0) return;
+      if (!Number.isFinite(dx) || !Number.isFinite(dy) || (dx === 0 && dy === 0)) return;
+      pushHistory();
+      const newObjs = get().objects.map((o) => (ids.has(o.id) ? translateCADObject(o, dx, dy) : o));
+      syncAndSave({ objects: newObjs });
     },
 
     addOperation: (op: OperationItem) => {

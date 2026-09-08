@@ -1,4 +1,45 @@
-import { ArcObject, MachineSettings, Point2D } from '../../types';
+import { ArcObject, CADObject, MachineSettings, Point2D } from '../../types';
+
+/**
+ * Вернуть ГЛУБОКУЮ копию фигуры, смещённую на (dx, dy) в системных координатах.
+ * Используется групповой вставкой (Ctrl+V), чтобы вставленная копия группы легла
+ * рядом с оригиналом, сохранив взаимное расположение фигур.
+ */
+export function translateCADObject(obj: CADObject, dx: number, dy: number): CADObject {
+  const copy = structuredClone(obj);
+  switch (copy.type) {
+    case 'point':
+      copy.x += dx;
+      copy.y += dy;
+      break;
+    case 'line':
+      copy.startX += dx;
+      copy.startY += dy;
+      copy.endX += dx;
+      copy.endY += dy;
+      break;
+    case 'rectangle':
+      copy.x += dx;
+      copy.y += dy;
+      break;
+    case 'circle':
+      copy.centerX += dx;
+      copy.centerY += dy;
+      break;
+    case 'arc':
+      copy.startX += dx;
+      copy.startY += dy;
+      copy.endX += dx;
+      copy.endY += dy;
+      copy.centerX += dx;
+      copy.centerY += dy;
+      break;
+    case 'polyline':
+      if (copy.points) copy.points = copy.points.map((p) => ({ x: p.x + dx, y: p.y + dy }));
+      break;
+  }
+  return copy;
+}
 
 /**
  * Transforms program coordinate (x, y) to machine coordinate based on machine settings
