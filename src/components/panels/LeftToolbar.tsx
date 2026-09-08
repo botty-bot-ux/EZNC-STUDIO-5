@@ -40,7 +40,7 @@ export const LeftToolbar: React.FC = () => {
   }
 
   return (
-    <aside className="absolute left-4 top-4 bottom-4 w-72 flex flex-col bg-transparent text-slate-800 dark:text-slate-100 z-20 select-none overflow-hidden transition-all duration-200">
+    <aside className="absolute left-4 top-20 bottom-4 w-72 flex flex-col bg-transparent text-slate-800 dark:text-slate-100 z-20 select-none overflow-hidden transition-all duration-200">
       {/* Header */}
       <div className="px-1.5 py-1 flex items-center justify-between gap-2 shrink-0">
         <div className="flex items-center gap-1.5 min-w-0">
