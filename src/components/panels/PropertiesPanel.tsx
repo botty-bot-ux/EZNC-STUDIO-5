@@ -2,15 +2,12 @@ import React from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { Circle, CircleDot, Eye, EyeOff, GitCompareArrows, Layers, LineDotRightHorizontal, Lock, Move, Ruler, Sliders, Spline, Square, Trash2, Unlock } from 'lucide-react';
 import { useProjectStore, useSelectedObjectId } from '../../store/useProjectStore';
-import { computeParallelArcs, computeParallelSegments } from '../../lib/geometry/transform';
 import { ArcObject, CircleObject, LineObject, PointHoleObject, RectangleObject } from '../../types';
 import { ArcProperties } from './properties/ArcProperties';
 import { CircleProperties } from './properties/CircleProperties';
 import { LineProperties } from './properties/LineProperties';
 import { PointProperties } from './properties/PointProperties';
 import { RectangleProperties } from './properties/RectangleProperties';
-import { MoveDialog } from '../modals/MoveDialog';
-import { ParallelDialog } from '../modals/ParallelDialog';
 
 interface SelectionActionsProps {
   /** Все выбранные видимы (кнопка Глаза). */
@@ -92,11 +89,10 @@ export const PropertiesPanel: React.FC = () => {
     updateSelectedObjects,
     deleteObject,
     deleteSelectedObjects,
-    moveSelectedObjectsBy,
-    addObject,
     activeTool,
     liveEdit,
     liveMeasure,
+    setShapeDialog,
   } = useProjectStore(
     useShallow((s) => ({
       selectedObjectIds: s.selectedObjectIds,
@@ -105,18 +101,14 @@ export const PropertiesPanel: React.FC = () => {
       updateSelectedObjects: s.updateSelectedObjects,
       deleteObject: s.deleteObject,
       deleteSelectedObjects: s.deleteSelectedObjects,
-      moveSelectedObjectsBy: s.moveSelectedObjectsBy,
-      addObject: s.addObject,
       activeTool: s.activeTool,
       liveEdit: s.liveEdit,
       liveMeasure: s.liveMeasure,
+      setShapeDialog: s.setShapeDialog,
     }))
   );
   // «Основная» фигура — производная от selectedObjectIds (последний id).
   const selectedObjectId = useSelectedObjectId();
-
-  const [moveOpen, setMoveOpen] = React.useState(false);
-  const [parallelOpen, setParallelOpen] = React.useState(false);
 
   // ── Линейка / штангенциркуль: живой замер вместо плавающего окна ──
   if (activeTool === 'measure') {
@@ -167,7 +159,7 @@ export const PropertiesPanel: React.FC = () => {
             plural
             onToggleVisible={() => updateSelectedObjects({ visible: !allVisible })}
             onToggleFrozen={() => updateSelectedObjects({ frozen: !allFrozen })}
-            onMove={() => setMoveOpen(true)}
+            onMove={() => setShapeDialog({ kind: 'move' })}
             onDelete={deleteSelectedObjects}
           />
         </div>
@@ -191,13 +183,6 @@ export const PropertiesPanel: React.FC = () => {
             </div>
           </div>
         </div>
-
-        <MoveDialog
-          isOpen={moveOpen}
-          ids={selectedObjs.filter((o) => !o.frozen).map((o) => o.id)}
-          onClose={() => setMoveOpen(false)}
-          onApply={moveSelectedObjectsBy}
-        />
       </div>
     );
   }
@@ -230,26 +215,6 @@ export const PropertiesPanel: React.FC = () => {
         })()
       : null;
 
-  // Источники для модуля «Параллельная …» — строятся один раз; раньше одинаковые
-  // литералы дублировались в makePreview и onCreate.
-  const arcSource =
-    selectedObj.type === 'arc'
-      ? {
-          centerX: selectedObj.centerX,
-          centerY: selectedObj.centerY,
-          radius: selectedObj.radius,
-          startX: selectedObj.startX,
-          startY: selectedObj.startY,
-          endX: selectedObj.endX,
-          endY: selectedObj.endY,
-          clockwise: selectedObj.clockwise,
-        }
-      : null;
-  const lineSource =
-    selectedObj.type === 'line'
-      ? { startX: selectedObj.startX, startY: selectedObj.startY, endX: selectedObj.endX, endY: selectedObj.endY }
-      : null;
-
   return (
     <div className="p-4 space-y-4 text-xs text-slate-800 dark:text-slate-100 overflow-y-auto h-full select-none">
       <div className="flex items-center justify-between pb-3 border-b border-slate-200/80 dark:border-slate-700/80">
@@ -269,7 +234,7 @@ export const PropertiesPanel: React.FC = () => {
           plural={false}
           onToggleVisible={() => updateObject(selectedObj.id, { visible: selectedObj.visible === false })}
           onToggleFrozen={() => updateObject(selectedObj.id, { frozen: selectedObj.frozen !== true })}
-          onMove={() => setMoveOpen(true)}
+          onMove={() => setShapeDialog({ kind: 'move' })}
           onDelete={() => deleteObject(selectedObj.id)}
           parallel={
             selectedObj.type === 'line' || selectedObj.type === 'arc'
@@ -278,7 +243,7 @@ export const PropertiesPanel: React.FC = () => {
                     selectedObj.type === 'arc'
                       ? 'Параллельная дуга (концентрическое смещение)'
                       : 'Параллельная линия (смещение по нормали)',
-                  onClick: () => setParallelOpen(true),
+                  onClick: () => setShapeDialog({ kind: 'parallel' }),
                 }
               : undefined
           }
@@ -344,77 +309,6 @@ export const PropertiesPanel: React.FC = () => {
           />
         )}
       </div>
-
-      <MoveDialog
-        isOpen={moveOpen}
-        ids={[selectedObj.id]}
-        onClose={() => setMoveOpen(false)}
-        onApply={moveSelectedObjectsBy}
-      />
-
-      {(selectedObj.type === 'line' || selectedObj.type === 'arc') && (
-        <ParallelDialog
-          isOpen={parallelOpen}
-          title={selectedObj.type === 'arc' ? 'Параллельная дуга' : 'Параллельная линия'}
-          countLabel={selectedObj.type === 'arc' ? 'Кол-во дуг' : 'Кол-во линий'}
-          hint={
-            selectedObj.type === 'arc'
-              ? `От исходной «${selectedObj.name}» концентрически. Знак «−» — к центру.`
-              : `От исходной «${selectedObj.name}» по нормали. Знак «−» меняет сторону.`
-          }
-          onClose={() => setParallelOpen(false)}
-          makePreview={(distance, count) => {
-            if (arcSource) {
-              const arcs = computeParallelArcs(arcSource, distance, count);
-              return arcs.length ? { segments: [], sourceArc: arcSource, arcs } : null;
-            }
-            if (!lineSource) return null;
-            const segments = computeParallelSegments(lineSource, distance, count);
-            return segments.length ? { segments, source: lineSource } : null;
-          }}
-          onCreate={(distance, count) => {
-            const baseIndex = objects.length; // нумерация «Имя N» продолжается от числа объектов
-            if (arcSource) {
-              const arcs = computeParallelArcs(arcSource, distance, count);
-              arcs.forEach((arc, i) => {
-                addObject({
-                  type: 'arc',
-                  name: `Дуга R${arc.radius.toFixed(1)} (${baseIndex + i + 1})`,
-                  depth: selectedObj.depth,
-                  operationType: selectedObj.operationType,
-                  color: selectedObj.color,
-                  visible: true,
-                  centerX: arc.centerX,
-                  centerY: arc.centerY,
-                  radius: arc.radius,
-                  startX: arc.startX,
-                  startY: arc.startY,
-                  endX: arc.endX,
-                  endY: arc.endY,
-                  clockwise: arc.clockwise,
-                });
-              });
-              return;
-            }
-            if (!lineSource) return;
-            const segments = computeParallelSegments(lineSource, distance, count);
-            segments.forEach((seg, i) => {
-              addObject({
-                type: 'line',
-                name: `Отрезок ${baseIndex + i + 1}`,
-                depth: selectedObj.depth,
-                operationType: selectedObj.operationType,
-                color: selectedObj.color,
-                visible: true,
-                startX: seg.startX,
-                startY: seg.startY,
-                endX: seg.endX,
-                endY: seg.endY,
-              });
-            });
-          }}
-        />
-      )}
     </div>
   );
 };

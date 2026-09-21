@@ -10,6 +10,7 @@ import { PropertiesPanel } from './components/panels/PropertiesPanel';
 import { MachineSettingsPanel } from './components/panels/MachineSettingsPanel';
 import { GcodeEditor } from './components/editor/GcodeEditor';
 import { SceneCanvas } from './components/canvas/SceneCanvas';
+import { ShapeActionsHost } from './components/canvas/ShapeActionsHost';
 import { useProjectStore } from './store/useProjectStore';
 import { useIsMobile } from './hooks/useIsMobile';
 
@@ -157,6 +158,9 @@ export default function App() {
 
         {/* Mobile tab bar floats at the bottom */}
         <MobileTabBar />
+
+        {/* Хост диалогов «Переместить» / «Параллельная линия» (общий с контекстным меню) */}
+        <ShapeActionsHost />
       </div>
     );
   }
@@ -177,6 +181,9 @@ export default function App() {
 
       {/* Floating Right Inspector, Machine & G-code Editor Overlay */}
       <RightSidebar />
+
+      {/* Хост диалогов «Переместить» / «Параллельная линия» (общий с контекстным меню) */}
+      <ShapeActionsHost />
     </div>
   );
 }

@@ -78,6 +78,11 @@ interface ProjectStore {
   // selectedObjectId, которое расходилось с массивом при загрузке проектов.
   selectedObjectIds: string[];
   selectedOperationId: string | null;
+  // Модалки действий с фигурами («Переместить», «Параллельная …») живут на уровне
+  // App (ShapeActionsHost) и открываются по запросу — из панели Свойств и из
+  // правого-кликового меню на холсте.
+  shapeDialog: { kind: 'move' | 'parallel' } | null;
+  setShapeDialog: (d: { kind: 'move' | 'parallel' } | null) => void;
   // Transient interaction state surfaced to the Свойства panel during a drag / measure.
   // Kept out of `objects` so it never triggers history, autosave or G-code regen.
   liveEdit: { id: string; patch: Partial<CADObject> } | null;
@@ -334,6 +339,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
 
     selectedObjectIds: [],
     selectedOperationId: null,
+    shapeDialog: null,
     liveEdit: null,
     liveMeasure: null,
     liveMove: null,
@@ -481,6 +487,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
     setLiveMeasure: (v) => set({ liveMeasure: v }),
     setLiveMove: (v) => set({ liveMove: v }),
     setParallelPreview: (v) => set({ parallelPreview: v }),
+    setShapeDialog: (d) => set({ shapeDialog: d }),
 
     // Подложка — только на сессию: plain set, без истории/автосейва/генерации G-кода.
     setUnderlayImage: (src) => {

@@ -6,6 +6,7 @@ import { CanvasControls } from './CanvasControls';
 import { CanvasHud } from './CanvasHud';
 import { ArcModeSelector } from './ArcModeSelector';
 import { LineModeSelector } from './LineModeSelector';
+import { ShapeContextMenu } from './ShapeContextMenu';
 import {
   DragMode,
   HandleType,
@@ -204,6 +205,9 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
   );
   // «Основная» фигура — производная от selectedObjectIds (последний id).
   const selectedObjectId = useSelectedObjectId();
+
+  // Правый клик по фигуре → контекстное меню (позиция на экране или null).
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null);
 
   // Canvas Pan & Zoom
   const [pan, setPan] = useState<Point2D>({ x: 350, y: 350 });
@@ -1489,6 +1493,8 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
   const touchedRecently = () => Date.now() - lastTouchTsRef.current < 1500;
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (touchedRecently()) return;
+    // Правая кнопка — не «клик»: её обрабатывает onContextMenu (меню фигуры).
+    if (e.button === 2) return;
     pointerDown(e);
   };
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -1520,7 +1526,20 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
     <div
       ref={containerRef}
       className="relative w-full h-full bg-[#f1f5f9] dark:bg-[#0f172a] overflow-hidden select-none"
-      onContextMenu={(e) => e.preventDefault()}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        setCtxMenu(null);
+        // Меню фигур — прерогатива инструмента «выбор»: в середине рисования
+        // (незавершённая линия/дуга) правый клик ничего не открывает.
+        if (activeTool !== 'select' || !canvasRef.current) return;
+        const rect = canvasRef.current.getBoundingClientRect();
+        const mousePx = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+        const worldPt = canvasToWorld(mousePx.x, mousePx.y, pan, zoom);
+        const hitId = findObjectBodyHit(objects, worldPt, zoom);
+        if (!hitId) return;
+        if (!selectedObjectIds.includes(hitId)) setSelectedObjectIds([hitId]);
+        setCtxMenu({ x: e.clientX, y: e.clientY });
+      }}
     >
       <canvas
         ref={canvasRef}
@@ -1536,6 +1555,10 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
         className="w-full h-full cursor-crosshair block"
         style={{ touchAction: 'none' }}
       />
+
+      {ctxMenu && (
+        <ShapeContextMenu x={ctxMenu.x} y={ctxMenu.y} onClose={() => setCtxMenu(null)} />
+      )}
 
       <CanvasHud
         activeTool={activeTool}
