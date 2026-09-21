@@ -1,6 +1,6 @@
 import React from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { Circle, CircleDot, Eye, EyeOff, Layers, LineDotRightHorizontal, Lock, Move, Ruler, Sliders, Spline, Square, Trash2, Unlock } from 'lucide-react';
+import { Circle, CircleDot, Eye, EyeOff, GitCompareArrows, Layers, LineDotRightHorizontal, Lock, Move, Ruler, Sliders, Spline, Square, Trash2, Unlock } from 'lucide-react';
 import { useProjectStore } from '../../store/useProjectStore';
 import { ArcObject, CircleObject, LineObject, PointHoleObject, RectangleObject } from '../../types';
 import { ArcProperties } from './properties/ArcProperties';
@@ -9,6 +9,7 @@ import { LineProperties } from './properties/LineProperties';
 import { PointProperties } from './properties/PointProperties';
 import { RectangleProperties } from './properties/RectangleProperties';
 import { MoveDialog } from '../modals/MoveDialog';
+import { ParallelLineDialog } from '../modals/ParallelLineDialog';
 
 export const PropertiesPanel: React.FC = () => {
   const {
@@ -20,6 +21,7 @@ export const PropertiesPanel: React.FC = () => {
     deleteObject,
     deleteSelectedObjects,
     moveSelectedObjectsBy,
+    addObject,
     activeTool,
     liveEdit,
     liveMeasure,
@@ -33,6 +35,7 @@ export const PropertiesPanel: React.FC = () => {
       deleteObject: s.deleteObject,
       deleteSelectedObjects: s.deleteSelectedObjects,
       moveSelectedObjectsBy: s.moveSelectedObjectsBy,
+      addObject: s.addObject,
       activeTool: s.activeTool,
       liveEdit: s.liveEdit,
       liveMeasure: s.liveMeasure,
@@ -40,6 +43,7 @@ export const PropertiesPanel: React.FC = () => {
   );
 
   const [moveOpen, setMoveOpen] = React.useState(false);
+  const [parallelOpen, setParallelOpen] = React.useState(false);
 
   // ── Линейка / штангенциркуль: живой замер вместо плавающего окна ──
   if (activeTool === 'measure') {
@@ -221,6 +225,15 @@ export const PropertiesPanel: React.FC = () => {
               <Move className="w-4 h-4" />
             </button>
           )}
+          {selectedObj.type === 'line' && (
+            <button
+              onClick={() => setParallelOpen(true)}
+              title="Параллельная линия (смещение по нормали)"
+              className="p-1.5 rounded-lg text-slate-400 dark:text-slate-500 hover:text-primary hover:bg-slate-100 hover:dark:bg-slate-700 transition-all"
+            >
+              <GitCompareArrows className="w-4 h-4" />
+            </button>
+          )}
           <button
             onClick={() => deleteObject(selectedObj.id)}
             title="Удалить объект"
@@ -297,6 +310,36 @@ export const PropertiesPanel: React.FC = () => {
         onClose={() => setMoveOpen(false)}
         onApply={moveSelectedObjectsBy}
       />
+
+      {selectedObj.type === 'line' && (
+        <ParallelLineDialog
+          isOpen={parallelOpen}
+          sourceName={selectedObj.name}
+          onClose={() => setParallelOpen(false)}
+          onCreate={(distance) => {
+            const l = selectedObj as LineObject;
+            const dx = l.endX - l.startX;
+            const dy = l.endY - l.startY;
+            const len = Math.hypot(dx, dy);
+            if (len === 0) return; // нулевая линия — направления нет
+            // Единичная нормаль к вектору отрезка.
+            const nx = -dy / len;
+            const ny = dx / len;
+            addObject({
+              type: 'line',
+              name: `${l.name} параллель`,
+              depth: l.depth,
+              operationType: l.operationType,
+              color: l.color,
+              visible: true,
+              startX: l.startX + nx * distance,
+              startY: l.startY + ny * distance,
+              endX: l.endX + nx * distance,
+              endY: l.endY + ny * distance,
+            });
+          }}
+        />
+      )}
     </div>
   );
 };
