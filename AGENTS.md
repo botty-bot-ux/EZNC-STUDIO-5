@@ -3,14 +3,15 @@
 React 19 + Vite + TypeScript SPA ("ЧПУ CAD/CAM Редактор G-code для проостого раскроя дсп 16 и 32мм") .
 
 ## Commands
-- `npm run dev` — Vite dev server on port **3000**, host `0.0.0.0`.
-- `npm run build` — production build (Vite). Output is **`dist`** (NOT `build`).
-- `npm run lint` — NOT a linter; it is `tsc --noEmit` (typecheck). Use it to verify types. There is no ESLint.
-- `npm install --save-dev gh-pages` was applied, so a `package-lock.json` exists locally but is untracked. Keep changes in sync with the committed **`bun.lock`** if you add deps.
+Package manager is **bun** (`bun.lock` is the committed lockfile). Use `bun install` / `bun run …`, not npm.
+- `bun run dev` — Vite dev server on port **3010**, host `0.0.0.0`.
+- `bun run build` — production build (Vite). Output is **`dist`** (NOT `build`).
+- `bun run lint` — NOT a linter; it is `tsc --noEmit` (typecheck). Use it to verify types. There is no ESLint.
+- `bun install` to add/update deps; keep `bun.lock` committed in sync.
 
 ## GitHub Pages deploy
 - Pages source is the **`gh-pages`** branch (set via API, not a workflow).
-- `npm run deploy` runs `predeploy` (`npm run build`) then `gh-pages -d dist`.
+- `bun run deploy` runs `predeploy` (`bun run build`) then `gh-pages -d dist`.
 - `vite.config.ts` sets `base: '/EZNC-STUDIO-5/'` so asset URLs work under the project subpath. Do not remove it.
 - Rebuild trigger when already up to date: `git commit --allow-empty -m "..."; git push` (pages deploy fires on push). To switch source branch: `gh api -X POST repos/<owner>/<repo>/pages -f build_type=legacy -f "source[branch]=gh-pages" -f "source[path]=/"`.
 
