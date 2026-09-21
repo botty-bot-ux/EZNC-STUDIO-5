@@ -261,8 +261,49 @@ export function parseGcodeToCadObjects(
     }
   }
 
-  for (let blockIdx = 0; blockIdx < blocks.length; blockIdx++) {
-    const block = blocks[blockIdx];
+  // Marker-less blocks can chain several primitives (optimized toolpath with no
+  // rapids between them). Split each such block into one sub-block per primitive —
+  // each arc on its own, each straight run on its own — so a mixed block isn't
+  // collapsed into a single bogus arc that spans the whole contour.
+  const splitBlocks: RawObjectBlock[] = [];
+  for (const block of blocks) {
+    if (block.meta?.type) {
+      splitBlocks.push(block);
+      continue;
+    }
+    const isArcSeg = (s: ToolpathSegment) => s.type === 'arc_cw' || s.type === 'arc_ccw';
+    const isPlunge = (s: ToolpathSegment) =>
+      s.type === 'feed' && Math.hypot(s.endX - s.startX, s.endY - s.startY) < 0.001;
+    const cutting = block.segments.filter(
+      (s) => s.type === 'feed' || s.type === 'arc_cw' || s.type === 'arc_ccw'
+    );
+    if (cutting.length === 0) {
+      splitBlocks.push(block);
+      continue;
+    }
+    let g: ToolpathSegment[] = [];
+    const flushG = () => {
+      if (g.length) {
+        splitBlocks.push({ segments: g });
+        g = [];
+      }
+    };
+    for (const s of cutting) {
+      if (isArcSeg(s)) {
+        // A leading plunge (approach) belongs to the arc; a real line before it starts a new primitive.
+        if (g.some((c) => !isArcSeg(c) && !isPlunge(c))) flushG();
+        g.push(s);
+        flushG();
+      } else {
+        if (g.length && isArcSeg(g[g.length - 1])) flushG();
+        g.push(s);
+      }
+    }
+    flushG();
+  }
+
+  for (let blockIdx = 0; blockIdx < splitBlocks.length; blockIdx++) {
+    const block = splitBlocks[blockIdx];
     const segs = block.segments;
 
     const cuttingSegs = segs.filter((s) => s.type === 'feed' || s.type === 'arc_cw' || s.type === 'arc_ccw');
