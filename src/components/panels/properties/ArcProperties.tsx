@@ -18,6 +18,7 @@ export const ArcProperties: React.FC<ArcPropertiesProps> = ({ obj, onUpdate }) =
           value={obj.startX}
           onChange={(startX) => onUpdate({ startX })}
           decimals={1}
+          step={1}
           className="text-slate-800 dark:text-slate-100"
         />
         <PropertyInput
@@ -25,6 +26,7 @@ export const ArcProperties: React.FC<ArcPropertiesProps> = ({ obj, onUpdate }) =
           value={obj.startY}
           onChange={(startY) => onUpdate({ startY })}
           decimals={1}
+          step={1}
           className="text-slate-800 dark:text-slate-100"
         />
       </div>
@@ -35,6 +37,7 @@ export const ArcProperties: React.FC<ArcPropertiesProps> = ({ obj, onUpdate }) =
           value={obj.endX}
           onChange={(endX) => onUpdate({ endX })}
           decimals={1}
+          step={1}
           className="text-slate-800 dark:text-slate-100"
         />
         <PropertyInput
@@ -42,6 +45,7 @@ export const ArcProperties: React.FC<ArcPropertiesProps> = ({ obj, onUpdate }) =
           value={obj.endY}
           onChange={(endY) => onUpdate({ endY })}
           decimals={1}
+          step={1}
           className="text-slate-800 dark:text-slate-100"
         />
       </div>
@@ -52,6 +56,7 @@ export const ArcProperties: React.FC<ArcPropertiesProps> = ({ obj, onUpdate }) =
           value={obj.centerX}
           onChange={(centerX) => onUpdate({ centerX })}
           decimals={1}
+          step={1}
           className="text-slate-800 dark:text-slate-100"
         />
         <PropertyInput
@@ -59,6 +64,7 @@ export const ArcProperties: React.FC<ArcPropertiesProps> = ({ obj, onUpdate }) =
           value={obj.centerY}
           onChange={(centerY) => onUpdate({ centerY })}
           decimals={1}
+          step={1}
           className="text-slate-800 dark:text-slate-100"
         />
       </div>
@@ -68,7 +74,7 @@ export const ArcProperties: React.FC<ArcPropertiesProps> = ({ obj, onUpdate }) =
           label="R, мм"
           value={obj.radius}
           onChange={(radius) => onUpdate({ radius: Math.max(0.1, radius) })}
-          step="0.5"
+          step={1}
           className="text-slate-800 dark:text-slate-100 font-bold"
           fallbackValue={1}
         />

@@ -1,10 +1,15 @@
 import React, { useState } from 'react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 
 interface PropertyInputProps {
   label: string;
   value: number;
   onChange: (val: number) => void;
-  /** Сохраняется в интерфейсе ради совместимости вызовов; для текстового поля не используется. */
+  /**
+   * Если задано положительным числом — справа появляются стрелки ▲/▼, каждая
+   * из которых меняет значение на ±step. По умолчанию шаг = 1 мм, то есть
+   * меняются цифры ДО запятой.
+   */
   step?: string | number;
   className?: string;
   fallbackValue?: number;
@@ -22,6 +27,7 @@ export const PropertyInput: React.FC<PropertyInputProps> = ({
   label,
   value,
   onChange,
+  step,
   className = 'text-slate-800 dark:text-slate-100',
   fallbackValue = 0,
   decimals,
@@ -55,6 +61,20 @@ export const PropertyInput: React.FC<PropertyInputProps> = ({
     setDraft(null);
   };
 
+  // Шаг для стрелок: принимаем и число, и строку («1», «0.5»); невалидное или <=0 → стрелок нет.
+  const stepNum = typeof step === 'string' ? parseFloat(step.replace(',', '.')) : step;
+  const hasStepper = typeof stepNum === 'number' && Number.isFinite(stepNum) && stepNum > 0;
+
+  const handleStep = (dir: 1 | -1) => {
+    // Считаем от текущего набранного (draft) или от props.value — чтобы стрелки продолжали
+    // набор, а не «перескакивали» на старое значение.
+    const base = draft !== null ? toNumber(draft) ?? value : value;
+    let next = base + dir * (stepNum as number);
+    if (decimals != null) next = Number(next.toFixed(decimals));
+    setDraft(null);
+    onChange(next);
+  };
+
   return (
     <div className="flex items-center gap-1.5 w-full">
       <label
@@ -72,8 +92,32 @@ export const PropertyInput: React.FC<PropertyInputProps> = ({
         onKeyDown={(e) => {
           if (e.key === 'Enter') e.currentTarget.blur();
         }}
-        className={`w-full bg-slate-50 dark:bg-slate-900 border border-slate-200/90 dark:border-slate-700/90 rounded-lg px-2 py-1 text-xs font-mono focus:bg-white focus:dark:bg-slate-800 focus:border-primary focus:outline-none transition-all ${className}`}
+        className={`w-full min-w-0 bg-slate-50 dark:bg-slate-900 border border-slate-200/90 dark:border-slate-700/90 ${hasStepper ? 'rounded-l-lg rounded-r-none border-r-0' : 'rounded-lg'} px-2 py-1 text-xs font-mono focus:bg-white focus:dark:bg-slate-800 focus:border-primary focus:outline-none transition-all ${className}`}
       />
+      {hasStepper && (
+        <div className="flex flex-col shrink-0 self-stretch">
+          <button
+            type="button"
+            tabIndex={-1}
+            onMouseDown={(e) => e.preventDefault()} // не давать кнопке уводить фокус с input
+            onClick={() => handleStep(1)}
+            title="+1 мм"
+            className="flex-1 px-1 rounded-r-lg bg-slate-100 dark:bg-slate-800 border border-slate-200/90 dark:border-slate-700/90 text-slate-500 dark:text-slate-400 hover:text-primary hover:bg-slate-200 hover:dark:bg-slate-700 transition-colors"
+          >
+            <ChevronUp className="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
+            tabIndex={-1}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => handleStep(-1)}
+            title="−1 мм"
+            className="flex-1 px-1 rounded-r-lg bg-slate-100 dark:bg-slate-800 border border-slate-200/90 dark:border-slate-700/90 border-t-0 dark:border-t-0 text-slate-500 dark:text-slate-400 hover:text-primary hover:bg-slate-200 hover:dark:bg-slate-700 transition-colors"
+          >
+            <ChevronDown className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
     </div>
   );
 };
