@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
+import { useScrub } from '../../ui/useScrub';
 
 interface PropertyInputProps {
   label: string;
@@ -8,7 +9,8 @@ interface PropertyInputProps {
   /**
    * Если задано положительным числом — справа появляются стрелки ▲/▼, каждая
    * из которых меняет значение на ±step. По умолчанию шаг = 1 мм, то есть
-   * меняются цифры ДО запятой.
+   * меняются цифры ДО запятой. Зажать стрелку и вести мышь вверх/вниз —
+   * значение меняется непрерывно (6 px = 1 шаг).
    */
   step?: string | number;
   className?: string;
@@ -65,15 +67,20 @@ export const PropertyInput: React.FC<PropertyInputProps> = ({
   const stepNum = typeof step === 'string' ? parseFloat(step.replace(',', '.')) : step;
   const hasStepper = typeof stepNum === 'number' && Number.isFinite(stepNum) && stepNum > 0;
 
-  const handleStep = (dir: 1 | -1) => {
-    // Считаем от текущего набранного (draft) или от props.value — чтобы стрелки продолжали
-    // набор, а не «перескакивали» на старое значение.
+  // Общая функция сдвига на `deltaSteps` шагов (клик = ±1; drag = накопленное число шагов).
+  // Считаем от актуального черновика, если он есть, иначе от props.value.
+  const shift = (deltaSteps: number) => {
+    if (!hasStepper) return;
     const base = draft !== null ? toNumber(draft) ?? value : value;
-    let next = base + dir * (stepNum as number);
+    let next = base + deltaSteps * (stepNum as number);
     if (decimals != null) next = Number(next.toFixed(decimals));
     setDraft(null);
     onChange(next);
   };
+
+  // Хуки нельзя вызывать условно — вешаем всегда, а внутри shift есть guard по hasStepper.
+  const up = useScrub(shift, { clickDir: 1 });
+  const down = useScrub(shift, { clickDir: -1 });
 
   return (
     <div className="flex items-center gap-1.5 w-full">
@@ -99,20 +106,18 @@ export const PropertyInput: React.FC<PropertyInputProps> = ({
           <button
             type="button"
             tabIndex={-1}
-            onMouseDown={(e) => e.preventDefault()} // не давать кнопке уводить фокус с input
-            onClick={() => handleStep(1)}
-            title="+1 мм"
-            className="flex-1 px-1 rounded-r-lg bg-slate-100 dark:bg-slate-800 border border-slate-200/90 dark:border-slate-700/90 text-slate-500 dark:text-slate-400 hover:text-primary hover:bg-slate-200 hover:dark:bg-slate-700 transition-colors"
+            {...up}
+            title="Больше: клик +1 мм; зажать и тянуть вверх/вниз"
+            className="flex-1 px-1 rounded-r-lg bg-slate-100 dark:bg-slate-800 border border-slate-200/90 dark:border-slate-700/90 text-slate-500 dark:text-slate-400 hover:text-primary hover:bg-slate-200 hover:dark:bg-slate-700 active:bg-slate-200 active:dark:bg-slate-700 transition-colors cursor-ns-resize"
           >
             <ChevronUp className="w-3.5 h-3.5" />
           </button>
           <button
             type="button"
             tabIndex={-1}
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => handleStep(-1)}
-            title="−1 мм"
-            className="flex-1 px-1 rounded-r-lg bg-slate-100 dark:bg-slate-800 border border-slate-200/90 dark:border-slate-700/90 border-t-0 dark:border-t-0 text-slate-500 dark:text-slate-400 hover:text-primary hover:bg-slate-200 hover:dark:bg-slate-700 transition-colors"
+            {...down}
+            title="Меньше: клик −1 мм; зажать и тянуть вверх/вниз"
+            className="flex-1 px-1 rounded-r-lg bg-slate-100 dark:bg-slate-800 border border-slate-200/90 dark:border-slate-700/90 border-t-0 dark:border-t-0 text-slate-500 dark:text-slate-400 hover:text-primary hover:bg-slate-200 hover:dark:bg-slate-700 active:bg-slate-200 active:dark:bg-slate-700 transition-colors cursor-ns-resize"
           >
             <ChevronDown className="w-3.5 h-3.5" />
           </button>

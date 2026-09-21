@@ -53,9 +53,9 @@ export const MoveDialog: React.FC<MoveDialogProps> = ({ isOpen, ids, onClose, on
     setLiveMove({ ids, dx: parseMM(xStr), dy: parseMM(v) });
   };
 
-  // Шаг стрелками ▲/▼: ±1 мм с обновлением живого смещения.
-  const stepX = (dir: 1 | -1) => changeX(String(parseMM(xStr) + dir));
-  const stepY = (dir: 1 | -1) => changeY(String(parseMM(yStr) + dir));
+  // Шаг стрелками: клик = ±1 мм; «зажать и тянуть» = сколько шагов прошли по вертикали.
+  const scrubX = (delta: number) => changeX(String(parseMM(xStr) + delta));
+  const scrubY = (delta: number) => changeY(String(parseMM(yStr) + delta));
 
   const cancel = () => {
     setLiveMove(null);
@@ -108,7 +108,7 @@ export const MoveDialog: React.FC<MoveDialogProps> = ({ isOpen, ids, onClose, on
             autoFocus
             placeholder="0"
             onChange={changeX}
-            onStep={stepX}
+            onScrub={scrubX}
             onEnter={confirm}
           />
           <StepperField
@@ -117,7 +117,7 @@ export const MoveDialog: React.FC<MoveDialogProps> = ({ isOpen, ids, onClose, on
             inputMode="decimal"
             placeholder="0"
             onChange={changeY}
-            onStep={stepY}
+            onScrub={scrubY}
             onEnter={confirm}
           />
         </div>

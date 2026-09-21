@@ -86,9 +86,10 @@ export const ParallelDialog: React.FC<ParallelDialogProps> = ({
     onClose();
   };
 
-  // Шаг стрелками: расстояние ±1 мм, количество ±1 (не ниже 1).
-  const stepDistance = (dir: 1 | -1) => setDistStr(String(parseMM(distStr) + dir));
-  const stepCount = (dir: 1 | -1) => setCountStr(String(Math.max(1, parseCount(countStr) + dir)));
+  // Шаг стрелками: клик = ±1; «зажать и тянуть» = несколько шагов за один жест.
+  const scrubDistance = (delta: number) => setDistStr(String(parseMM(distStr) + delta));
+  const scrubCount = (delta: number) =>
+    setCountStr(String(Math.max(1, parseCount(countStr) + delta)));
 
   return (
     <div
@@ -127,7 +128,7 @@ export const ParallelDialog: React.FC<ParallelDialogProps> = ({
             autoFocus
             placeholder="16"
             onChange={setDistStr}
-            onStep={stepDistance}
+            onScrub={scrubDistance}
             onEnter={confirm}
           />
           <StepperField
@@ -136,7 +137,7 @@ export const ParallelDialog: React.FC<ParallelDialogProps> = ({
             inputMode="numeric"
             placeholder="1"
             onChange={setCountStr}
-            onStep={stepCount}
+            onScrub={scrubCount}
             onEnter={confirm}
           />
         </div>
