@@ -22,8 +22,8 @@ export const LineProperties: React.FC<LinePropertiesProps> = ({ obj, onUpdate })
     <div className="flex items-center gap-2">
       {/* Точка 1 (X1, Y1) */}
       <div className="flex-1 space-y-1.5">
-        <PropertyInput label="X1, мм" value={obj.startX} onChange={(startX) => onUpdate({ startX })} />
-        <PropertyInput label="Y1, мм" value={obj.startY} onChange={(startY) => onUpdate({ startY })} />
+        <PropertyInput label="X1, мм" value={obj.startX} onChange={(startX) => onUpdate({ startX })} decimals={1} />
+        <PropertyInput label="Y1, мм" value={obj.startY} onChange={(startY) => onUpdate({ startY })} decimals={1} />
       </div>
 
       {/* Кнопка "Поменять точки местами" */}
@@ -38,8 +38,8 @@ export const LineProperties: React.FC<LinePropertiesProps> = ({ obj, onUpdate })
 
       {/* Точка 2 (X2, Y2) */}
       <div className="flex-1 space-y-1.5">
-        <PropertyInput label="X2, мм" value={obj.endX} onChange={(endX) => onUpdate({ endX })} />
-        <PropertyInput label="Y2, мм" value={obj.endY} onChange={(endY) => onUpdate({ endY })} />
+        <PropertyInput label="X2, мм" value={obj.endX} onChange={(endX) => onUpdate({ endX })} decimals={1} />
+        <PropertyInput label="Y2, мм" value={obj.endY} onChange={(endY) => onUpdate({ endY })} decimals={1} />
       </div>
     </div>
   );

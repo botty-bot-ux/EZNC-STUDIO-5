@@ -17,12 +17,14 @@ export const ArcProperties: React.FC<ArcPropertiesProps> = ({ obj, onUpdate }) =
           label="X1, мм"
           value={obj.startX}
           onChange={(startX) => onUpdate({ startX })}
+          decimals={1}
           className="text-slate-800 dark:text-slate-100"
         />
         <PropertyInput
           label="Y1, мм"
           value={obj.startY}
           onChange={(startY) => onUpdate({ startY })}
+          decimals={1}
           className="text-slate-800 dark:text-slate-100"
         />
       </div>
@@ -32,12 +34,14 @@ export const ArcProperties: React.FC<ArcPropertiesProps> = ({ obj, onUpdate }) =
           label="X2, мм"
           value={obj.endX}
           onChange={(endX) => onUpdate({ endX })}
+          decimals={1}
           className="text-slate-800 dark:text-slate-100"
         />
         <PropertyInput
           label="Y2, мм"
           value={obj.endY}
           onChange={(endY) => onUpdate({ endY })}
+          decimals={1}
           className="text-slate-800 dark:text-slate-100"
         />
       </div>
@@ -47,12 +51,14 @@ export const ArcProperties: React.FC<ArcPropertiesProps> = ({ obj, onUpdate }) =
           label="Xc, мм"
           value={obj.centerX}
           onChange={(centerX) => onUpdate({ centerX })}
+          decimals={1}
           className="text-slate-800 dark:text-slate-100"
         />
         <PropertyInput
           label="Yc, мм"
           value={obj.centerY}
           onChange={(centerY) => onUpdate({ centerY })}
+          decimals={1}
           className="text-slate-800 dark:text-slate-100"
         />
       </div>
