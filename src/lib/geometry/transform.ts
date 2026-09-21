@@ -1,4 +1,33 @@
-import { ArcObject, CADObject, MachineSettings, Point2D } from '../../types';
+import { ArcObject, CADObject, MachineSettings, ParallelSegment, Point2D } from '../../types';
+
+/**
+ * Линии, параллельные исходному отрезку, смещённые перпендикулярно (по нормали)
+ * на distance·k мм для k = 1..count. Знак distance задаёт сторону смещения.
+ * Пустой массив — для вырожденного (нулевой длины) отрезка или count < 1.
+ */
+export function computeParallelSegments(
+  line: ParallelSegment,
+  distance: number,
+  count: number
+): ParallelSegment[] {
+  const dx = line.endX - line.startX;
+  const dy = line.endY - line.startY;
+  const len = Math.hypot(dx, dy);
+  if (len === 0 || count < 1) return [];
+  const nx = -dy / len;
+  const ny = dx / len;
+  const out: ParallelSegment[] = [];
+  for (let k = 1; k <= count; k++) {
+    const off = distance * k;
+    out.push({
+      startX: line.startX + nx * off,
+      startY: line.startY + ny * off,
+      endX: line.endX + nx * off,
+      endY: line.endY + ny * off,
+    });
+  }
+  return out;
+}
 
 /**
  * Вернуть ГЛУБОКУЮ копию фигуры, смещённую на (dx, dy) в системных координатах.

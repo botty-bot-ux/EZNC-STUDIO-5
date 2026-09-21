@@ -1,10 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { GitCompareArrows, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, GitCompareArrows, X } from 'lucide-react';
+import { useProjectStore } from '../../store/useProjectStore';
+import { LineObject } from '../../types';
+import { computeParallelSegments } from '../../lib/geometry/transform';
 
 interface ParallelLineDialogProps {
   isOpen: boolean;
-  /** Название исходной линии — для заголовка. */
-  sourceName: string;
+  /** Исходный отрезок — по нему считаем превью и подписываем в окне. */
+  line: LineObject;
   onClose: () => void;
   /** Создаёт `count` параллельных линий со шагом `distance` мм по нормали. */
   onCreate: (distance: number, count: number) => void;
@@ -22,20 +25,86 @@ function parseCount(raw: string): number {
   return Number.isFinite(v) && v > 0 ? v : 1;
 }
 
+interface StepperFieldProps {
+  label: string;
+  value: string;
+  inputMode?: 'decimal' | 'numeric';
+  placeholder?: string;
+  autoFocus?: boolean;
+  onChange: (v: string) => void;
+  onStep: (dir: 1 | -1) => void;
+  onEnter: () => void;
+}
+
+/** Числовое поле с вертикальными стрелками ▲/▼ для ввода мышкой. */
+const StepperField: React.FC<StepperFieldProps> = ({
+  label,
+  value,
+  inputMode = 'decimal',
+  placeholder,
+  autoFocus,
+  onChange,
+  onStep,
+  onEnter,
+}) => (
+  <label className="block">
+    <span className="text-[13px] font-medium text-slate-500 dark:text-slate-400">{label}</span>
+    <div className="mt-1 flex items-stretch gap-1">
+      <input
+        type="text"
+        inputMode={inputMode}
+        autoFocus={autoFocus}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            onEnter();
+          }
+        }}
+        placeholder={placeholder}
+        className="w-full min-w-0 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 font-mono text-sm text-center focus:border-primary focus:bg-white focus:dark:bg-slate-900 focus:outline-none transition-all"
+      />
+      <div className="flex flex-col shrink-0">
+        <button
+          type="button"
+          tabIndex={-1}
+          onClick={() => onStep(1)}
+          title="Больше"
+          className="flex-1 px-1.5 rounded-t-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:text-primary hover:bg-slate-200 hover:dark:bg-slate-700 transition-colors"
+        >
+          <ChevronUp className="w-3.5 h-3.5" />
+        </button>
+        <button
+          type="button"
+          tabIndex={-1}
+          onClick={() => onStep(-1)}
+          title="Меньше"
+          className="flex-1 px-1.5 rounded-b-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 border-t-0 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:text-primary hover:bg-slate-200 hover:dark:bg-slate-700 transition-colors"
+        >
+          <ChevronDown className="w-3.5 h-3.5" />
+        </button>
+      </div>
+    </div>
+  </label>
+);
+
 /**
- * Модуль построения параллельных линий: пользователь задаёт расстояние (мм) между линиями
- * и их количество. Знак расстояния задаёт сторону смещения. «Подтвердить»/Enter создаёт
- * все линии, «Отмена»/Escape — закрывает.
+ * Модуль построения параллельных линий: шаг (мм) между линиями и их количество. Знак шага
+ * задаёт сторону смещения. Пока пользователь вводит значения, на холсте показывается живое
+ * превью будущих линий. «Подтвердить»/Enter создаёт все линии, «Отмена»/Escape — закрывает.
  */
 export const ParallelLineDialog: React.FC<ParallelLineDialogProps> = ({
   isOpen,
-  sourceName,
+  line,
   onClose,
   onCreate,
 }) => {
+  const setParallelPreview = useProjectStore((s) => s.setParallelPreview);
   const [distStr, setDistStr] = useState('16');
   const [countStr, setCountStr] = useState('1');
 
+  // Открыли — сбрасываем поля к значениям по умолчанию.
   useEffect(() => {
     if (isOpen) {
       setDistStr('16');
@@ -43,16 +112,48 @@ export const ParallelLineDialog: React.FC<ParallelLineDialogProps> = ({
     }
   }, [isOpen]);
 
-  if (!isOpen) return null;
+  // Гарантированно убираем превью с холста при размонтировании окна.
+  useEffect(() => () => setParallelPreview(null), [setParallelPreview]);
 
   const distance = parseMM(distStr);
   const count = parseCount(countStr);
+
+  // Синхронизируем живое превью на холсте со значениями полей; при закрытии снимаем.
+  useEffect(() => {
+    if (!isOpen) {
+      setParallelPreview(null);
+      return;
+    }
+    const segments = computeParallelSegments(
+      { startX: line.startX, startY: line.startY, endX: line.endX, endY: line.endY },
+      distance,
+      count
+    );
+    setParallelPreview(
+      segments.length
+        ? { source: { startX: line.startX, startY: line.startY, endX: line.endX, endY: line.endY }, segments }
+        : null
+    );
+  }, [isOpen, line, distance, count, setParallelPreview]);
+
+  if (!isOpen) return null;
+
   const canApply = distance !== 0 && count >= 1;
 
   const confirm = () => {
     if (!canApply) return;
     onCreate(distance, count);
     onClose();
+  };
+
+  // Шаг стрелками: расстояние ±1 мм (сохраняем текущий дробный формат), количество ±1.
+  const stepDistance = (dir: 1 | -1) => {
+    const next = parseMM(distStr) + dir;
+    setDistStr(String(next));
+  };
+  const stepCount = (dir: 1 | -1) => {
+    const next = Math.max(1, parseCount(countStr) + dir);
+    setCountStr(String(next));
   };
 
   return (
@@ -85,44 +186,28 @@ export const ParallelLineDialog: React.FC<ParallelLineDialogProps> = ({
         </div>
 
         <div className="grid grid-cols-2 gap-3">
-          <label className="block">
-            <span className="text-[13px] font-medium text-slate-500 dark:text-slate-400">Шаг, мм</span>
-            <input
-              type="text"
-              inputMode="decimal"
-              autoFocus
-              value={distStr}
-              onChange={(e) => setDistStr(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  confirm();
-                }
-              }}
-              placeholder="16"
-              className="mt-1 w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 font-mono text-sm text-center focus:border-primary focus:bg-white focus:dark:bg-slate-900 focus:outline-none transition-all"
-            />
-          </label>
-          <label className="block">
-            <span className="text-[13px] font-medium text-slate-500 dark:text-slate-400">Кол-во линий</span>
-            <input
-              type="text"
-              inputMode="numeric"
-              value={countStr}
-              onChange={(e) => setCountStr(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  confirm();
-                }
-              }}
-              placeholder="1"
-              className="mt-1 w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 font-mono text-sm text-center focus:border-primary focus:bg-white focus:dark:bg-slate-900 focus:outline-none transition-all"
-            />
-          </label>
+          <StepperField
+            label="Шаг, мм"
+            value={distStr}
+            inputMode="decimal"
+            autoFocus
+            placeholder="16"
+            onChange={setDistStr}
+            onStep={stepDistance}
+            onEnter={confirm}
+          />
+          <StepperField
+            label="Кол-во линий"
+            value={countStr}
+            inputMode="numeric"
+            placeholder="1"
+            onChange={setCountStr}
+            onStep={stepCount}
+            onEnter={confirm}
+          />
         </div>
         <p className="mt-2 text-[12px] text-slate-400 dark:text-slate-500">
-          От исходной «{sourceName}» с шагом {distance} мм. Знак «−» меняет сторону.
+          От исходной «{line.name}» с шагом {distance} мм. Знак «−» меняет сторону.
         </p>
 
         <div className="mt-5 flex items-center justify-end gap-2">
@@ -143,4 +228,4 @@ export const ParallelLineDialog: React.FC<ParallelLineDialogProps> = ({
       </div>
     </div>
   );
-}
+};

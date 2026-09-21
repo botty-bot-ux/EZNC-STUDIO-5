@@ -1,4 +1,4 @@
-import { ActiveTool, CADObject, MachineSettings, Point2D, ToolpathSegment, UnderlayState, ViewMode } from '../../types';
+import { ActiveTool, CADObject, MachineSettings, ParallelPreviewState, Point2D, ToolpathSegment, UnderlayState, ViewMode } from '../../types';
 import { DragMode } from './canvasHitTest';
 import { HoveredHandle, SnapPointInfo, getArcFrom3Points, worldToCanvas } from './canvasUtils';
 import { CanvasPalette, LIGHT_PALETTE } from './canvasPalette';
@@ -1305,5 +1305,68 @@ export function drawSelectionBox(
 
   ctx.fillRect(left, top, width, height);
   ctx.strokeRect(left, top, width, height);
+  ctx.restore();
+}
+
+/**
+ * Превью модуля «Параллельная линия»: штриховые будущие копии + стрелка от середины
+ * исходного отрезка к самой дальней копии (показывает направление и величину смещения).
+ */
+export function drawParallelPreview(
+  ctx: CanvasRenderingContext2D,
+  preview: ParallelPreviewState,
+  pan: Point2D,
+  zoom: number
+) {
+  if (!preview.segments.length) return;
+  const wToC = (x: number, y: number) => worldToCanvas(x, y, pan, zoom);
+
+  ctx.save();
+
+  // Штриховые копии будущих линий.
+  ctx.strokeStyle = '#2563eb';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([6, 4]);
+  for (const seg of preview.segments) {
+    const p1 = wToC(seg.startX, seg.startY);
+    const p2 = wToC(seg.endX, seg.endY);
+    ctx.beginPath();
+    ctx.moveTo(p1.x, p1.y);
+    ctx.lineTo(p2.x, p2.y);
+    ctx.stroke();
+  }
+  ctx.setLineDash([]);
+
+  // Стрелка направления: от середины исходного отрезка к середине самой дальней копии.
+  const srcMid = wToC(
+    (preview.source.startX + preview.source.endX) / 2,
+    (preview.source.startY + preview.source.endY) / 2
+  );
+  const far = preview.segments[preview.segments.length - 1];
+  const dstMid = wToC((far.startX + far.endX) / 2, (far.startY + far.endY) / 2);
+
+  const vx = dstMid.x - srcMid.x;
+  const vy = dstMid.y - srcMid.y;
+  const vlen = Math.hypot(vx, vy);
+  if (vlen > 1) {
+    const ux = vx / vlen;
+    const uy = vy / vlen;
+    ctx.strokeStyle = '#2563eb';
+    ctx.fillStyle = '#2563eb';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(srcMid.x, srcMid.y);
+    ctx.lineTo(dstMid.x, dstMid.y);
+    ctx.stroke();
+    // Наконечник стрелки.
+    const head = 8;
+    ctx.beginPath();
+    ctx.moveTo(dstMid.x, dstMid.y);
+    ctx.lineTo(dstMid.x - head * ux - head * 0.5 * uy, dstMid.y - head * uy + head * 0.5 * ux);
+    ctx.lineTo(dstMid.x - head * ux + head * 0.5 * uy, dstMid.y - head * uy - head * 0.5 * ux);
+    ctx.closePath();
+    ctx.fill();
+  }
+
   ctx.restore();
 }

@@ -18,6 +18,7 @@ import {
   drawGrid,
   drawMachineBoundsAndStock,
   drawMeasurementTool,
+  drawParallelPreview,
   drawSelectionBox,
   drawSnapIndicator,
   drawToolpathSegments,
@@ -152,6 +153,7 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
     setLiveEdit,
     setLiveMeasure,
     liveMove,
+    parallelPreview,
     underlay,
     updateUnderlay,
     mobileSheet,
@@ -182,6 +184,7 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
       setLiveEdit: s.setLiveEdit,
       setLiveMeasure: s.setLiveMeasure,
       liveMove: s.liveMove,
+      parallelPreview: s.parallelPreview,
       underlay: s.underlay,
       updateUnderlay: s.updateUnderlay,
       mobileSheet: s.mobileSheet,
@@ -576,6 +579,11 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
     // 5. CAD Objects
     drawCADObjects(ctx, displayObjects, selectedObjectIds, hoveredHandle, dragMode, pan, zoom, machine.toolDiameter, palette);
 
+    // 5a. Превью «Параллельная линия» (штриховые будущие копии + стрелка смещения).
+    if (parallelPreview) {
+      drawParallelPreview(ctx, parallelPreview, pan, zoom);
+    }
+
     // 5b. Selection Box Marquee
     if (dragMode === 'selection_box' && selectionBoxStart && selectionBoxCurrent) {
       drawSelectionBox(ctx, selectionBoxStart, selectionBoxCurrent);
@@ -619,6 +627,7 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
     displayObjects,
     selectedObjectId,
     selectedObjectIds,
+    parallelPreview,
     toolpathSegments,
     viewMode,
     activeTool,

@@ -7,6 +7,7 @@ import {
   MobileSheet,
   NewCADObjectInput,
   OperationItem,
+  ParallelPreviewState,
   Point2D,
   PostprocessorTemplates,
   ProjectData,
@@ -80,6 +81,9 @@ interface ProjectStore {
   // Живое превью перемещения группы (модуль «Переместить»): смещение выбранных фигур на
   // холсте до подтверждения. Только отрисовка — не трогает objects/историю/G-код.
   liveMove: { ids: string[]; dx: number; dy: number } | null;
+  // Живое превью модуля «Параллельная линия»: штриховые копии будущих линий на холсте
+  // до подтверждения. Только отрисовка — не трогает objects/историю/G-код.
+  parallelPreview: ParallelPreviewState | null;
   // Session-only background reference image («подложка»). Never persisted, never affects G-code.
   underlay: UnderlayState;
   activeTool: ActiveTool;
@@ -135,6 +139,7 @@ interface ProjectStore {
   setLiveEdit: (v: { id: string; patch: Partial<CADObject> } | null) => void;
   setLiveMeasure: (v: { start: Point2D; end: Point2D } | null) => void;
   setLiveMove: (v: { ids: string[]; dx: number; dy: number } | null) => void;
+  setParallelPreview: (v: ParallelPreviewState | null) => void;
 
   // Подложка (фоновая референсная картинка) — только на сессию.
   setUnderlayImage: (src: string) => void;
@@ -295,6 +300,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
     liveEdit: null,
     liveMeasure: null,
     liveMove: null,
+    parallelPreview: null,
     underlay: DEFAULT_UNDERLAY,
     activeTool: 'select',
     activeTab: 'gcode',
@@ -420,6 +426,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
     setLiveEdit: (v) => set({ liveEdit: v }),
     setLiveMeasure: (v) => set({ liveMeasure: v }),
     setLiveMove: (v) => set({ liveMove: v }),
+    setParallelPreview: (v) => set({ parallelPreview: v }),
 
     // Подложка — только на сессию: plain set, без истории/автосейва/генерации G-кода.
     setUnderlayImage: (src) => {

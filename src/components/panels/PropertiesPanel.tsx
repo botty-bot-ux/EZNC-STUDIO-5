@@ -2,6 +2,7 @@ import React from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { Circle, CircleDot, Eye, EyeOff, GitCompareArrows, Layers, LineDotRightHorizontal, Lock, Move, Ruler, Sliders, Spline, Square, Trash2, Unlock } from 'lucide-react';
 import { useProjectStore } from '../../store/useProjectStore';
+import { computeParallelSegments } from '../../lib/geometry/transform';
 import { ArcObject, CircleObject, LineObject, PointHoleObject, RectangleObject } from '../../types';
 import { ArcProperties } from './properties/ArcProperties';
 import { CircleProperties } from './properties/CircleProperties';
@@ -314,33 +315,32 @@ export const PropertiesPanel: React.FC = () => {
       {selectedObj.type === 'line' && (
         <ParallelLineDialog
           isOpen={parallelOpen}
-          sourceName={selectedObj.name}
+          line={selectedObj as LineObject}
           onClose={() => setParallelOpen(false)}
           onCreate={(distance, count) => {
             const l = selectedObj as LineObject;
-            const dx = l.endX - l.startX;
-            const dy = l.endY - l.startY;
-            const len = Math.hypot(dx, dy);
-            if (len === 0) return; // нулевая линия — направления нет
-            // Единичная нормаль к вектору отрезка.
-            const nx = -dy / len;
-            const ny = dx / len;
-            // Создаём count линий, смещённых на distance·k (k = 1..count) от исходной.
-            for (let k = 1; k <= count; k++) {
-              const off = distance * k;
+            const segments = computeParallelSegments(
+              { startX: l.startX, startY: l.startY, endX: l.endX, endY: l.endY },
+              distance,
+              count
+            );
+            if (segments.length === 0) return;
+            // Нумерация «Отрезок N» продолжается от текущего числа объектов (как при рисовании).
+            const baseIndex = objects.length;
+            segments.forEach((seg, i) => {
               addObject({
                 type: 'line',
-                name: count > 1 ? `${l.name} параллель ${k}` : `${l.name} параллель`,
+                name: `Отрезок ${baseIndex + i + 1}`,
                 depth: l.depth,
                 operationType: l.operationType,
                 color: l.color,
                 visible: true,
-                startX: l.startX + nx * off,
-                startY: l.startY + ny * off,
-                endX: l.endX + nx * off,
-                endY: l.endY + ny * off,
+                startX: seg.startX,
+                startY: seg.startY,
+                endX: seg.endX,
+                endY: seg.endY,
               });
-            }
+            });
           }}
         />
       )}

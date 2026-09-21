@@ -99,6 +99,20 @@ export interface StockSheetSettings {
   color?: string; // hex color for dashed line outline
 }
 
+// Сегмент-копия для превью «Параллельная линия» (координаты мира, мм).
+export interface ParallelSegment {
+  startX: number;
+  startY: number;
+  endX: number;
+  endY: number;
+}
+
+// Живое превью модуля «Параллельная линия»: исходный отрезок + будущие параллельные копии.
+export interface ParallelPreviewState {
+  source: ParallelSegment;
+  segments: ParallelSegment[];
+}
+
 // Фоновая референсная картинка («подложка»/чертёж). Только на сессию — не сохраняется и не влияет на G-код.
 export interface UnderlayState {
   src: string | null; // data-URL загруженного изображения
