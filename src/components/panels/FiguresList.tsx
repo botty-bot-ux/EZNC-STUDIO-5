@@ -11,7 +11,6 @@ export const FiguresList: React.FC = () => {
     setSelectedObjectId,
     toggleObjectSelection,
     deleteObject,
-    duplicateObject,
     updateObject,
     reorderObjects,
     setActiveTab,
@@ -22,7 +21,6 @@ export const FiguresList: React.FC = () => {
       setSelectedObjectId: s.setSelectedObjectId,
       toggleObjectSelection: s.toggleObjectSelection,
       deleteObject: s.deleteObject,
-      duplicateObject: s.duplicateObject,
       updateObject: s.updateObject,
       reorderObjects: s.reorderObjects,
       setActiveTab: s.setActiveTab,
@@ -77,7 +75,6 @@ export const FiguresList: React.FC = () => {
             onMoveUp={() => moveObjectUp(idx)}
             onMoveDown={() => moveObjectDown(idx)}
             onDelete={() => deleteObject(obj.id)}
-            onDuplicate={() => duplicateObject(obj.id)}
             onUpdate={(partial) => updateObject(obj.id, partial)}
           />
         );
