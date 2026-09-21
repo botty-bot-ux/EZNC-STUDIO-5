@@ -202,9 +202,31 @@ interface ProjectStore {
 export const useProjectStore = create<ProjectStore>((set, get) => {
   const HISTORY_LIMIT = 20;
 
+  // Слияние (коалесценция) шагов истории для непрерывного ввода: набор символов
+  // в PropertyInput (onchange на каждое нажатие), клики степпера, поля настроек
+  // станка — это ОДНО действие пользователя, а не десяток. Без слияния каждое
+  // нажатие клавиши толкало snapshot + полную генерацию G-кода, и undo откатывал
+  // по одной цифре. Ключ = цель+поля; если он совпадает с предыдущим и прошло
+  // меньше HISTORY_COALESCE_MS — новый шаг не создаётся (первый keystroke уже
+  // записал состояние ДО начала набора).
+  const HISTORY_COALESCE_MS = 900;
+  let lastCoalesceKey: string | null = null;
+  let lastCoalesceAt = 0;
+  const pushHistoryCoalesced = (key: string) => {
+    const now = Date.now();
+    if (key !== lastCoalesceKey || now - lastCoalesceAt > HISTORY_COALESCE_MS) {
+      pushHistory(); // сбрасывает lastCoalesceKey внутри себя
+    }
+    lastCoalesceKey = key;
+    lastCoalesceAt = now;
+  };
+
   // Helper to record history step. Snapshots the current (pre-change) state so that
   // an undo restores what was there before the action. Call BEFORE mutating state.
   const pushHistory = () => {
+    // Дискретная запись истории заканчивает предыдущую «сессию непрерывного ввода»:
+    // следующее коалесцируемое изменение обязано создать новый шаг.
+    lastCoalesceKey = null;
     const cur = get();
     const snapshot: HistoryState = {
       objects: structuredClone(cur.objects),
@@ -478,7 +500,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
     clearUnderlay: () => set({ underlay: { ...DEFAULT_UNDERLAY } }),
 
     updateMachine: (partial: Partial<MachineSettings>) => {
-      pushHistory();
+      pushHistoryCoalesced(`machine:${Object.keys(partial).sort().join('+')}`);
       syncAndSave({
         machine: { ...get().machine, ...partial },
       });
@@ -530,9 +552,12 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
       const newObjs = [...get().objects, newObj];
 
       // Auto link to first matching operation or create new default operation if missing
+      // ВАЖНО: ops — поверхностная копия, поэтому ops[0] перезаписываем НОВЫМ объектом
+      // с новым массивом linkedObjectIds. Push прямо в ops[0].linkedObjectIds мутировал
+      // бы массив, разделяемый с состоянием стора и снапшотами истории.
       let ops = [...get().operations];
       if (ops.length > 0) {
-        ops[0].linkedObjectIds.push(newObj.id);
+        ops[0] = { ...ops[0], linkedObjectIds: [...ops[0].linkedObjectIds, newObj.id] };
       } else {
         const newOp: OperationItem = {
           id: `op_${Date.now()}`,
@@ -567,7 +592,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
 
     updateObject: (id: string, partial: Partial<CADObject>, saveHistory = true) => {
       if (saveHistory) {
-        pushHistory();
+        pushHistoryCoalesced(`obj:${id}:${Object.keys(partial).sort().join('+')}`);
       }
       const newObjs = get().objects.map((o) => (o.id === id ? ({ ...o, ...partial } as CADObject) : o));
       syncAndSave({ objects: newObjs });
@@ -1016,6 +1041,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
     },
 
     undo: () => {
+      lastCoalesceKey = null; // после undo следующая правка всегда пишет новый шаг
       const undoStack = get().historyUndo;
       if (undoStack.length === 0) return;
 
@@ -1038,6 +1064,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
     },
 
     redo: () => {
+      lastCoalesceKey = null; // симметрично undo: после redo — всегда новый шаг
       const redoStack = get().historyRedo;
       if (redoStack.length === 0) return;
 
