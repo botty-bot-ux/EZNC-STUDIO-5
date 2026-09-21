@@ -5,6 +5,7 @@ import { CADObject, Point2D } from '../../types';
 import { CanvasControls } from './CanvasControls';
 import { CanvasHud } from './CanvasHud';
 import { ArcModeSelector } from './ArcModeSelector';
+import { LineModeSelector } from './LineModeSelector';
 import {
   DragMode,
   HandleType,
@@ -152,6 +153,8 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
     setActiveTool,
     arcMode,
     setArcMode,
+    lineMode,
+    setLineMode,
     snapToGrid,
     setSnapToGrid,
     gridStep,
@@ -184,6 +187,8 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
       setActiveTool: s.setActiveTool,
       arcMode: s.arcMode,
       setArcMode: s.setArcMode,
+      lineMode: s.lineMode,
+      setLineMode: s.setLineMode,
       snapToGrid: s.snapToGrid,
       setSnapToGrid: s.setSnapToGrid,
       gridStep: s.gridStep,
@@ -238,6 +243,8 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
   const [drawStartPt, setDrawStartPt] = useState<Point2D | null>(null);
   const [drawArcStartPt, setDrawArcStartPt] = useState<Point2D | null>(null);
   const [drawArcEndPt, setDrawArcEndPt] = useState<Point2D | null>(null);
+  // Накопленные узлы при построении полилинии/контура (под-режимы «Линия»).
+  const [polyPts, setPolyPts] = useState<Point2D[]>([]);
   const [currentMouseProgPt, setCurrentMouseProgPt] = useState<Point2D | null>(null);
 
   // Active Measurement Tool state
@@ -287,17 +294,21 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
   // Latest drawing state/functions for the window keydown handler (avoids stale closures)
   const drawStateRef = useRef({
     activeTool,
+    lineMode,
     drawStartPt,
     drawArcStartPt,
     drawArcEndPt,
+    polyPts,
     lineLengthInput,
     lineDirAngle,
   });
   drawStateRef.current = {
     activeTool,
+    lineMode,
     drawStartPt,
     drawArcStartPt,
     drawArcEndPt,
+    polyPts,
     lineLengthInput,
     lineDirAngle,
   };
@@ -325,6 +336,28 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
     setLineLengthInput('');
   };
 
+  // Завершение полилинии/контура: из накопленных узлов создаём фигуру-ломаную.
+  const commitPolyline = () => {
+    if (polyPts.length < 2) {
+      setPolyPts([]);
+      return;
+    }
+    const closed = lineMode === 'polygon';
+    addObject({
+      name: `${closed ? 'Контур' : 'Полилиния'} ${objects.length + 1}`,
+      type: 'polyline',
+      points: polyPts,
+      closed,
+      depth: 5,
+      operationType: 'cut',
+    });
+    setPolyPts([]);
+    setLineLengthInput('');
+  };
+  // Свежий доступ к commitPolyline из window-обработчика keydown (без stale-замыкания).
+  const commitPolylineRef = useRef<() => void>(() => {});
+  commitPolylineRef.current = commitPolyline;
+
   // DYN: place the pending line end / arc chord end at the typed length along the
   // current rubber-band direction. Used by Enter (desktop) and the on-screen OK (mobile).
   const commitDynLength = () => {
@@ -351,6 +384,9 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
     if (activeTool !== 'measure') {
       setMeasureStartPt(null);
       setMeasureEndPt(null);
+    }
+    if (activeTool !== 'line') {
+      setPolyPts([]);
     }
   }, [activeTool]);
 
@@ -508,6 +544,20 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
         }
       }
 
+      // ---- Полилиния / контур: Enter — завершить, Escape — сбросить узлы ----
+      if (ds.activeTool === 'line' && ds.lineMode !== 'line') {
+        if (e.key === 'Enter' && ds.polyPts.length >= 2) {
+          e.preventDefault();
+          commitPolylineRef.current();
+          return;
+        }
+        if (e.key === 'Escape' && ds.polyPts.length > 0) {
+          e.preventDefault();
+          setPolyPts([]);
+          return;
+        }
+      }
+
       if (e.key === 'Escape') {
         cancelDrawing();
         setActiveTool('select');
@@ -544,6 +594,7 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
     setDrawStartPt(null);
     setDrawArcStartPt(null);
     setDrawArcEndPt(null);
+    setPolyPts([]);
     setLineLengthInput('');
     setMeasureStartPt(null);
     setMeasureEndPt(null);
@@ -616,6 +667,8 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
       pan,
       zoom,
       arcMode,
+      lineMode,
+      polyPts,
       machine.toolDiameter
     );
 
@@ -649,6 +702,8 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
     viewMode,
     activeTool,
     arcMode,
+    lineMode,
+    polyPts,
     drawStartPt,
     drawArcStartPt,
     drawArcEndPt,
@@ -712,6 +767,27 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
     }
 
     if (activeTool === 'line') {
+      // Под-режимы «Полилиния» / «Контур»: каждый клик добавляет узел ломаной.
+      if (lineMode !== 'line') {
+        const pt = clampToPosFaces(snapPt);
+        if (polyPts.length === 0) {
+          setPolyPts([pt]);
+        } else {
+          const first = polyPts[0];
+          const last = polyPts[polyPts.length - 1];
+          const tol = 14 / zoom;
+          const nearFirst = Math.hypot(pt.x - first.x, pt.y - first.y) <= tol;
+          const nearLast = Math.hypot(pt.x - last.x, pt.y - last.y) <= tol;
+          if (lineMode === 'polygon' && polyPts.length >= 2 && nearFirst) {
+            commitPolylineRef.current(); // замкнуть контур на первый узел
+          } else if (nearLast && polyPts.length >= 2) {
+            commitPolylineRef.current(); // двойной клик = завершить
+          } else {
+            setPolyPts([...polyPts, pt]);
+          }
+        }
+        return;
+      }
       if (!drawStartPt) {
         setDrawStartPt(clampToPosFaces(snapPt));
         setLineLengthInput('');
@@ -1405,6 +1481,8 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
       <CanvasHud
         activeTool={activeTool}
         arcMode={arcMode}
+        lineMode={lineMode}
+        polyPtsCount={polyPts.length}
         drawStartPt={drawStartPt}
         drawArcStartPt={drawArcStartPt}
         drawArcEndPt={drawArcEndPt}
@@ -1413,6 +1491,7 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
         lineLengthInput={lineLengthInput}
         dynAnchorPx={dynAnchorPx}
         onCancelDraw={cancelDrawing}
+        onCommitPolyline={commitPolyline}
         isMobile={isMobile}
         onLineLengthChange={setLineLengthInput}
         onDynCommit={commitDynLength}
@@ -1427,6 +1506,19 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
             setDrawArcEndPt(null);
             setLineLengthInput('');
             setArcMode(mode);
+          }}
+        />
+      )}
+
+      {activeTool === 'line' && (
+        <LineModeSelector
+          value={lineMode}
+          onChange={(mode) => {
+            // Смена способа — сбрасываем и одиночную линию, и незавершённую ломаную.
+            setDrawStartPt(null);
+            setPolyPts([]);
+            setLineLengthInput('');
+            setLineMode(mode);
           }}
         />
       )}

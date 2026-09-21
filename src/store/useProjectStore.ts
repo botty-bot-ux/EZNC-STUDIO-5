@@ -4,6 +4,7 @@ import {
   ActiveTool,
   ArcMode,
   CADObject,
+  LineMode,
   MachineSettings,
   MobileSheet,
   NewCADObjectInput,
@@ -90,6 +91,8 @@ interface ProjectStore {
   activeTool: ActiveTool;
   // Под-режим построения дуги (используется, когда activeTool === 'arc').
   arcMode: ArcMode;
+  // Под-режим построения линии (используется, когда activeTool === 'line').
+  lineMode: LineMode;
   activeTab: ActiveTab;
   viewMode: ViewMode;
 
@@ -128,6 +131,7 @@ interface ProjectStore {
   setProjectName: (name: string) => void;
   setActiveTool: (tool: ActiveTool) => void;
   setArcMode: (mode: ArcMode) => void;
+  setLineMode: (mode: LineMode) => void;
   setActiveTab: (tab: ActiveTab) => void;
   setViewMode: (mode: ViewMode) => void;
   setTheme: (theme: Theme) => void;
@@ -308,6 +312,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
     underlay: DEFAULT_UNDERLAY,
     activeTool: 'select',
     arcMode: 'bulge',
+    lineMode: 'line',
     activeTab: 'gcode',
     viewMode: 'edit',
 
@@ -346,6 +351,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
           : {}),
       })),
     setArcMode: (mode: ArcMode) => set({ arcMode: mode }),
+    setLineMode: (mode: LineMode) => set({ lineMode: mode }),
     setActiveTab: (tab: ActiveTab) =>
       set((state) => ({
         activeTab: tab,

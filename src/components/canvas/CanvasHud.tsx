@@ -1,9 +1,11 @@
 import React from 'react';
-import { ActiveTool, ArcMode, Point2D } from '../../types';
+import { ActiveTool, ArcMode, LineMode, Point2D } from '../../types';
 
 interface CanvasHudProps {
   activeTool: ActiveTool;
   arcMode?: ArcMode;
+  lineMode?: LineMode;
+  polyPtsCount?: number;
   drawStartPt: Point2D | null;
   drawArcStartPt: Point2D | null;
   drawArcEndPt: Point2D | null;
@@ -13,6 +15,7 @@ interface CanvasHudProps {
   /** Экранные пиксели конца текущего отрезка/хорды — куда прилепить модуль длины. */
   dynAnchorPx?: Point2D | null;
   onCancelDraw: () => void;
+  onCommitPolyline?: () => void;
   // Мобильный DYN-ввод: экранная клавиатура вместо физических клавиш.
   isMobile?: boolean;
   onLineLengthChange?: (v: string) => void;
@@ -24,6 +27,8 @@ interface CanvasHudProps {
 export const CanvasHud: React.FC<CanvasHudProps> = ({
   activeTool,
   arcMode = 'bulge',
+  lineMode = 'line',
+  polyPtsCount = 0,
   drawStartPt,
   drawArcStartPt,
   drawArcEndPt,
@@ -32,6 +37,7 @@ export const CanvasHud: React.FC<CanvasHudProps> = ({
   lineLengthInput,
   dynAnchorPx,
   onCancelDraw,
+  onCommitPolyline,
   isMobile,
   onLineLengthChange,
   onDynCommit,
@@ -39,6 +45,20 @@ export const CanvasHud: React.FC<CanvasHudProps> = ({
   // HUD banner for active tool instruction
   const getToolInstruction = () => {
     if (activeTool === 'line') {
+      if (lineMode === 'polyline' || lineMode === 'polygon') {
+        const closing = lineMode === 'polygon';
+        if (polyPtsCount === 0) {
+          return closing
+            ? 'Контур: кликните первую точку'
+            : 'Полилиния: кликните первую точку';
+        }
+        if (polyPtsCount === 1) {
+          return 'Кликайте следующие узлы · Enter — завершить · ESC — отмена';
+        }
+        return closing
+          ? `Узлов: ${polyPtsCount} · клик по первой точке или Enter — замкнуть · ESC — отмена`
+          : `Узлов: ${polyPtsCount} · Enter или двойной клик — завершить · ESC — отмена`;
+      }
       if (lineLengthInput) {
         return 'Enter — создать отрезок заданной длины · Backspace — правка · ESC — сброс';
       }
@@ -176,6 +196,16 @@ export const CanvasHud: React.FC<CanvasHudProps> = ({
           }`}
         >
           <span>{instruction}</span>
+          {activeTool === 'line' &&
+            (lineMode === 'polyline' || lineMode === 'polygon') &&
+            polyPtsCount >= 2 && (
+              <button
+                onClick={() => onCommitPolyline?.()}
+                className="bg-primary text-primary-fg hover:opacity-90 px-2.5 py-0.5 rounded-lg text-[13px] font-bold transition-colors"
+              >
+                {lineMode === 'polygon' ? 'Замкнуть' : 'Готово'}
+              </button>
+            )}
           <button
             onClick={onCancelDraw}
             className="bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 hover:dark:bg-slate-700 px-2 py-0.5 rounded-lg text-[13px] transition-colors"

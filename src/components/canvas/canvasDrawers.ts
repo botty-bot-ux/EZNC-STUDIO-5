@@ -1,4 +1,4 @@
-import { ActiveTool, ArcMode, CADObject, MachineSettings, ParallelPreviewState, Point2D, ToolpathSegment, UnderlayState, ViewMode } from '../../types';
+import { ActiveTool, ArcMode, CADObject, LineMode, MachineSettings, ParallelPreviewState, Point2D, ToolpathSegment, UnderlayState, ViewMode } from '../../types';
 import { DragMode } from './canvasHitTest';
 import { HoveredHandle, SnapPointInfo, buildArc, worldToCanvas } from './canvasUtils';
 import { CanvasPalette, LIGHT_PALETTE } from './canvasPalette';
@@ -937,6 +937,8 @@ export function drawDrawingPreview(
   pan: Point2D,
   zoom: number,
   arcMode: ArcMode,
+  lineMode: LineMode,
+  polyPts: Point2D[],
   toolDiameter?: number
 ) {
   if (activeTool === 'select' || !currentMouseProgPt) return;
@@ -1060,6 +1062,37 @@ export function drawDrawingPreview(
           ctx.fill();
         }
       }
+    }
+  } else if (activeTool === 'line' && lineMode !== 'line' && polyPts.length > 0) {
+    const pts = polyPts.map((p) => wToC(p.x, p.y));
+    const mouse = wToC(currentMouseProgPt.x, currentMouseProgPt.y);
+    // Уже набранные звенья.
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+    ctx.stroke();
+    // Резинка от последнего узла к курсору.
+    const last = pts[pts.length - 1];
+    ctx.beginPath();
+    ctx.moveTo(last.x, last.y);
+    ctx.lineTo(mouse.x, mouse.y);
+    ctx.stroke();
+    // Для контура — подсказка замыкания к первой точке.
+    if (lineMode === 'polygon' && pts.length >= 2) {
+      ctx.save();
+      ctx.strokeStyle = 'rgba(244, 63, 94, 0.45)';
+      ctx.beginPath();
+      ctx.moveTo(mouse.x, mouse.y);
+      ctx.lineTo(pts[0].x, pts[0].y);
+      ctx.stroke();
+      ctx.restore();
+    }
+    // Узлы.
+    ctx.fillStyle = '#f43f5e';
+    for (const p of pts) {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+      ctx.fill();
     }
   } else if (drawStartPt) {
     const p1 = wToC(drawStartPt.x, drawStartPt.y);

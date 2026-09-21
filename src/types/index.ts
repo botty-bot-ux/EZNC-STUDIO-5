@@ -207,6 +207,12 @@ export type ActiveTool = 'select' | 'point' | 'line' | 'polyline' | 'rectangle' 
 //  'bulge'  — хорда + высота горба (старт → конец, мышь тянет вершину прогиба);
 //  'center' — старт → центр → охват (радиус фиксирован, конец скользит по окружности).
 export type ArcMode = '3pt' | 'bulge' | 'center';
+
+// Способ построения линии (под-режим инструмента «Линия»):
+//  'line'     — обычная линия (две точки, одно звено);
+//  'polyline' — полилиния: ломаная из нескольких звеньев (клик = следующий узел, Enter — готово);
+//  'polygon'  — контур: замкнутая полилиния (последний узел соединяется с первым).
+export type LineMode = 'line' | 'polyline' | 'polygon';
 export type ActiveTab = 'machine' | 'gcode' | 'properties';
 // Мобильная нижняя шторка: какая панель открыта поверх холста ('none' — всё закрыто).
 export type MobileSheet = 'none' | 'figures' | ActiveTab;
