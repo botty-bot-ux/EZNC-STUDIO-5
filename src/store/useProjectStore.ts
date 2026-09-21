@@ -126,6 +126,9 @@ interface ProjectStore {
 
   leftPanelOpen: boolean;
   rightPanelOpen: boolean;
+  // Пользователь свернул правую панель РУКОЙ: с этого момента авто-открытие
+  // (выбор фигуры, линейка) молчит, пока он сам не нажмёт кнопку панели.
+  panelDismissed: boolean;
   toggleLeftPanel: () => void;
   toggleRightPanel: () => void;
 
@@ -362,8 +365,14 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
 
     leftPanelOpen: true,
     rightPanelOpen: true,
+    panelDismissed: false,
     toggleLeftPanel: () => set((state) => ({ leftPanelOpen: !state.leftPanelOpen })),
-    toggleRightPanel: () => set((state) => ({ rightPanelOpen: !state.rightPanelOpen })),
+    toggleRightPanel: () =>
+      set((state) => {
+        const next = !state.rightPanelOpen;
+        // Открыл сам — снова разрешаем авто-раскрытие; свернул сам — запрещаем.
+        return { rightPanelOpen: next, panelDismissed: !next };
+      }),
 
     mobileSheet: 'none',
     setMobileSheet: (sheet: MobileSheet) => set({ mobileSheet: sheet }),
@@ -374,7 +383,12 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
       set((state) => ({
         activeTool: tool,
         ...(tool === 'measure'
-          ? { activeTab: 'properties' as ActiveTab, mobileSheet: 'properties' as MobileSheet, rightPanelOpen: true, viewMode: state.viewMode === 'gcode' ? 'edit' : state.viewMode }
+          ? {
+              ...(state.panelDismissed
+                ? {}
+                : { activeTab: 'properties' as ActiveTab, mobileSheet: 'properties' as MobileSheet, rightPanelOpen: true }),
+              viewMode: state.viewMode === 'gcode' ? 'edit' : state.viewMode,
+            }
           : {}),
       })),
     setArcMode: (mode: ArcMode) => set({ arcMode: mode }),
@@ -384,12 +398,15 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
       set((state) => ({
         activeTab: tab,
         mobileSheet: tab,
+        // Явный клик по вкладке = пользователь вернулся к панели — снимаем «свернуто рукой».
         rightPanelOpen: tab === 'properties' ? true : state.rightPanelOpen,
+        panelDismissed: false,
         viewMode: tab === 'gcode' ? 'gcode' : state.viewMode === 'gcode' ? 'edit' : state.viewMode,
       })),
     setViewMode: (mode: ViewMode) =>
       set((state) => ({
         viewMode: mode,
+        panelDismissed: false,
         activeTab: mode === 'gcode' ? 'gcode' : state.activeTab === 'gcode' ? 'machine' : state.activeTab,
         rightPanelOpen: mode === 'gcode' ? true : state.rightPanelOpen,
       })),
@@ -412,7 +429,14 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
       set((state) => ({
         selectedObjectIds: id ? [id] : [],
         ...(id
-          ? { activeTab: 'properties' as ActiveTab, rightPanelOpen: true, viewMode: state.viewMode === 'gcode' ? 'edit' : state.viewMode }
+          ? {
+              // Свернуто рукой → не раскрываем и не сбиваем вкладку;
+              // из редактора G-кода всё равно выходим — выделение должно быть видно.
+              ...(state.panelDismissed
+                ? {}
+                : { activeTab: 'properties' as ActiveTab, rightPanelOpen: true }),
+              viewMode: state.viewMode === 'gcode' ? 'edit' : state.viewMode,
+            }
           : {}),
       })),
 
@@ -420,7 +444,12 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
       set((state) => ({
         selectedObjectIds: ids,
         ...(ids.length > 0
-          ? { activeTab: 'properties' as ActiveTab, rightPanelOpen: true, viewMode: state.viewMode === 'gcode' ? 'edit' : state.viewMode }
+          ? {
+              ...(state.panelDismissed
+                ? {}
+                : { activeTab: 'properties' as ActiveTab, rightPanelOpen: true }),
+              viewMode: state.viewMode === 'gcode' ? 'edit' : state.viewMode,
+            }
           : {}),
       })),
 
@@ -428,10 +457,12 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
       const cur = get().selectedObjectIds;
       const exists = cur.includes(id);
       const newIds = exists ? cur.filter((i) => i !== id) : [...cur, id];
-      set({
+      set((state) => ({
         selectedObjectIds: newIds,
-        ...(newIds.length > 0 ? { activeTab: 'properties' as ActiveTab, rightPanelOpen: true } : {}),
-      });
+        ...(newIds.length > 0 && !state.panelDismissed
+          ? { activeTab: 'properties' as ActiveTab, rightPanelOpen: true }
+          : {}),
+      }));
     },
 
     selectAllObjects: () => {
