@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import {
   ActiveTab,
   ActiveTool,
+  ArcMode,
   CADObject,
   MachineSettings,
   MobileSheet,
@@ -87,6 +88,8 @@ interface ProjectStore {
   // Session-only background reference image («подложка»). Never persisted, never affects G-code.
   underlay: UnderlayState;
   activeTool: ActiveTool;
+  // Под-режим построения дуги (используется, когда activeTool === 'arc').
+  arcMode: ArcMode;
   activeTab: ActiveTab;
   viewMode: ViewMode;
 
@@ -124,6 +127,7 @@ interface ProjectStore {
   // Actions
   setProjectName: (name: string) => void;
   setActiveTool: (tool: ActiveTool) => void;
+  setArcMode: (mode: ArcMode) => void;
   setActiveTab: (tab: ActiveTab) => void;
   setViewMode: (mode: ViewMode) => void;
   setTheme: (theme: Theme) => void;
@@ -303,6 +307,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
     parallelPreview: null,
     underlay: DEFAULT_UNDERLAY,
     activeTool: 'select',
+    arcMode: 'bulge',
     activeTab: 'gcode',
     viewMode: 'edit',
 
@@ -340,6 +345,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
           ? { activeTab: 'properties' as ActiveTab, mobileSheet: 'properties' as MobileSheet, rightPanelOpen: true, viewMode: state.viewMode === 'gcode' ? 'edit' : state.viewMode }
           : {}),
       })),
+    setArcMode: (mode: ArcMode) => set({ arcMode: mode }),
     setActiveTab: (tab: ActiveTab) =>
       set((state) => ({
         activeTab: tab,

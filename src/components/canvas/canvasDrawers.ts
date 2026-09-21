@@ -1,6 +1,6 @@
-import { ActiveTool, CADObject, MachineSettings, ParallelPreviewState, Point2D, ToolpathSegment, UnderlayState, ViewMode } from '../../types';
+import { ActiveTool, ArcMode, CADObject, MachineSettings, ParallelPreviewState, Point2D, ToolpathSegment, UnderlayState, ViewMode } from '../../types';
 import { DragMode } from './canvasHitTest';
-import { HoveredHandle, SnapPointInfo, getArcFromBulge, worldToCanvas } from './canvasUtils';
+import { HoveredHandle, SnapPointInfo, buildArc, worldToCanvas } from './canvasUtils';
 import { CanvasPalette, LIGHT_PALETTE } from './canvasPalette';
 
 export interface DrawOptions {
@@ -936,6 +936,7 @@ export function drawDrawingPreview(
   currentMouseProgPt: Point2D | null,
   pan: Point2D,
   zoom: number,
+  arcMode: ArcMode,
   toolDiameter?: number
 ) {
   if (activeTool === 'select' || !currentMouseProgPt) return;
@@ -977,12 +978,12 @@ export function drawDrawingPreview(
         ctx.arc(p1.x, p1.y, r * zoom, 0, Math.PI * 2);
         ctx.stroke();
       } else if (activeTool === 'arc' && drawArcStartPt && drawArcEndPt) {
-        const arcData = getArcFromBulge(drawArcStartPt, drawArcEndPt, currentMouseProgPt);
+        const arcData = buildArc(arcMode, drawArcStartPt, drawArcEndPt, currentMouseProgPt);
         if (arcData) {
           const cp = wToC(arcData.centerX, arcData.centerY);
           const rPx = arcData.radius * zoom;
-          const pStart = wToC(drawArcStartPt.x, drawArcStartPt.y);
-          const pEnd = wToC(drawArcEndPt.x, drawArcEndPt.y);
+          const pStart = wToC(arcData.startX, arcData.startY);
+          const pEnd = wToC(arcData.endX, arcData.endY);
 
           const a1 = Math.atan2(pStart.y - cp.y, pStart.x - cp.x);
           const a2 = Math.atan2(pEnd.y - cp.y, pEnd.x - cp.x);
@@ -1008,27 +1009,56 @@ export function drawDrawingPreview(
       ctx.moveTo(p1.x, p1.y);
       ctx.lineTo(p2.x, p2.y);
       ctx.stroke();
+      // Для режима «центр» показываем окружность будущего радиуса, пока выбираем центр.
+      if (arcMode === 'center') {
+        const r = Math.hypot(currentMouseProgPt.x - drawArcStartPt.x, currentMouseProgPt.y - drawArcStartPt.y);
+        if (r > 1e-4) {
+          ctx.save();
+          ctx.strokeStyle = 'rgba(244, 63, 94, 0.4)';
+          ctx.beginPath();
+          ctx.arc(p1.x, p1.y, r * zoom, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.restore();
+        }
+      }
     } else if (drawArcStartPt && drawArcEndPt) {
-      const arcData = getArcFromBulge(drawArcStartPt, drawArcEndPt, currentMouseProgPt);
+      const arcData = buildArc(arcMode, drawArcStartPt, drawArcEndPt, currentMouseProgPt);
       if (arcData) {
         const cp = wToC(arcData.centerX, arcData.centerY);
         const rPx = arcData.radius * zoom;
-        const pStart = wToC(drawArcStartPt.x, drawArcStartPt.y);
-        const pEnd = wToC(drawArcEndPt.x, drawArcEndPt.y);
+        const pStart = wToC(arcData.startX, arcData.startY);
+        const pEnd = wToC(arcData.endX, arcData.endY);
 
         const a1 = Math.atan2(pStart.y - cp.y, pStart.x - cp.x);
         const a2 = Math.atan2(pEnd.y - cp.y, pEnd.x - cp.x);
+
+        // Для режима «центр» — вся направляющая окружность.
+        if (arcData.guideCenter) {
+          const gc = wToC(arcData.guideCenter.x, arcData.guideCenter.y);
+          ctx.save();
+          ctx.strokeStyle = 'rgba(244, 63, 94, 0.4)';
+          ctx.beginPath();
+          ctx.arc(gc.x, gc.y, rPx, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.fillStyle = '#f43f5e';
+          ctx.beginPath();
+          ctx.arc(gc.x, gc.y, 3, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        }
 
         ctx.beginPath();
         ctx.arc(cp.x, cp.y, rPx, a1, a2, !arcData.clockwise);
         ctx.stroke();
 
-        // Вершина горба — ровно под курсором мыши.
-        const apex = wToC(arcData.apex.x, arcData.apex.y);
-        ctx.fillStyle = '#f43f5e';
-        ctx.beginPath();
-        ctx.arc(apex.x, apex.y, 3, 0, Math.PI * 2);
-        ctx.fill();
+        // Маркер точки «под курсором» (вершина горба / средняя точка дуги).
+        if (arcData.apex) {
+          const apex = wToC(arcData.apex.x, arcData.apex.y);
+          ctx.fillStyle = '#f43f5e';
+          ctx.beginPath();
+          ctx.arc(apex.x, apex.y, 3, 0, Math.PI * 2);
+          ctx.fill();
+        }
       }
     }
   } else if (drawStartPt) {

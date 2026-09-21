@@ -1,8 +1,9 @@
 import React from 'react';
-import { ActiveTool, Point2D } from '../../types';
+import { ActiveTool, ArcMode, Point2D } from '../../types';
 
 interface CanvasHudProps {
   activeTool: ActiveTool;
+  arcMode?: ArcMode;
   drawStartPt: Point2D | null;
   drawArcStartPt: Point2D | null;
   drawArcEndPt: Point2D | null;
@@ -22,6 +23,7 @@ interface CanvasHudProps {
 // Здесь остаются только подсказка по активному инструменту и DYN-счётчик длины при наборе.
 export const CanvasHud: React.FC<CanvasHudProps> = ({
   activeTool,
+  arcMode = 'bulge',
   drawStartPt,
   drawArcStartPt,
   drawArcEndPt,
@@ -53,12 +55,26 @@ export const CanvasHud: React.FC<CanvasHudProps> = ({
       return drawStartPt ? 'Укажите точку на окружности (радиус)' : 'Укажите центр окружности';
     }
     if (activeTool === 'arc') {
-      if (!drawArcStartPt) return 'Укажите начальную точку дуги (Точка 1)';
+      if (!drawArcStartPt) return 'Дуга: укажите начальную точку (Точка 1)';
       if (!drawArcEndPt) {
+        if (arcMode === 'center') {
+          return lineLengthInput
+            ? 'Enter — задать радиус · Backspace — правка · ESC — сброс'
+            : 'Дуга · Центр: кликните ЦЕНТР окружности (радиус = расстояние от старта)';
+        }
         if (lineLengthInput) {
           return 'Enter — зафиксировать длину хорды · Backspace — правка · ESC — сброс';
         }
-        return 'Введите длину хорды или укажите конечную точку (Shift = 90°/45°) · ESC — отмена';
+        if (arcMode === '3pt') {
+          return 'Дуга · 3 точки: кликните точку НА самой дуге (2-я точка)';
+        }
+        return 'Дуга · Хорда+высота: укажите конец хорды (Shift = 90°/45°) · ESC — отмена';
+      }
+      if (arcMode === 'center') {
+        return 'Ведите мышью вокруг центра — конец скользит по окружности · ESC — отмена';
+      }
+      if (arcMode === '3pt') {
+        return 'Кликните конечную точку — дуга пройдёт через все три · ESC — отмена';
       }
       return 'Тяните вершину горба: ближе к хорде — пололее, дальше — круглее · ESC — отмена';
     }
@@ -78,6 +94,11 @@ export const CanvasHud: React.FC<CanvasHudProps> = ({
   };
 
   const instruction = getToolInstruction();
+
+  // Подпись DYN-модуля: для дуги в режиме «центр» расстояние старт→центр = радиус,
+  // иначе — длина хорды; для линии — длина.
+  const dynLabel =
+    activeTool === 'arc' ? (arcMode === 'center' ? 'Радиус' : 'Хорда') : 'Длина';
 
   // DYN distance readout is shown while typing for the line, and for the arc's
   // start→end chord (before the endpoint is placed).
@@ -101,7 +122,7 @@ export const CanvasHud: React.FC<CanvasHudProps> = ({
       {mobileDynActive && (
         <div className="absolute top-24 left-1/2 -translate-x-1/2 z-40 flex items-center gap-1.5 bg-slate-900 dark:bg-slate-100 border border-slate-600 dark:border-slate-300 px-2 py-1.5 rounded-2xl shadow-md">
           <span className="text-xs text-slate-400 dark:text-slate-500 font-semibold ml-1">
-            {activeTool === 'arc' ? 'Хорда' : 'Длина'}
+            {dynLabel}
           </span>
           <input
             inputMode="decimal"
@@ -138,7 +159,7 @@ export const CanvasHud: React.FC<CanvasHudProps> = ({
           style={{ left: dynAnchorPx.x, top: dynAnchorPx.y, transform: 'translate(12px, -50%)' }}
         >
           <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">
-            {activeTool === 'arc' ? 'Хорда' : 'Длина'}
+            {dynLabel}
           </span>
           <span className="font-mono text-sm font-semibold text-slate-900 dark:text-slate-100 tabular-nums">
             {lineLengthInput}

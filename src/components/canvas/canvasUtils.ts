@@ -1,4 +1,4 @@
-import { Point2D } from '../../types';
+import { ArcMode, Point2D } from '../../types';
 
 export interface SnapPointInfo {
   x: number;
@@ -81,6 +81,108 @@ export function getArcFromBulge(p1: Point2D, p2: Point2D, mouse: Point2D) {
 
   const arc = getArcFrom3Points(p1, p2, apex);
   return { ...arc, apex };
+}
+
+/**
+ * Дуга по «старт + ЦЕНТР + направление на конец».
+ *
+ * П1 — начало, П2 — центр (тогда радиус = |П1−П2| фиксирован), «живая» мышь задаёт
+ * угол конца: конец всегда лежит на окружности ровно под направлением «центр→мышь»,
+ * а дуга идёт по короткой стороне от старта к концу. Позволяет рисовать окружности
+ * точного радиуса и управлять охватом, водя мышью вокруг центра.
+ */
+export function getArcFromStartCenterEnd(start: Point2D, center: Point2D, live: Point2D) {
+  const r = Math.hypot(start.x - center.x, start.y - center.y);
+  if (r < 1e-4) return null; // центр совпал со стартом
+
+  const a1 = Math.atan2(start.y - center.y, start.x - center.x);
+  const a2 = Math.atan2(live.y - center.y, live.x - center.x);
+  // Короткая дуга: приводим разность углов к (−π, π].
+  let d = a2 - a1;
+  while (d > Math.PI) d -= Math.PI * 2;
+  while (d <= -Math.PI) d += Math.PI * 2;
+  if (Math.abs(d) < 1e-4) return null; // конец почти совпал со стартом
+
+  const end: Point2D = { x: center.x + Math.cos(a2) * r, y: center.y + Math.sin(a2) * r };
+  const midA = a1 + d / 2;
+  const mid: Point2D = { x: center.x + Math.cos(midA) * r, y: center.y + Math.sin(midA) * r };
+
+  const arc = getArcFrom3Points(start, mid, end);
+  return { ...arc, end, apex: mid, center };
+}
+
+/**
+ * Единая сборка превью-дуги для любого под-режима. Возвращает концы/центр/радиус
+ * (для отрисовки и для записи в фигуру) плюс необязательные направляющие точки.
+ * Возвращает null, пока дуга вырождена (мало точек / слишком прямой угол).
+ */
+export interface ArcBuild {
+  startX: number;
+  startY: number;
+  endX: number;
+  endY: number;
+  centerX: number;
+  centerY: number;
+  radius: number;
+  clockwise: boolean;
+  /** Точка на дуге «под курсором» (вершина горба / средняя точка) — для маркера. */
+  apex: Point2D | null;
+  /** Центр окружности — только для режима 'center' (рисуем направляющую окружность). */
+  guideCenter: Point2D | null;
+}
+
+export function buildArc(
+  mode: ArcMode,
+  p1: Point2D,
+  p2: Point2D,
+  live: Point2D
+): ArcBuild | null {
+  if (mode === '3pt') {
+    const arc = getArcFrom3Points(p1, p2, live);
+    return {
+      startX: p1.x,
+      startY: p1.y,
+      endX: live.x,
+      endY: live.y,
+      centerX: arc.centerX,
+      centerY: arc.centerY,
+      radius: arc.radius,
+      clockwise: arc.clockwise,
+      apex: { x: p2.x, y: p2.y },
+      guideCenter: null,
+    };
+  }
+  if (mode === 'center') {
+    const arc = getArcFromStartCenterEnd(p1, p2, live);
+    if (!arc) return null;
+    return {
+      startX: p1.x,
+      startY: p1.y,
+      endX: arc.end.x,
+      endY: arc.end.y,
+      centerX: arc.centerX,
+      centerY: arc.centerY,
+      radius: arc.radius,
+      clockwise: arc.clockwise,
+      apex: arc.apex,
+      guideCenter: { x: p2.x, y: p2.y },
+    };
+  }
+  // 'bulge' (по умолчанию)
+  const arc = getArcFromBulge(p1, p2, live);
+  if (!arc) return null;
+  return {
+    startX: p1.x,
+    startY: p1.y,
+    endX: p2.x,
+    endY: p2.y,
+    centerX: arc.centerX,
+    centerY: arc.centerY,
+    radius: arc.radius,
+    clockwise: arc.clockwise,
+    apex: arc.apex,
+    guideCenter: null,
+  };
 }
 
 /**

@@ -201,6 +201,12 @@ export interface WarningItem {
 }
 
 export type ActiveTool = 'select' | 'point' | 'line' | 'polyline' | 'rectangle' | 'circle' | 'arc' | 'measure';
+
+// Способ построения дуги (под-режим инструмента «Дуга»):
+//  '3pt'    — три точки (старт → точка НА дуге → конец), дуга через все три;
+//  'bulge'  — хорда + высота горба (старт → конец, мышь тянет вершину прогиба);
+//  'center' — старт → центр → охват (радиус фиксирован, конец скользит по окружности).
+export type ArcMode = '3pt' | 'bulge' | 'center';
 export type ActiveTab = 'machine' | 'gcode' | 'properties';
 // Мобильная нижняя шторка: какая панель открыта поверх холста ('none' — всё закрыто).
 export type MobileSheet = 'none' | 'figures' | ActiveTab;

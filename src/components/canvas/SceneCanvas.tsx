@@ -4,6 +4,7 @@ import { useProjectStore } from '../../store/useProjectStore';
 import { CADObject, Point2D } from '../../types';
 import { CanvasControls } from './CanvasControls';
 import { CanvasHud } from './CanvasHud';
+import { ArcModeSelector } from './ArcModeSelector';
 import {
   DragMode,
   HandleType,
@@ -32,7 +33,7 @@ import {
   SnapPointInfo,
   canvasToWorld,
   worldToCanvas,
-  getArcFromBulge,
+  buildArc,
 } from './canvasUtils';
 import { paletteForTheme } from './canvasPalette';
 import { constrainAngle } from '../../lib/geometry/transform';
@@ -149,6 +150,8 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
     setViewMode,
     activeTool,
     setActiveTool,
+    arcMode,
+    setArcMode,
     snapToGrid,
     setSnapToGrid,
     gridStep,
@@ -179,6 +182,8 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
       setViewMode: s.setViewMode,
       activeTool: s.activeTool,
       setActiveTool: s.setActiveTool,
+      arcMode: s.arcMode,
+      setArcMode: s.setArcMode,
       snapToGrid: s.snapToGrid,
       setSnapToGrid: s.setSnapToGrid,
       gridStep: s.gridStep,
@@ -610,6 +615,7 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
       currentMouseProgPt,
       pan,
       zoom,
+      arcMode,
       machine.toolDiameter
     );
 
@@ -642,6 +648,7 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
     toolpathSegments,
     viewMode,
     activeTool,
+    arcMode,
     drawStartPt,
     drawArcStartPt,
     drawArcEndPt,
@@ -778,10 +785,13 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
         setLineLengthInput('');
         setLineDirAngle(0);
       } else if (!drawArcEndPt) {
-        // End of chord: priority typed length > Shift-ortho/45° > free magnetic point.
-        const L = parseFloat(lineLengthInput);
+        // Вторая точка: для 'center' — это ЦЕНТР (просто магнитная точка),
+        // для '3pt'/'bulge' — конец хорды с приоритетом: введённая длина > Shift 90°/45°.
         let end: Point2D;
-        if (L > 0) {
+        const L = parseFloat(lineLengthInput);
+        if (arcMode === 'center') {
+          end = snapPt;
+        } else if (L > 0) {
           end = pointFromPolar(drawArcStartPt, lineDirAngle, L);
         } else if (e.shiftKey) {
           end = constrainAngle(drawArcStartPt, snapPt, 45);
@@ -791,18 +801,16 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
         setDrawArcEndPt(clampRayToPosFaces(drawArcStartPt, end));
         setLineLengthInput('');
       } else {
-        // Третий клик = ВЕРШИНА ГОРБА дуги под курсором. Начало и конец остаются
-        // там, где их кликнули, а мышь тянет прогиб: ближе к хорде — пололее,
-        // дальше — круглее.
-        const arcData = getArcFromBulge(drawArcStartPt, drawArcEndPt, snapPt);
+        // Третья точка = «живая» мышь. Интерпретация зависит от режима (см. buildArc).
+        const arcData = buildArc(arcMode, drawArcStartPt, drawArcEndPt, snapPt);
         if (arcData) {
           addObject({
             name: `Дуга R${arcData.radius.toFixed(1)} (${objects.length + 1})`,
             type: 'arc',
-            startX: drawArcStartPt.x,
-            startY: drawArcStartPt.y,
-            endX: drawArcEndPt.x,
-            endY: drawArcEndPt.y,
+            startX: arcData.startX,
+            startY: arcData.startY,
+            endX: arcData.endX,
+            endY: arcData.endY,
             centerX: arcData.centerX,
             centerY: arcData.centerY,
             radius: arcData.radius,
@@ -1380,6 +1388,7 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
 
       <CanvasHud
         activeTool={activeTool}
+        arcMode={arcMode}
         drawStartPt={drawStartPt}
         drawArcStartPt={drawArcStartPt}
         drawArcEndPt={drawArcEndPt}
@@ -1392,6 +1401,19 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
         onLineLengthChange={setLineLengthInput}
         onDynCommit={commitDynLength}
       />
+
+      {activeTool === 'arc' && (
+        <ArcModeSelector
+          value={arcMode}
+          onChange={(mode) => {
+            // Смена способа при незавершённом построении — сбрасываем накопленные точки.
+            setDrawArcStartPt(null);
+            setDrawArcEndPt(null);
+            setLineLengthInput('');
+            setArcMode(mode);
+          }}
+        />
+      )}
 
       <CanvasControls
         cursorPos={currentMouseProgPt}
