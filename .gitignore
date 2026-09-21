@@ -6,3 +6,9 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Local scratch / trash
+.trash/
+
+# Sample .nc kept locally for manual import testing (not part of the app)
+/Проект_ЧПУ_Деталь_1.nc

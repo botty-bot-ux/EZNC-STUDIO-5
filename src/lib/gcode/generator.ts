@@ -501,13 +501,3 @@ export function generateGcode(
   };
 }
 
-/**
- * Packs the project JSON metadata into a comment at the top of the .nc file,
- * keeping the file 100% executable by NC Studio 5 while restoring full project state on open.
- */
-export function generateNCFileWithMetadata(exportData: any, gcode: string): string {
-  const jsonStr = JSON.stringify(exportData);
-  const headerBlock = `; NCSTUDIO_PROJECT:${jsonStr}\n`;
-  return headerBlock + gcode;
-}
-

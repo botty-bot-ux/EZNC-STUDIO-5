@@ -113,6 +113,11 @@ export function parseGcodeToCadObjects(
     return null;
   };
 
+  // Detect whether the program carries per-object ";[ID: ...]" markers. When present
+  // (our editor's own G-code), blocks are split by those markers and identity is preserved.
+  // When absent (a clean machine .nc), we fall back to contour segmentation below.
+  const hasAnyMarker = lines.some((l) => parseHeaderLine(l) !== null);
+
   for (let idx = 0; idx < lines.length; idx++) {
     const rawLine = lines[idx];
     const headerInfo = parseHeaderLine(rawLine);
@@ -178,6 +183,17 @@ export function parseGcodeToCadObjects(
     }
 
     if (hasX || hasY || hasZ) {
+      // Clean .nc без маркеров ;[ID:]: каждый репозиционирующий быстрый ход G00
+      // со смещением по XY, идущий после режущих сегментов, начинает новый контур.
+      if (
+        !hasAnyMarker &&
+        activeMotion === 'G0' &&
+        currentSegments.length > 0 &&
+        Math.hypot(nextX - curX, nextY - curY) > 0.001
+      ) {
+        pushCurrentBlock();
+      }
+
       if (activeMotion === 'G0') {
         currentSegments.push({
           id: `seg_${currentSegments.length}`,
@@ -294,27 +310,25 @@ export function parseGcodeToCadObjects(
     let targetType: CADObject['type'] = block.meta?.type || 'polyline';
 
     if (!block.meta?.type) {
-      if (pts.length <= 1) {
+      const hasArcs = cuttingSegs.some((s) => s.type === 'arc_cw' || s.type === 'arc_ccw');
+      if (hasArcs) {
+        const firstArc = cuttingSegs.find((s) => s.type === 'arc_cw' || s.type === 'arc_ccw');
+        if (
+          firstArc &&
+          Math.hypot(firstArc.startX - firstArc.endX, firstArc.startY - firstArc.endY) < 0.01
+        ) {
+          targetType = 'circle';
+        } else {
+          targetType = 'arc';
+        }
+      } else if (pts.length <= 1) {
         targetType = 'point';
       } else if (pts.length === 2) {
         targetType = 'line';
+      } else if (pts.length === 5 && isRectanglePoints(pts)) {
+        targetType = 'rectangle';
       } else {
-        const hasArcs = cuttingSegs.some((s) => s.type === 'arc_cw' || s.type === 'arc_ccw');
-        if (hasArcs) {
-          const firstArc = cuttingSegs.find((s) => s.type === 'arc_cw' || s.type === 'arc_ccw');
-          if (
-            firstArc &&
-            Math.hypot(firstArc.startX - firstArc.endX, firstArc.startY - firstArc.endY) < 0.01
-          ) {
-            targetType = 'circle';
-          } else {
-            targetType = 'arc';
-          }
-        } else if (pts.length === 5 && isRectanglePoints(pts)) {
-          targetType = 'rectangle';
-        } else {
-          targetType = 'polyline';
-        }
+        targetType = 'polyline';
       }
     }
 

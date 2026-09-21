@@ -15,7 +15,7 @@ import {
   ViewMode,
   WarningItem,
 } from '../types';
-import { generateGcode, generateNCFileWithMetadata } from '../lib/gcode/generator';
+import { generateGcode } from '../lib/gcode/generator';
 import { extractProjectDataFromNC, parseGcodeToCadObjects, parseGcodeToSegments } from '../lib/gcode/parser';
 import { DEFAULT_TEMPLATES } from '../lib/postprocessor/templates';
 import { analyzeProjectWarnings } from '../lib/utils/warnings';
@@ -175,7 +175,6 @@ interface ProjectStore {
   loadProjectJSON: (jsonStr: string) => boolean;
   loadProjectNC: (fileContent: string, fileName?: string) => boolean;
   exportProjectJSON: () => string;
-  exportProjectNC: () => string;
   exportGcode: () => string;
 
   undo: () => void;
@@ -976,19 +975,6 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
         postprocessorTemplates: get().templates,
       };
       return JSON.stringify(exportData, null, 2);
-    },
-
-    exportProjectNC: () => {
-      const exportData: ProjectData = {
-        version: '1.0',
-        name: get().projectName,
-        machine: { ...get().machine, controllerProfile: 'ncstudio' },
-        objects: get().objects,
-        operations: get().operations,
-        postprocessorTemplates: get().templates,
-      };
-      const gcode = get().generatedGcode || get().manualGcode;
-      return generateNCFileWithMetadata(exportData, gcode);
     },
 
     // Clean G-code for the machine — no embedded "; NCSTUDIO_PROJECT" metadata and no
