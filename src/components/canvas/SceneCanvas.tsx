@@ -1125,9 +1125,25 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
                 if (chosen.type === 'line_start') patch = { startX: nx, startY: ny };
                 else if (chosen.type === 'line_end') patch = { endX: nx, endY: ny };
                 else if (chosen.type === 'arc_start' && o.type === 'arc') {
-                  patch = { startX: nx, startY: ny, radius: Math.hypot(nx - o.centerX, ny - o.centerY) };
+                  // Тянем за конец дуги — перемещаем ВСЮ дугу целиком (центр и оба
+                  // конца), форма и радиус сохраняются, второй конец едет следом.
+                  patch = {
+                    centerX: o.centerX + dx,
+                    centerY: o.centerY + dy,
+                    startX: o.startX + dx,
+                    startY: o.startY + dy,
+                    endX: o.endX + dx,
+                    endY: o.endY + dy,
+                  };
                 } else if (chosen.type === 'arc_end' && o.type === 'arc') {
-                  patch = { endX: nx, endY: ny, radius: Math.hypot(nx - o.centerX, ny - o.centerY) };
+                  patch = {
+                    centerX: o.centerX + dx,
+                    centerY: o.centerY + dy,
+                    startX: o.startX + dx,
+                    startY: o.startY + dy,
+                    endX: o.endX + dx,
+                    endY: o.endY + dy,
+                  };
                 }
               }
             }
