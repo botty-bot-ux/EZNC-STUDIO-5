@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { GitCompareArrows, X } from 'lucide-react';
 import { useProjectStore } from '../../store/useProjectStore';
 import { ParallelPreviewState } from '../../types';
+import { parseDecimal as parseMM } from '../../lib/utils/num';
 import { StepperField } from '../ui/StepperField';
 
 interface ParallelDialogProps {
@@ -17,12 +18,6 @@ interface ParallelDialogProps {
   onCreate: (distance: number, count: number) => void;
   /** Строит живое превью на холсте для текущих значений шага/количества. */
   makePreview: (distance: number, count: number) => ParallelPreviewState | null;
-}
-
-/** Ввод → число мм: запятая как разделитель, пусто/нечисло → 0. */
-function parseMM(raw: string): number {
-  const v = parseFloat(raw.replace(',', '.').trim());
-  return Number.isFinite(v) ? v : 0;
 }
 
 /** Ввод → целое ≥ 1 (количество копий), пусто/нечисло → 1. */

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Move, X } from 'lucide-react';
 import { useProjectStore } from '../../store/useProjectStore';
+import { parseDecimal as parseMM } from '../../lib/utils/num';
 import { StepperField } from '../ui/StepperField';
 
 interface MoveDialogProps {
@@ -9,12 +10,6 @@ interface MoveDialogProps {
   ids: string[];
   onClose: () => void;
   onApply: (dx: number, dy: number) => void;
-}
-
-/** Ввод → число мм: запятая как разделитель, пусто/нечисло → 0. */
-function parseMM(raw: string): number {
-  const v = parseFloat(raw.replace(',', '.').trim());
-  return Number.isFinite(v) ? v : 0;
 }
 
 /**

@@ -22,6 +22,29 @@ const WIDTH_OPTIONS = [881, 981, 1281, 1481, 1681, 1881, 2081];
 const HEIGHT_OPTIONS = [250, 360, 1081, 1121, 1201];
 const HEIGHT_LABELS: Record<number, string> = { 250: 'парящая', 360: 'царга' };
 
+// Общие «киты» стилей панели — раньше каждая строка копипастилась по 4–12 раз.
+const LABEL_CLS = 'text-[12px] text-slate-500 dark:text-slate-400 block mb-0.5 font-medium';
+const NUM_INPUT_CLS =
+  'w-full bg-slate-100/80 dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/90 rounded-lg px-2.5 py-1.5 font-mono font-bold text-slate-800 dark:text-slate-100 text-xs focus:bg-white focus:dark:bg-slate-800 focus:border-primary focus:outline-none transition-all';
+const NUM_INPUT_SM_CLS =
+  'w-full bg-slate-100/80 dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/90 rounded-lg px-1.5 py-1 font-mono text-[13px] text-slate-800 dark:text-slate-100 font-bold focus:bg-white focus:dark:bg-slate-800 focus:outline-none transition-all text-center';
+const SELECT_CLS =
+  'w-full bg-slate-100/80 dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/90 rounded-lg px-2 py-1.5 text-xs text-slate-800 dark:text-slate-100 font-bold focus:border-primary focus:bg-white focus:dark:bg-slate-800 focus:outline-none cursor-pointer transition-all';
+
+/** Переключатель sr-only peer + трек; checkedBg — цвет включённого трека. */
+const PeerToggle: React.FC<{
+  checked: boolean;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  checkedBg?: string;
+}> = ({ checked, onChange, checkedBg = 'peer-checked:bg-primary' }) => (
+  <label className="relative inline-flex items-center cursor-pointer">
+    <input type="checkbox" checked={checked} onChange={onChange} className="sr-only peer" />
+    <div
+      className={`w-7 h-4 bg-slate-300 dark:bg-slate-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white peer-checked:after:dark:border-slate-700 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:dark:bg-slate-900 after:border-slate-300 after:dark:border-slate-600 after:border after:rounded-full after:h-3 after:w-3 after:transition-all ${checkedBg}`}
+    />
+  </label>
+);
+
 export const MachineSettingsPanel: React.FC = () => {
   const {
     machine,
@@ -91,30 +114,25 @@ export const MachineSettingsPanel: React.FC = () => {
             Заготовка листа
           </span>
 
-          <label className="relative inline-flex items-center cursor-pointer">
-            <input
-              type="checkbox"
-              checked={stockSheet.enabled}
-              onChange={(e) =>
-                updateMachine({
-                  stockSheet: {
-                    ...stockSheet,
-                    enabled: e.target.checked,
-                    preset: e.target.checked ? 'custom' : 'none',
-                    color: '#22c55e',
-                  },
-                })
-              }
-              className="sr-only peer"
-            />
-            <div className="w-7 h-4 bg-slate-300 dark:bg-slate-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white peer-checked:after:dark:border-slate-700 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:dark:bg-slate-900 after:border-slate-300 after:dark:border-slate-600 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-primary" />
-          </label>
+          <PeerToggle
+            checked={stockSheet.enabled}
+            onChange={(e) =>
+              updateMachine({
+                stockSheet: {
+                  ...stockSheet,
+                  enabled: e.target.checked,
+                  preset: e.target.checked ? 'custom' : 'none',
+                  color: '#22c55e',
+                },
+              })
+            }
+          />
         </div>
 
         {stockSheet.enabled && (
           <div className="grid grid-cols-2 gap-2 pt-1">
             <div>
-              <label className="text-[12px] text-slate-500 dark:text-slate-400 block mb-0.5 font-medium">
+              <label className={LABEL_CLS}>
                 Ширина (Y, мм)
               </label>
               <select
@@ -131,7 +149,7 @@ export const MachineSettingsPanel: React.FC = () => {
                     },
                   });
                 }}
-                className="w-full bg-slate-100/80 dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/90 rounded-lg px-2 py-1.5 text-xs text-slate-800 dark:text-slate-100 font-bold focus:border-primary focus:bg-white focus:dark:bg-slate-800 focus:outline-none cursor-pointer transition-all"
+                className={SELECT_CLS}
               >
                 {widthOptions.map((w) => (
                   <option key={w} value={w}>
@@ -142,7 +160,7 @@ export const MachineSettingsPanel: React.FC = () => {
             </div>
 
             <div>
-              <label className="text-[12px] text-slate-500 dark:text-slate-400 block mb-0.5 font-medium">
+              <label className={LABEL_CLS}>
                 Высота (X, мм)
               </label>
               <select
@@ -159,7 +177,7 @@ export const MachineSettingsPanel: React.FC = () => {
                     },
                   });
                 }}
-                className="w-full bg-slate-100/80 dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/90 rounded-lg px-2 py-1.5 text-xs text-slate-800 dark:text-slate-100 font-bold focus:border-primary focus:bg-white focus:dark:bg-slate-800 focus:outline-none cursor-pointer transition-all"
+                className={SELECT_CLS}
               >
                 {heightOptions.map((h) => (
                   <option key={h} value={h}>
@@ -181,7 +199,7 @@ export const MachineSettingsPanel: React.FC = () => {
 
         {/* Диаметр фрезы */}
         <div className="pt-1">
-          <label className="text-[12px] text-slate-500 dark:text-slate-400 block mb-0.5 font-medium">
+          <label className={LABEL_CLS}>
             Диаметр фрезы (мм)
           </label>
           <div className="flex items-center gap-1.5">
@@ -195,7 +213,7 @@ export const MachineSettingsPanel: React.FC = () => {
                 const val = parseFloat(e.target.value) || 1;
                 updateMachine({ toolDiameter: Math.max(0.1, val) });
               }}
-              className="w-full bg-slate-100/80 dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/90 rounded-lg px-2.5 py-1.5 font-mono font-bold text-slate-800 dark:text-slate-100 text-xs focus:bg-white focus:dark:bg-slate-800 focus:border-primary focus:outline-none transition-all"
+              className={NUM_INPUT_CLS}
             />
             <span className="text-slate-400 dark:text-slate-500 font-bold text-xs shrink-0">мм</span>
           </div>
@@ -204,32 +222,32 @@ export const MachineSettingsPanel: React.FC = () => {
         {/* Spindle & Feeds */}
         <div className="space-y-2 pt-1">
           <div>
-            <label className="text-[12px] text-slate-500 dark:text-slate-400 block mb-0.5 font-medium">
+            <label className={LABEL_CLS}>
               Обороты (об/мин)
             </label>
             <input
               type="number"
               value={machine.spindleSpeed}
               onChange={(e) => updateMachine({ spindleSpeed: parseInt(e.target.value) || 15000 })}
-              className="w-full bg-slate-100/80 dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/90 rounded-lg px-2.5 py-1.5 font-mono font-bold text-slate-800 dark:text-slate-100 text-xs focus:bg-white focus:dark:bg-slate-800 focus:border-primary focus:outline-none transition-all"
+              className={NUM_INPUT_CLS}
             />
           </div>
 
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="text-[12px] text-slate-500 dark:text-slate-400 block mb-0.5 font-medium">
+              <label className={LABEL_CLS}>
                 Подача (F cut)
               </label>
               <input
                 type="number"
                 value={machine.feedCut}
                 onChange={(e) => updateMachine({ feedCut: parseFloat(e.target.value) || 1000 })}
-                className="w-full bg-slate-100/80 dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/90 rounded-lg px-2.5 py-1.5 font-mono font-bold text-slate-800 dark:text-slate-100 text-xs focus:bg-white focus:dark:bg-slate-800 focus:border-primary focus:outline-none transition-all"
+                className={NUM_INPUT_CLS}
               />
             </div>
 
             <div>
-              <label className="text-[12px] text-slate-500 dark:text-slate-400 block mb-0.5 font-medium">
+              <label className={LABEL_CLS}>
                 Врезание (F plunge)
               </label>
               <input
@@ -239,7 +257,7 @@ export const MachineSettingsPanel: React.FC = () => {
                   const val = parseFloat(e.target.value) || 700;
                   updateMachine({ feedPlunge: val, feedDrill: val });
                 }}
-                className="w-full bg-slate-100/80 dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/90 rounded-lg px-2.5 py-1.5 font-mono font-bold text-slate-800 dark:text-slate-100 text-xs focus:bg-white focus:dark:bg-slate-800 focus:border-primary focus:outline-none transition-all"
+                className={NUM_INPUT_CLS}
               />
             </div>
           </div>
@@ -247,19 +265,19 @@ export const MachineSettingsPanel: React.FC = () => {
           {/* Высоты Z */}
           <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
             <div>
-              <label className="text-[12px] text-slate-500 dark:text-slate-400 block mb-0.5 font-medium">
+              <label className={LABEL_CLS}>
                 Безопасная Z (мм)
               </label>
               <input
                 type="number"
                 value={machine.safeZ}
                 onChange={(e) => updateMachine({ safeZ: parseFloat(e.target.value) || 20 })}
-                className="w-full bg-slate-100/80 dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/90 rounded-lg px-2.5 py-1.5 font-mono font-bold text-slate-800 dark:text-slate-100 text-xs focus:bg-white focus:dark:bg-slate-800 focus:border-primary focus:outline-none transition-all"
+                className={NUM_INPUT_CLS}
               />
             </div>
 
             <div>
-              <label className="text-[12px] text-slate-500 dark:text-slate-400 block mb-0.5 font-medium">
+              <label className={LABEL_CLS}>
                 Глубина реза Z (мм)
               </label>
               <input
@@ -267,7 +285,7 @@ export const MachineSettingsPanel: React.FC = () => {
                 step="0.5"
                 value={machine.cutDepth ?? 5}
                 onChange={(e) => updateMachine({ cutDepth: parseFloat(e.target.value) || 5 })}
-                className="w-full bg-slate-100/80 dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/90 rounded-lg px-2.5 py-1.5 font-mono font-bold text-slate-800 dark:text-slate-100 text-xs focus:bg-white focus:dark:bg-slate-800 focus:border-primary focus:outline-none transition-all"
+                className={NUM_INPUT_CLS}
               />
             </div>
           </div>
@@ -283,7 +301,7 @@ export const MachineSettingsPanel: React.FC = () => {
 
         <div className="grid grid-cols-2 gap-2">
           <div>
-            <label className="text-[12px] text-slate-500 dark:text-slate-400 block mb-0.5 font-medium">
+            <label className={LABEL_CLS}>
               Ось X (мин..макс)
             </label>
             <div className="flex items-center gap-1">
@@ -295,7 +313,7 @@ export const MachineSettingsPanel: React.FC = () => {
                     bounds: { ...machine.bounds, xMin: parseFloat(e.target.value) || -1200 },
                   })
                 }
-                className="w-full bg-slate-100/80 dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/90 rounded-lg px-1.5 py-1 font-mono text-[13px] text-slate-800 dark:text-slate-100 font-bold focus:bg-white focus:dark:bg-slate-800 focus:outline-none transition-all text-center"
+                className={NUM_INPUT_SM_CLS}
               />
               <span className="text-slate-300 dark:text-slate-600 font-bold">..</span>
               <input
@@ -306,13 +324,13 @@ export const MachineSettingsPanel: React.FC = () => {
                     bounds: { ...machine.bounds, xMax: parseFloat(e.target.value) || 0 },
                   })
                 }
-                className="w-full bg-slate-100/80 dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/90 rounded-lg px-1.5 py-1 font-mono text-[13px] text-slate-800 dark:text-slate-100 font-bold focus:bg-white focus:dark:bg-slate-800 focus:outline-none transition-all text-center"
+                className={NUM_INPUT_SM_CLS}
               />
             </div>
           </div>
 
           <div>
-            <label className="text-[12px] text-slate-500 dark:text-slate-400 block mb-0.5 font-medium">
+            <label className={LABEL_CLS}>
               Ось Y (мин..макс)
             </label>
             <div className="flex items-center gap-1">
@@ -324,7 +342,7 @@ export const MachineSettingsPanel: React.FC = () => {
                     bounds: { ...machine.bounds, yMin: parseFloat(e.target.value) || -900 },
                   })
                 }
-                className="w-full bg-slate-100/80 dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/90 rounded-lg px-1.5 py-1 font-mono text-[13px] text-slate-800 dark:text-slate-100 font-bold focus:bg-white focus:dark:bg-slate-800 focus:outline-none transition-all text-center"
+                className={NUM_INPUT_SM_CLS}
               />
               <span className="text-slate-300 dark:text-slate-600 font-bold">..</span>
               <input
@@ -335,7 +353,7 @@ export const MachineSettingsPanel: React.FC = () => {
                     bounds: { ...machine.bounds, yMax: parseFloat(e.target.value) || 0 },
                   })
                 }
-                className="w-full bg-slate-100/80 dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/90 rounded-lg px-1.5 py-1 font-mono text-[13px] text-slate-800 dark:text-slate-100 font-bold focus:bg-white focus:dark:bg-slate-800 focus:outline-none transition-all text-center"
+                className={NUM_INPUT_SM_CLS}
               />
             </div>
           </div>
@@ -407,15 +425,10 @@ export const MachineSettingsPanel: React.FC = () => {
                 {underlay.visible ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
                 Показывать
               </span>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={underlay.visible}
-                  onChange={(e) => updateUnderlay({ visible: e.target.checked })}
-                  className="sr-only peer"
-                />
-                <div className="w-7 h-4 bg-slate-300 dark:bg-slate-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white peer-checked:after:dark:border-slate-700 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:dark:bg-slate-900 after:border-slate-300 after:dark:border-slate-600 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-primary" />
-              </label>
+              <PeerToggle
+                checked={underlay.visible}
+                onChange={(e) => updateUnderlay({ visible: e.target.checked })}
+              />
             </div>
 
             <div className="flex items-center justify-between">
@@ -423,15 +436,11 @@ export const MachineSettingsPanel: React.FC = () => {
                 {underlay.frozen ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
                 Заморозить
               </span>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={underlay.frozen}
-                  onChange={(e) => updateUnderlay({ frozen: e.target.checked })}
-                  className="sr-only peer"
-                />
-                <div className="w-7 h-4 bg-slate-300 dark:bg-slate-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white peer-checked:after:dark:border-slate-700 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:dark:bg-slate-900 after:border-slate-300 after:dark:border-slate-600 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-slate-600" />
-              </label>
+              <PeerToggle
+                checked={underlay.frozen}
+                onChange={(e) => updateUnderlay({ frozen: e.target.checked })}
+                checkedBg="peer-checked:bg-slate-600"
+              />
             </div>
 
             {underlay.frozen && (

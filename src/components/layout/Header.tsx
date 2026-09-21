@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useProjectStore } from '../../store/useProjectStore';
+import { ActiveTool } from '../../types';
 import { saveAs } from 'file-saver';
 import { ExportModal } from '../modals/ExportModal';
 import { NewProjectModal } from '../modals/NewProjectModal';
@@ -176,16 +177,28 @@ export const Header: React.FC = () => {
   // Режим детали (фреза Ø8 и толще = царга) влияет на набор инструментов черчения.
   const isRail = (machine.toolDiameter ?? 0) >= 5;
 
+  // Набор инструментов черчения: один список на мобильный и десктоп-ряды
+  // (раньше — 10 копий одинаковых кнопок с расходящимися title/классами).
+  const TOOL_DEFS: Array<{
+    id: ActiveTool;
+    Icon: React.ComponentType<{ className?: string }>;
+    title: string;
+    mobileTitle: string;
+    show: boolean;
+  }> = [
+    { id: 'select', Icon: MousePointer, title: 'Выбор и перемещение (S)', mobileTitle: 'Выбор и перемещение', show: true },
+    { id: 'line', Icon: LineDotRightHorizontal, title: 'Линия / Отрезок (L) · Shift = углы 90°/45°', mobileTitle: 'Линия / Отрезок', show: true },
+    { id: 'point', Icon: CircleDot, title: 'Отверстие / Точка (H)', mobileTitle: 'Отверстие / Точка', show: isRail },
+    { id: 'arc', Icon: Spline, title: 'Дуга окружности (A) · Shift = хорда 90°/45°', mobileTitle: 'Дуга окружности', show: !isRail },
+    { id: 'measure', Icon: Ruler, title: 'Линейка / Штангенциркуль (M)', mobileTitle: 'Линейка / Штангенциркуль', show: true },
+  ];
+
   const isMobile = useIsMobile();
   const [menuOpen, setMenuOpen] = useState(false);
   const [newProjectOpen, setNewProjectOpen] = useState(false);
 
   // ─────────────── Мобильный компактный Header: 2 ряда ───────────────
   if (isMobile) {
-    const toolBtn = (active: boolean) =>
-      `p-2 rounded-lg transition-all shrink-0 ${
-        active ? 'bg-primary text-primary-fg' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 hover:dark:bg-slate-800/60'
-      }`;
     const menuItems = [
       { label: 'Новый проект', Icon: FilePlus, onClick: () => setNewProjectOpen(true), color: 'text-accent' },
       { label: 'Открыть (.json / .nc)', Icon: FolderOpen, onClick: () => fileInputRef.current?.click(), color: 'text-accent' },
@@ -239,25 +252,21 @@ export const Header: React.FC = () => {
 
         {/* Row 2: инструменты черчения + undo/redo */}
         <div className="flex items-center gap-1 bg-slate-100/90 dark:bg-slate-800/90 px-1 py-0.5 rounded-xl border border-slate-200/90 dark:border-slate-700 overflow-x-auto">
-          <button onClick={() => setActiveTool('select')} title="Выбор и перемещение" className={toolBtn(activeTool === 'select')}>
-            <MousePointer className="w-4 h-4" />
-          </button>
-          <button onClick={() => setActiveTool('line')} title="Линия / Отрезок" className={toolBtn(activeTool === 'line')}>
-            <LineDotRightHorizontal className={`w-4 h-4 ${activeTool === 'line' ? 'text-primary-fg' : 'text-accent'}`} />
-          </button>
-          {isRail && (
-            <button onClick={() => setActiveTool('point')} title="Отверстие / Точка" className={toolBtn(activeTool === 'point')}>
-              <CircleDot className={`w-4 h-4 ${activeTool === 'point' ? 'text-primary-fg' : 'text-accent'}`} />
-            </button>
-          )}
-          {!isRail && (
-            <button onClick={() => setActiveTool('arc')} title="Дуга окружности" className={toolBtn(activeTool === 'arc')}>
-              <Spline className={`w-4 h-4 ${activeTool === 'arc' ? 'text-primary-fg' : 'text-accent'}`} />
-            </button>
-          )}
-          <button onClick={() => setActiveTool('measure')} title="Линейка / Штангенциркуль" className={toolBtn(activeTool === 'measure')}>
-            <Ruler className={`w-4 h-4 ${activeTool === 'measure' ? 'text-primary-fg' : 'text-accent'}`} />
-          </button>
+          {TOOL_DEFS.filter((t) => t.show).map(({ id, Icon, mobileTitle }) => {
+            const active = activeTool === id;
+            return (
+              <button
+                key={id}
+                onClick={() => setActiveTool(id)}
+                title={mobileTitle}
+                className={`p-2 rounded-lg transition-all shrink-0 ${
+                  active ? 'bg-primary text-primary-fg' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 hover:dark:bg-slate-800/60'
+                }`}
+              >
+                <Icon className={id === 'select' ? 'w-4 h-4' : `w-4 h-4 ${active ? 'text-primary-fg' : 'text-accent'}`} />
+              </button>
+            );
+          })}
 
           <div className="w-px h-5 bg-slate-200 dark:bg-slate-700 mx-0.5 shrink-0" />
 
@@ -374,69 +383,23 @@ export const Header: React.FC = () => {
       {/* Middle section: Drawing Tools Toolbar */}
       <div className="flex-1 flex items-center justify-center">
         <div className="flex items-center gap-1 bg-slate-100/90 dark:bg-slate-800/90 p-1 rounded-xl border border-slate-200/90 dark:border-slate-700 shadow-inner">
-          <button
-            onClick={() => setActiveTool('select')}
-            title="Выбор и перемещение (S)"
-            className={`p-2 rounded-lg transition-all ${
-              activeTool === 'select'
-                ? 'bg-primary text-primary-fg'
-                : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:dark:text-slate-100 hover:bg-slate-50 hover:dark:bg-slate-800/60'
-            }`}
-          >
-            <MousePointer className="w-4 h-4" />
-          </button>
-
-          <button
-            onClick={() => setActiveTool('line')}
-            title="Линия / Отрезок (L) · Shift = углы 90°/45°"
-            className={`p-2 rounded-lg transition-all ${
-              activeTool === 'line'
-                ? 'bg-primary text-primary-fg'
-                : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:dark:text-slate-100 hover:bg-slate-50 hover:dark:bg-slate-800/60'
-            }`}
-          >
-            <LineDotRightHorizontal className={`w-4 h-4 ${activeTool === 'line' ? 'text-primary-fg' : 'text-accent'}`} />
-          </button>
-
-          {isRail && (
-            <button
-              onClick={() => setActiveTool('point')}
-              title="Отверстие / Точка (H)"
-              className={`p-2 rounded-lg transition-all ${
-                activeTool === 'point'
-                  ? 'bg-primary text-primary-fg'
-                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:dark:text-slate-100 hover:bg-slate-50 hover:dark:bg-slate-800/60'
-              }`}
-            >
-              <CircleDot className={`w-4 h-4 ${activeTool === 'point' ? 'text-primary-fg' : 'text-accent'}`} />
-            </button>
-          )}
-
-          {!isRail && (
-            <button
-              onClick={() => setActiveTool('arc')}
-              title="Дуга окружности (A) · Shift = хорда 90°/45°"
-              className={`p-2 rounded-lg transition-all ${
-                activeTool === 'arc'
-                  ? 'bg-primary text-primary-fg'
-                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:dark:text-slate-100 hover:bg-slate-50 hover:dark:bg-slate-800/60'
-              }`}
-            >
-              <Spline className={`w-4 h-4 ${activeTool === 'arc' ? 'text-primary-fg' : 'text-accent'}`} />
-            </button>
-          )}
-
-          <button
-            onClick={() => setActiveTool('measure')}
-            title="Линейка / Штангенциркуль (M)"
-            className={`p-2 rounded-lg transition-all ${
-              activeTool === 'measure'
-                ? 'bg-primary text-primary-fg'
-                : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:dark:text-slate-100 hover:bg-slate-50 hover:dark:bg-slate-800/60'
-            }`}
-          >
-            <Ruler className={`w-4 h-4 ${activeTool === 'measure' ? 'text-primary-fg' : 'text-accent'}`} />
-          </button>
+          {TOOL_DEFS.filter((t) => t.show).map(({ id, Icon, title }) => {
+            const active = activeTool === id;
+            return (
+              <button
+                key={id}
+                onClick={() => setActiveTool(id)}
+                title={title}
+                className={`p-2 rounded-lg transition-all ${
+                  active
+                    ? 'bg-primary text-primary-fg'
+                    : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:dark:text-slate-100 hover:bg-slate-50 hover:dark:bg-slate-800/60'
+                }`}
+              >
+                <Icon className={id === 'select' ? 'w-4 h-4' : `w-4 h-4 ${active ? 'text-primary-fg' : 'text-accent'}`} />
+              </button>
+            );
+          })}
 
           <div className="w-px h-5 bg-slate-200 dark:bg-slate-700 mx-0.5 shrink-0" />
 

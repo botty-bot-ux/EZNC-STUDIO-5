@@ -3,7 +3,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { Circle, CircleDot, Eye, EyeOff, GitCompareArrows, Layers, LineDotRightHorizontal, Lock, Move, Ruler, Sliders, Spline, Square, Trash2, Unlock } from 'lucide-react';
 import { useProjectStore, useSelectedObjectId } from '../../store/useProjectStore';
 import { computeParallelArcs, computeParallelSegments } from '../../lib/geometry/transform';
-import { ArcObject, CircleObject, LineObject, ParallelPreviewState, PointHoleObject, RectangleObject } from '../../types';
+import { ArcObject, CircleObject, LineObject, PointHoleObject, RectangleObject } from '../../types';
 import { ArcProperties } from './properties/ArcProperties';
 import { CircleProperties } from './properties/CircleProperties';
 import { LineProperties } from './properties/LineProperties';
@@ -11,6 +11,78 @@ import { PointProperties } from './properties/PointProperties';
 import { RectangleProperties } from './properties/RectangleProperties';
 import { MoveDialog } from '../modals/MoveDialog';
 import { ParallelDialog } from '../modals/ParallelDialog';
+
+interface SelectionActionsProps {
+  /** Все выбранные видимы (кнопка Глаза). */
+  showing: boolean;
+  /** Все выбранные заморожены (кнопка Замка). */
+  frozen: boolean;
+  /** Формулировки «фигура» vs «фигуры» для title. */
+  plural: boolean;
+  onToggleVisible: () => void;
+  onToggleFrozen: () => void;
+  onMove: () => void;
+  onDelete: () => void;
+  /** Кнопка «Параллельная линия/дуга» — только для одиночной линии/дуги. */
+  parallel?: { title: string; onClick: () => void };
+}
+
+const SelectionActions: React.FC<SelectionActionsProps> = ({
+  showing,
+  frozen,
+  plural,
+  onToggleVisible,
+  onToggleFrozen,
+  onMove,
+  onDelete,
+  parallel,
+}) => (
+  <div className="flex items-center gap-1">
+    <button
+      onClick={onToggleVisible}
+      title={showing ? (plural ? 'Скрыть выбранные фигуры' : 'Скрыть фигуру') : plural ? 'Показать выбранные фигуры' : 'Показать фигуру'}
+      className="p-1.5 rounded-lg text-slate-400 dark:text-slate-500 hover:text-slate-700 hover:dark:text-slate-200 hover:bg-slate-100 hover:dark:bg-slate-700 transition-all"
+    >
+      {showing ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+    </button>
+    <button
+      onClick={onToggleFrozen}
+      title={frozen ? 'Разморозить (разрешить перемещение)' : 'Заморозить (запретить случайное перемещение)'}
+      className={`p-1.5 rounded-lg transition-all ${
+        frozen
+          ? 'text-primary bg-primary/10 hover:bg-primary/15'
+          : 'text-slate-400 dark:text-slate-500 hover:text-primary hover:bg-slate-100 hover:dark:bg-slate-700'
+      }`}
+    >
+      {frozen ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
+    </button>
+    {!frozen && (
+      <button
+        onClick={onMove}
+        title="Переместить (точное смещение по X/Y)"
+        className="p-1.5 rounded-lg text-slate-400 dark:text-slate-500 hover:text-primary hover:bg-slate-100 hover:dark:bg-slate-700 transition-all"
+      >
+        <Move className="w-4 h-4" />
+      </button>
+    )}
+    {parallel && (
+      <button
+        onClick={parallel.onClick}
+        title={parallel.title}
+        className="p-1.5 rounded-lg text-slate-400 dark:text-slate-500 hover:text-primary hover:bg-slate-100 hover:dark:bg-slate-700 transition-all"
+      >
+        <GitCompareArrows className="w-4 h-4" />
+      </button>
+    )}
+    <button
+      onClick={onDelete}
+      title={plural ? 'Удалить выбранные объекты' : 'Удалить объект'}
+      className="p-1.5 rounded-lg text-slate-400 dark:text-slate-500 hover:text-danger hover:bg-danger/10 transition-all"
+    >
+      <Trash2 className="w-4 h-4" />
+    </button>
+  </div>
+);
 
 export const PropertiesPanel: React.FC = () => {
   const {
@@ -89,42 +161,15 @@ export const PropertiesPanel: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => updateSelectedObjects({ visible: !allVisible })}
-              title={allVisible ? 'Скрыть выбранные фигуры' : 'Показать выбранные фигуры'}
-              className="p-1.5 rounded-lg text-slate-400 dark:text-slate-500 hover:text-slate-700 hover:dark:text-slate-200 hover:bg-slate-100 hover:dark:bg-slate-700 transition-all"
-            >
-              {allVisible ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-            </button>
-            <button
-              onClick={() => updateSelectedObjects({ frozen: !allFrozen })}
-              title={allFrozen ? 'Разморозить (разрешить перемещение)' : 'Заморозить (запретить случайное перемещение)'}
-              className={`p-1.5 rounded-lg transition-all ${
-                allFrozen
-                  ? 'text-primary bg-primary/10 hover:bg-primary/15'
-                  : 'text-slate-400 dark:text-slate-500 hover:text-primary hover:bg-slate-100 hover:dark:bg-slate-700'
-              }`}
-            >
-              {allFrozen ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
-            </button>
-            {!allFrozen && (
-              <button
-                onClick={() => setMoveOpen(true)}
-                title="Переместить (точное смещение по X/Y)"
-                className="p-1.5 rounded-lg text-slate-400 dark:text-slate-500 hover:text-primary hover:bg-slate-100 hover:dark:bg-slate-700 transition-all"
-              >
-                <Move className="w-4 h-4" />
-              </button>
-            )}
-            <button
-              onClick={deleteSelectedObjects}
-              title="Удалить выбранные объекты"
-              className="p-1.5 rounded-lg text-slate-400 dark:text-slate-500 hover:text-danger hover:bg-danger/10 transition-all"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
-          </div>
+          <SelectionActions
+            showing={allVisible}
+            frozen={allFrozen}
+            plural
+            onToggleVisible={() => updateSelectedObjects({ visible: !allVisible })}
+            onToggleFrozen={() => updateSelectedObjects({ frozen: !allFrozen })}
+            onMove={() => setMoveOpen(true)}
+            onDelete={deleteSelectedObjects}
+          />
         </div>
 
         <div className="space-y-3">
@@ -185,6 +230,26 @@ export const PropertiesPanel: React.FC = () => {
         })()
       : null;
 
+  // Источники для модуля «Параллельная …» — строятся один раз; раньше одинаковые
+  // литералы дублировались в makePreview и onCreate.
+  const arcSource =
+    selectedObj.type === 'arc'
+      ? {
+          centerX: selectedObj.centerX,
+          centerY: selectedObj.centerY,
+          radius: selectedObj.radius,
+          startX: selectedObj.startX,
+          startY: selectedObj.startY,
+          endX: selectedObj.endX,
+          endY: selectedObj.endY,
+          clockwise: selectedObj.clockwise,
+        }
+      : null;
+  const lineSource =
+    selectedObj.type === 'line'
+      ? { startX: selectedObj.startX, startY: selectedObj.startY, endX: selectedObj.endX, endY: selectedObj.endY }
+      : null;
+
   return (
     <div className="p-4 space-y-4 text-xs text-slate-800 dark:text-slate-100 overflow-y-auto h-full select-none">
       <div className="flex items-center justify-between pb-3 border-b border-slate-200/80 dark:border-slate-700/80">
@@ -198,51 +263,26 @@ export const PropertiesPanel: React.FC = () => {
           <span className="font-bold text-sm text-slate-800 dark:text-slate-100 truncate">{selectedObj.name}</span>
         </div>
 
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => updateObject(selectedObj.id, { visible: selectedObj.visible === false })}
-            title={selectedObj.visible !== false ? 'Скрыть фигуру' : 'Показать фигуру'}
-            className="p-1.5 rounded-lg text-slate-400 dark:text-slate-500 hover:text-slate-700 hover:dark:text-slate-200 hover:bg-slate-100 hover:dark:bg-slate-700 transition-all"
-          >
-            {selectedObj.visible !== false ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-          </button>
-          <button
-            onClick={() => updateObject(selectedObj.id, { frozen: selectedObj.frozen !== true })}
-            title={selectedObj.frozen === true ? 'Разморозить (разрешить перемещение)' : 'Заморозить (запретить случайное перемещение)'}
-            className={`p-1.5 rounded-lg transition-all ${
-              selectedObj.frozen === true
-                ? 'text-primary bg-primary/10 hover:bg-primary/15'
-                : 'text-slate-400 dark:text-slate-500 hover:text-primary hover:bg-slate-100 hover:dark:bg-slate-700'
-            }`}
-          >
-            {selectedObj.frozen === true ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
-          </button>
-          {!selectedObj.frozen && (
-            <button
-              onClick={() => setMoveOpen(true)}
-              title="Переместить (точное смещение по X/Y)"
-              className="p-1.5 rounded-lg text-slate-400 dark:text-slate-500 hover:text-primary hover:bg-slate-100 hover:dark:bg-slate-700 transition-all"
-            >
-              <Move className="w-4 h-4" />
-            </button>
-          )}
-          {(selectedObj.type === 'line' || selectedObj.type === 'arc') && (
-            <button
-              onClick={() => setParallelOpen(true)}
-              title={selectedObj.type === 'arc' ? 'Параллельная дуга (концентрическое смещение)' : 'Параллельная линия (смещение по нормали)'}
-              className="p-1.5 rounded-lg text-slate-400 dark:text-slate-500 hover:text-primary hover:bg-slate-100 hover:dark:bg-slate-700 transition-all"
-            >
-              <GitCompareArrows className="w-4 h-4" />
-            </button>
-          )}
-          <button
-            onClick={() => deleteObject(selectedObj.id)}
-            title="Удалить объект"
-            className="p-1.5 rounded-lg text-slate-400 dark:text-slate-500 hover:text-danger hover:bg-danger/10 transition-all"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
-        </div>
+        <SelectionActions
+          showing={selectedObj.visible !== false}
+          frozen={selectedObj.frozen === true}
+          plural={false}
+          onToggleVisible={() => updateObject(selectedObj.id, { visible: selectedObj.visible === false })}
+          onToggleFrozen={() => updateObject(selectedObj.id, { frozen: selectedObj.frozen !== true })}
+          onMove={() => setMoveOpen(true)}
+          onDelete={() => deleteObject(selectedObj.id)}
+          parallel={
+            selectedObj.type === 'line' || selectedObj.type === 'arc'
+              ? {
+                  title:
+                    selectedObj.type === 'arc'
+                      ? 'Параллельная дуга (концентрическое смещение)'
+                      : 'Параллельная линия (смещение по нормали)',
+                  onClick: () => setParallelOpen(true),
+                }
+              : undefined
+          }
+        />
       </div>
 
       {/* Common properties */}
@@ -324,52 +364,25 @@ export const PropertiesPanel: React.FC = () => {
           }
           onClose={() => setParallelOpen(false)}
           makePreview={(distance, count) => {
-            if (selectedObj.type === 'arc') {
-              const a = selectedObj as ArcObject;
-              const sourceArc = {
-                centerX: a.centerX,
-                centerY: a.centerY,
-                radius: a.radius,
-                startX: a.startX,
-                startY: a.startY,
-                endX: a.endX,
-                endY: a.endY,
-                clockwise: a.clockwise,
-              };
-              const arcs = computeParallelArcs(sourceArc, distance, count);
-              const preview: ParallelPreviewState = arcs.length ? { segments: [], sourceArc, arcs } : { segments: [] };
-              return arcs.length ? preview : null;
+            if (arcSource) {
+              const arcs = computeParallelArcs(arcSource, distance, count);
+              return arcs.length ? { segments: [], sourceArc: arcSource, arcs } : null;
             }
-            const l = selectedObj as LineObject;
-            const source = { startX: l.startX, startY: l.startY, endX: l.endX, endY: l.endY };
-            const segments = computeParallelSegments(source, distance, count);
-            return segments.length ? { segments, source } : null;
+            if (!lineSource) return null;
+            const segments = computeParallelSegments(lineSource, distance, count);
+            return segments.length ? { segments, source: lineSource } : null;
           }}
           onCreate={(distance, count) => {
             const baseIndex = objects.length; // нумерация «Имя N» продолжается от числа объектов
-            if (selectedObj.type === 'arc') {
-              const a = selectedObj as ArcObject;
-              const arcs = computeParallelArcs(
-                {
-                  centerX: a.centerX,
-                  centerY: a.centerY,
-                  radius: a.radius,
-                  startX: a.startX,
-                  startY: a.startY,
-                  endX: a.endX,
-                  endY: a.endY,
-                  clockwise: a.clockwise,
-                },
-                distance,
-                count
-              );
+            if (arcSource) {
+              const arcs = computeParallelArcs(arcSource, distance, count);
               arcs.forEach((arc, i) => {
                 addObject({
                   type: 'arc',
                   name: `Дуга R${arc.radius.toFixed(1)} (${baseIndex + i + 1})`,
-                  depth: a.depth,
-                  operationType: a.operationType,
-                  color: a.color,
+                  depth: selectedObj.depth,
+                  operationType: selectedObj.operationType,
+                  color: selectedObj.color,
                   visible: true,
                   centerX: arc.centerX,
                   centerY: arc.centerY,
@@ -383,19 +396,15 @@ export const PropertiesPanel: React.FC = () => {
               });
               return;
             }
-            const l = selectedObj as LineObject;
-            const segments = computeParallelSegments(
-              { startX: l.startX, startY: l.startY, endX: l.endX, endY: l.endY },
-              distance,
-              count
-            );
+            if (!lineSource) return;
+            const segments = computeParallelSegments(lineSource, distance, count);
             segments.forEach((seg, i) => {
               addObject({
                 type: 'line',
                 name: `Отрезок ${baseIndex + i + 1}`,
-                depth: l.depth,
-                operationType: l.operationType,
-                color: l.color,
+                depth: selectedObj.depth,
+                operationType: selectedObj.operationType,
+                color: selectedObj.color,
                 visible: true,
                 startX: seg.startX,
                 startY: seg.startY,

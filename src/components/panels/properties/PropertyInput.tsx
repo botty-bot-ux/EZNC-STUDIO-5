@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { ChevronDown, ChevronUp } from 'lucide-react';
 import { useScrub } from '../../ui/useScrub';
+import { ScrubChevrons } from '../../ui/ScrubChevrons';
+import { parseDecimalOrNull } from '../../../lib/utils/num';
 
 interface PropertyInputProps {
   label: string;
@@ -17,12 +18,6 @@ interface PropertyInputProps {
   fallbackValue?: number;
   /** Если задано — значение округляется до этого числа знаков после запятой при уходе из поля. */
   decimals?: number;
-}
-
-/** Строка → число (запятая как разделитель); не число/пусто → null. */
-function toNumber(raw: string): number | null {
-  const v = parseFloat(raw.replace(',', '.').trim());
-  return Number.isFinite(v) ? v : null;
 }
 
 export const PropertyInput: React.FC<PropertyInputProps> = ({
@@ -49,13 +44,13 @@ export const PropertyInput: React.FC<PropertyInputProps> = ({
 
   const handleChange = (raw: string) => {
     setDraft(raw);
-    const n = toNumber(raw);
+    const n = parseDecimalOrNull(raw);
     if (n !== null) onChange(n); // живое обновление холста/G-кода без округления
   };
 
   const commit = () => {
     if (draft !== null) {
-      const n = toNumber(draft);
+      const n = parseDecimalOrNull(draft);
       let next = n !== null ? n : fallbackValue;
       if (decimals != null) next = Number(next.toFixed(decimals));
       onChange(next);
@@ -71,7 +66,7 @@ export const PropertyInput: React.FC<PropertyInputProps> = ({
   // Считаем от актуального черновика, если он есть, иначе от props.value.
   const shift = (deltaSteps: number) => {
     if (!hasStepper) return;
-    const base = draft !== null ? toNumber(draft) ?? value : value;
+    const base = draft !== null ? parseDecimalOrNull(draft) ?? value : value;
     let next = base + deltaSteps * (stepNum as number);
     if (decimals != null) next = Number(next.toFixed(decimals));
     setDraft(null);
@@ -102,26 +97,15 @@ export const PropertyInput: React.FC<PropertyInputProps> = ({
         className={`w-full min-w-0 bg-slate-50 dark:bg-slate-900 border border-slate-200/90 dark:border-slate-700/90 ${hasStepper ? 'rounded-l-lg rounded-r-none border-r-0' : 'rounded-lg'} px-2 py-1 text-xs font-mono focus:bg-white focus:dark:bg-slate-800 focus:border-primary focus:outline-none transition-all ${className}`}
       />
       {hasStepper && (
-        <div className="flex flex-col shrink-0 self-stretch">
-          <button
-            type="button"
-            tabIndex={-1}
-            {...up}
-            title="Больше: клик +1 мм; зажать и тянуть вверх/вниз"
-            className="flex-1 px-1 rounded-r-lg bg-slate-100 dark:bg-slate-800 border border-slate-200/90 dark:border-slate-700/90 text-slate-500 dark:text-slate-400 hover:text-primary hover:bg-slate-200 hover:dark:bg-slate-700 active:bg-slate-200 active:dark:bg-slate-700 transition-colors cursor-ns-resize"
-          >
-            <ChevronUp className="w-3.5 h-3.5" />
-          </button>
-          <button
-            type="button"
-            tabIndex={-1}
-            {...down}
-            title="Меньше: клик −1 мм; зажать и тянуть вверх/вниз"
-            className="flex-1 px-1 rounded-r-lg bg-slate-100 dark:bg-slate-800 border border-slate-200/90 dark:border-slate-700/90 border-t-0 dark:border-t-0 text-slate-500 dark:text-slate-400 hover:text-primary hover:bg-slate-200 hover:dark:bg-slate-700 active:bg-slate-200 active:dark:bg-slate-700 transition-colors cursor-ns-resize"
-          >
-            <ChevronDown className="w-3.5 h-3.5" />
-          </button>
-        </div>
+        <ScrubChevrons
+          up={up}
+          down={down}
+          variant="field"
+          titles={{
+            up: 'Больше: клик +1 мм; зажать и тянуть вверх/вниз',
+            down: 'Меньше: клик −1 мм; зажать и тянуть вверх/вниз',
+          }}
+        />
       )}
     </div>
   );
