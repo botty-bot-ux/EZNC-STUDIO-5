@@ -316,7 +316,7 @@ export const PropertiesPanel: React.FC = () => {
           isOpen={parallelOpen}
           sourceName={selectedObj.name}
           onClose={() => setParallelOpen(false)}
-          onCreate={(distance) => {
+          onCreate={(distance, count) => {
             const l = selectedObj as LineObject;
             const dx = l.endX - l.startX;
             const dy = l.endY - l.startY;
@@ -325,18 +325,22 @@ export const PropertiesPanel: React.FC = () => {
             // Единичная нормаль к вектору отрезка.
             const nx = -dy / len;
             const ny = dx / len;
-            addObject({
-              type: 'line',
-              name: `${l.name} параллель`,
-              depth: l.depth,
-              operationType: l.operationType,
-              color: l.color,
-              visible: true,
-              startX: l.startX + nx * distance,
-              startY: l.startY + ny * distance,
-              endX: l.endX + nx * distance,
-              endY: l.endY + ny * distance,
-            });
+            // Создаём count линий, смещённых на distance·k (k = 1..count) от исходной.
+            for (let k = 1; k <= count; k++) {
+              const off = distance * k;
+              addObject({
+                type: 'line',
+                name: count > 1 ? `${l.name} параллель ${k}` : `${l.name} параллель`,
+                depth: l.depth,
+                operationType: l.operationType,
+                color: l.color,
+                visible: true,
+                startX: l.startX + nx * off,
+                startY: l.startY + ny * off,
+                endX: l.endX + nx * off,
+                endY: l.endY + ny * off,
+              });
+            }
           }}
         />
       )}

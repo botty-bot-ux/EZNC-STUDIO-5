@@ -6,8 +6,8 @@ interface ParallelLineDialogProps {
   /** Название исходной линии — для заголовка. */
   sourceName: string;
   onClose: () => void;
-  /** Применяет создание параллельной линии со смещением distance мм по нормали. */
-  onCreate: (distance: number) => void;
+  /** Создаёт `count` параллельных линий со шагом `distance` мм по нормали. */
+  onCreate: (distance: number, count: number) => void;
 }
 
 /** Ввод → число мм: запятая как разделитель, пусто/нечисло → 0. */
@@ -16,9 +16,16 @@ function parseMM(raw: string): number {
   return Number.isFinite(v) ? v : 0;
 }
 
+/** Ввод → целое ≥ 1 (количество линий), пусто/нечисло → 1. */
+function parseCount(raw: string): number {
+  const v = parseInt(raw.trim(), 10);
+  return Number.isFinite(v) && v > 0 ? v : 1;
+}
+
 /**
- * Модуль построения параллельной линии: пользователь задаёт расстояние (мм) от исходной
- * линии. Знак задаёт сторону смещения. «Подтвердить»/Enter создаёт линию, «Отмена»/Escape — закрывает.
+ * Модуль построения параллельных линий: пользователь задаёт расстояние (мм) между линиями
+ * и их количество. Знак расстояния задаёт сторону смещения. «Подтвердить»/Enter создаёт
+ * все линии, «Отмена»/Escape — закрывает.
  */
 export const ParallelLineDialog: React.FC<ParallelLineDialogProps> = ({
   isOpen,
@@ -27,19 +34,24 @@ export const ParallelLineDialog: React.FC<ParallelLineDialogProps> = ({
   onCreate,
 }) => {
   const [distStr, setDistStr] = useState('16');
+  const [countStr, setCountStr] = useState('1');
 
   useEffect(() => {
-    if (isOpen) setDistStr('16');
+    if (isOpen) {
+      setDistStr('16');
+      setCountStr('1');
+    }
   }, [isOpen]);
 
   if (!isOpen) return null;
 
   const distance = parseMM(distStr);
-  const canApply = distance !== 0;
+  const count = parseCount(countStr);
+  const canApply = distance !== 0 && count >= 1;
 
   const confirm = () => {
     if (!canApply) return;
-    onCreate(distance);
+    onCreate(distance, count);
     onClose();
   };
 
@@ -72,28 +84,45 @@ export const ParallelLineDialog: React.FC<ParallelLineDialogProps> = ({
           </button>
         </div>
 
-        <label className="block">
-          <span className="text-[13px] font-medium text-slate-500 dark:text-slate-400">
-            Расстояние от линии, мм
-          </span>
-          <input
-            type="text"
-            inputMode="decimal"
-            autoFocus
-            value={distStr}
-            onChange={(e) => setDistStr(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                confirm();
-              }
-            }}
-            placeholder="16"
-            className="mt-1 w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 font-mono text-sm text-center focus:border-primary focus:bg-white focus:dark:bg-slate-900 focus:outline-none transition-all"
-          />
-        </label>
+        <div className="grid grid-cols-2 gap-3">
+          <label className="block">
+            <span className="text-[13px] font-medium text-slate-500 dark:text-slate-400">Шаг, мм</span>
+            <input
+              type="text"
+              inputMode="decimal"
+              autoFocus
+              value={distStr}
+              onChange={(e) => setDistStr(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  confirm();
+                }
+              }}
+              placeholder="16"
+              className="mt-1 w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 font-mono text-sm text-center focus:border-primary focus:bg-white focus:dark:bg-slate-900 focus:outline-none transition-all"
+            />
+          </label>
+          <label className="block">
+            <span className="text-[13px] font-medium text-slate-500 dark:text-slate-400">Кол-во линий</span>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={countStr}
+              onChange={(e) => setCountStr(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  confirm();
+                }
+              }}
+              placeholder="1"
+              className="mt-1 w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 font-mono text-sm text-center focus:border-primary focus:bg-white focus:dark:bg-slate-900 focus:outline-none transition-all"
+            />
+          </label>
+        </div>
         <p className="mt-2 text-[12px] text-slate-400 dark:text-slate-500">
-          Исходная: {sourceName}. Знак «−» смещает линию на другую сторону.
+          От исходной «{sourceName}» с шагом {distance} мм. Знак «−» меняет сторону.
         </p>
 
         <div className="mt-5 flex items-center justify-end gap-2">
@@ -108,7 +137,7 @@ export const ParallelLineDialog: React.FC<ParallelLineDialogProps> = ({
             disabled={!canApply}
             className="px-5 py-2 rounded-xl text-xs font-bold text-primary-fg bg-primary hover:opacity-90 active:opacity-100 disabled:opacity-40 disabled:cursor-not-allowed shadow-sm transition-all cursor-pointer"
           >
-            ОК
+            Подтвердить
           </button>
         </div>
       </div>
