@@ -1309,8 +1309,9 @@ export function drawSelectionBox(
 }
 
 /**
- * Превью модуля «Параллельная линия»: штриховые будущие копии + стрелка от середины
- * исходного отрезка к самой дальней копии (показывает направление и величину смещения).
+ * Превью модуля «Параллельная …»: штриховые будущие копии (линии и/или дуги) + стрелка,
+ * показывающая направление и величину смещения (для линий — середина→середина,
+ * для дуг — стартовая точка→стартовая_point самой дальней концентрической копии).
  */
 export function drawParallelPreview(
   ctx: CanvasRenderingContext2D,
@@ -1318,15 +1319,19 @@ export function drawParallelPreview(
   pan: Point2D,
   zoom: number
 ) {
-  if (!preview.segments.length) return;
   const wToC = (x: number, y: number) => worldToCanvas(x, y, pan, zoom);
+  const hasLines = preview.segments.length > 0;
+  const arcs = preview.arcs ?? [];
+  const hasArcs = arcs.length > 0;
+  if (!hasLines && !hasArcs) return;
 
   ctx.save();
-
-  // Штриховые копии будущих линий.
   ctx.strokeStyle = '#2563eb';
+  ctx.fillStyle = '#2563eb';
   ctx.lineWidth = 2;
   ctx.setLineDash([6, 4]);
+
+  // Штриховые будущие линии.
   for (const seg of preview.segments) {
     const p1 = wToC(seg.startX, seg.startY);
     const p2 = wToC(seg.endX, seg.endY);
@@ -1335,37 +1340,57 @@ export function drawParallelPreview(
     ctx.lineTo(p2.x, p2.y);
     ctx.stroke();
   }
+
+  // Штриховые будущие дуги (тот же центр/углы, радиус смещён).
+  for (const a of arcs) {
+    const cp = wToC(a.centerX, a.centerY);
+    const rPx = a.radius * zoom;
+    const pS = wToC(a.startX, a.startY);
+    const pE = wToC(a.endX, a.endY);
+    const ang1 = Math.atan2(pS.y - cp.y, pS.x - cp.x);
+    const ang2 = Math.atan2(pE.y - cp.y, pE.x - cp.x);
+    ctx.beginPath();
+    ctx.arc(cp.x, cp.y, rPx, ang1, ang2, !a.clockwise);
+    ctx.stroke();
+  }
   ctx.setLineDash([]);
 
-  // Стрелка направления: от середины исходного отрезка к середине самой дальней копии.
-  const srcMid = wToC(
-    (preview.source.startX + preview.source.endX) / 2,
-    (preview.source.startY + preview.source.endY) / 2
-  );
-  const far = preview.segments[preview.segments.length - 1];
-  const dstMid = wToC((far.startX + far.endX) / 2, (far.startY + far.endY) / 2);
+  // Стрелка направления смещения.
+  let src: Point2D | null = null;
+  let dst: Point2D | null = null;
+  if (hasLines && preview.source) {
+    src = wToC(
+      (preview.source.startX + preview.source.endX) / 2,
+      (preview.source.startY + preview.source.endY) / 2
+    );
+    const far = preview.segments[preview.segments.length - 1];
+    dst = wToC((far.startX + far.endX) / 2, (far.startY + far.endY) / 2);
+  } else if (hasArcs && preview.sourceArc) {
+    src = wToC(preview.sourceArc.startX, preview.sourceArc.startY);
+    const far = arcs[arcs.length - 1];
+    dst = wToC(far.startX, far.startY);
+  }
 
-  const vx = dstMid.x - srcMid.x;
-  const vy = dstMid.y - srcMid.y;
-  const vlen = Math.hypot(vx, vy);
-  if (vlen > 1) {
-    const ux = vx / vlen;
-    const uy = vy / vlen;
-    ctx.strokeStyle = '#2563eb';
-    ctx.fillStyle = '#2563eb';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(srcMid.x, srcMid.y);
-    ctx.lineTo(dstMid.x, dstMid.y);
-    ctx.stroke();
-    // Наконечник стрелки.
-    const head = 8;
-    ctx.beginPath();
-    ctx.moveTo(dstMid.x, dstMid.y);
-    ctx.lineTo(dstMid.x - head * ux - head * 0.5 * uy, dstMid.y - head * uy + head * 0.5 * ux);
-    ctx.lineTo(dstMid.x - head * ux + head * 0.5 * uy, dstMid.y - head * uy - head * 0.5 * ux);
-    ctx.closePath();
-    ctx.fill();
+  if (src && dst) {
+    const vx = dst.x - src.x;
+    const vy = dst.y - src.y;
+    const vlen = Math.hypot(vx, vy);
+    if (vlen > 1) {
+      const ux = vx / vlen;
+      const uy = vy / vlen;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(src.x, src.y);
+      ctx.lineTo(dst.x, dst.y);
+      ctx.stroke();
+      const head = 8;
+      ctx.beginPath();
+      ctx.moveTo(dst.x, dst.y);
+      ctx.lineTo(dst.x - head * ux - head * 0.5 * uy, dst.y - head * uy + head * 0.5 * ux);
+      ctx.lineTo(dst.x - head * ux + head * 0.5 * uy, dst.y - head * uy - head * 0.5 * ux);
+      ctx.closePath();
+      ctx.fill();
+    }
   }
 
   ctx.restore();

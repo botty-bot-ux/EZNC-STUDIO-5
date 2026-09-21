@@ -107,10 +107,24 @@ export interface ParallelSegment {
   endY: number;
 }
 
-// Живое превью модуля «Параллельная линия»: исходный отрезок + будущие параллельные копии.
+// Дуга-копия для превью «Параллельная дуга» (концентрическая, координаты мира, мм).
+export interface ParallelArc {
+  centerX: number;
+  centerY: number;
+  radius: number;
+  startX: number;
+  startY: number;
+  endX: number;
+  endY: number;
+  clockwise: boolean;
+}
+
+// Живое превью модуля «Параллельная …»: будущие копии (линии и/или дуги) + исходник для стрелки.
 export interface ParallelPreviewState {
-  source: ParallelSegment;
-  segments: ParallelSegment[];
+  segments: ParallelSegment[]; // штриховые будущие линии
+  source?: ParallelSegment; // исходный отрезок (для стрелки направления)
+  arcs?: ParallelArc[]; // штриховые будущие дуги
+  sourceArc?: ParallelArc; // исходная дуга (для стрелки направления)
 }
 
 // Фоновая референсная картинка («подложка»/чертёж). Только на сессию — не сохраняется и не влияет на G-код.

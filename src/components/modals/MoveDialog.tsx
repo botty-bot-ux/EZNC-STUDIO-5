@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Move, X } from 'lucide-react';
 import { useProjectStore } from '../../store/useProjectStore';
+import { StepperField } from '../ui/StepperField';
 
 interface MoveDialogProps {
   isOpen: boolean;
@@ -52,6 +53,10 @@ export const MoveDialog: React.FC<MoveDialogProps> = ({ isOpen, ids, onClose, on
     setLiveMove({ ids, dx: parseMM(xStr), dy: parseMM(v) });
   };
 
+  // Шаг стрелками ▲/▼: ±1 мм с обновлением живого смещения.
+  const stepX = (dir: 1 | -1) => changeX(String(parseMM(xStr) + dir));
+  const stepY = (dir: 1 | -1) => changeY(String(parseMM(yStr) + dir));
+
   const cancel = () => {
     setLiveMove(null);
     onClose();
@@ -96,41 +101,25 @@ export const MoveDialog: React.FC<MoveDialogProps> = ({ isOpen, ids, onClose, on
         </div>
 
         <div className="grid grid-cols-2 gap-3">
-          <label className="block">
-            <span className="text-[13px] font-medium text-slate-500 dark:text-slate-400">X, мм</span>
-            <input
-              type="text"
-              inputMode="decimal"
-              autoFocus
-              value={xStr}
-              onChange={(e) => changeX(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  confirm();
-                }
-              }}
-              placeholder="0"
-              className="mt-1 w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 font-mono text-sm text-center focus:border-primary focus:bg-white focus:dark:bg-slate-900 focus:outline-none transition-all"
-            />
-          </label>
-          <label className="block">
-            <span className="text-[13px] font-medium text-slate-500 dark:text-slate-400">Y, мм</span>
-            <input
-              type="text"
-              inputMode="decimal"
-              value={yStr}
-              onChange={(e) => changeY(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  confirm();
-                }
-              }}
-              placeholder="0"
-              className="mt-1 w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 font-mono text-sm text-center focus:border-primary focus:bg-white focus:dark:bg-slate-900 focus:outline-none transition-all"
-            />
-          </label>
+          <StepperField
+            label="X, мм"
+            value={xStr}
+            inputMode="decimal"
+            autoFocus
+            placeholder="0"
+            onChange={changeX}
+            onStep={stepX}
+            onEnter={confirm}
+          />
+          <StepperField
+            label="Y, мм"
+            value={yStr}
+            inputMode="decimal"
+            placeholder="0"
+            onChange={changeY}
+            onStep={stepY}
+            onEnter={confirm}
+          />
         </div>
 
         <div className="mt-5 flex items-center justify-end gap-2">

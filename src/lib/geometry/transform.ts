@@ -1,4 +1,4 @@
-import { ArcObject, CADObject, MachineSettings, ParallelSegment, Point2D } from '../../types';
+import { ArcObject, CADObject, MachineSettings, ParallelArc, ParallelSegment, Point2D } from '../../types';
 
 /**
  * Линии, параллельные исходному отрезку, смещённые перпендикулярно (по нормали)
@@ -24,6 +24,38 @@ export function computeParallelSegments(
       startY: line.startY + ny * off,
       endX: line.endX + nx * off,
       endY: line.endY + ny * off,
+    });
+  }
+  return out;
+}
+
+/**
+ * Дуги, параллельные исходной (концентрические): тот же центр, те же углы и направление,
+ * радиус r + distance·k для k = 1..count. Концы смещаются вдоль радиальных лучей, поэтому
+ * угловой охват сохраняется. Копии с неположительным радиусом пропускаются.
+ */
+export function computeParallelArcs(arc: ParallelArc, distance: number, count: number): ParallelArc[] {
+  const r = arc.radius;
+  if (r === 0 || count < 1) return [];
+  const sLen = Math.hypot(arc.startX - arc.centerX, arc.startY - arc.centerY) || r;
+  const eLen = Math.hypot(arc.endX - arc.centerX, arc.endY - arc.centerY) || r;
+  const usx = (arc.startX - arc.centerX) / sLen;
+  const usy = (arc.startY - arc.centerY) / sLen;
+  const uex = (arc.endX - arc.centerX) / eLen;
+  const uey = (arc.endY - arc.centerY) / eLen;
+  const out: ParallelArc[] = [];
+  for (let k = 1; k <= count; k++) {
+    const rk = r + distance * k;
+    if (rk <= 0) continue;
+    out.push({
+      centerX: arc.centerX,
+      centerY: arc.centerY,
+      radius: rk,
+      startX: arc.centerX + usx * rk,
+      startY: arc.centerY + usy * rk,
+      endX: arc.centerX + uex * rk,
+      endY: arc.centerY + uey * rk,
+      clockwise: arc.clockwise,
     });
   }
   return out;

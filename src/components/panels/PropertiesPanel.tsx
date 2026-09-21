@@ -2,15 +2,15 @@ import React from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { Circle, CircleDot, Eye, EyeOff, GitCompareArrows, Layers, LineDotRightHorizontal, Lock, Move, Ruler, Sliders, Spline, Square, Trash2, Unlock } from 'lucide-react';
 import { useProjectStore } from '../../store/useProjectStore';
-import { computeParallelSegments } from '../../lib/geometry/transform';
-import { ArcObject, CircleObject, LineObject, PointHoleObject, RectangleObject } from '../../types';
+import { computeParallelArcs, computeParallelSegments } from '../../lib/geometry/transform';
+import { ArcObject, CircleObject, LineObject, ParallelPreviewState, PointHoleObject, RectangleObject } from '../../types';
 import { ArcProperties } from './properties/ArcProperties';
 import { CircleProperties } from './properties/CircleProperties';
 import { LineProperties } from './properties/LineProperties';
 import { PointProperties } from './properties/PointProperties';
 import { RectangleProperties } from './properties/RectangleProperties';
 import { MoveDialog } from '../modals/MoveDialog';
-import { ParallelLineDialog } from '../modals/ParallelLineDialog';
+import { ParallelDialog } from '../modals/ParallelDialog';
 
 export const PropertiesPanel: React.FC = () => {
   const {
@@ -226,10 +226,10 @@ export const PropertiesPanel: React.FC = () => {
               <Move className="w-4 h-4" />
             </button>
           )}
-          {selectedObj.type === 'line' && (
+          {(selectedObj.type === 'line' || selectedObj.type === 'arc') && (
             <button
               onClick={() => setParallelOpen(true)}
-              title="Параллельная линия (смещение по нормали)"
+              title={selectedObj.type === 'arc' ? 'Параллельная дуга (концентрическое смещение)' : 'Параллельная линия (смещение по нормали)'}
               className="p-1.5 rounded-lg text-slate-400 dark:text-slate-500 hover:text-primary hover:bg-slate-100 hover:dark:bg-slate-700 transition-all"
             >
               <GitCompareArrows className="w-4 h-4" />
@@ -312,21 +312,83 @@ export const PropertiesPanel: React.FC = () => {
         onApply={moveSelectedObjectsBy}
       />
 
-      {selectedObj.type === 'line' && (
-        <ParallelLineDialog
+      {(selectedObj.type === 'line' || selectedObj.type === 'arc') && (
+        <ParallelDialog
           isOpen={parallelOpen}
-          line={selectedObj as LineObject}
+          title={selectedObj.type === 'arc' ? 'Параллельная дуга' : 'Параллельная линия'}
+          countLabel={selectedObj.type === 'arc' ? 'Кол-во дуг' : 'Кол-во линий'}
+          hint={
+            selectedObj.type === 'arc'
+              ? `От исходной «${selectedObj.name}» концентрически. Знак «−» — к центру.`
+              : `От исходной «${selectedObj.name}» по нормали. Знак «−» меняет сторону.`
+          }
           onClose={() => setParallelOpen(false)}
+          makePreview={(distance, count) => {
+            if (selectedObj.type === 'arc') {
+              const a = selectedObj as ArcObject;
+              const sourceArc = {
+                centerX: a.centerX,
+                centerY: a.centerY,
+                radius: a.radius,
+                startX: a.startX,
+                startY: a.startY,
+                endX: a.endX,
+                endY: a.endY,
+                clockwise: a.clockwise,
+              };
+              const arcs = computeParallelArcs(sourceArc, distance, count);
+              const preview: ParallelPreviewState = arcs.length ? { segments: [], sourceArc, arcs } : { segments: [] };
+              return arcs.length ? preview : null;
+            }
+            const l = selectedObj as LineObject;
+            const source = { startX: l.startX, startY: l.startY, endX: l.endX, endY: l.endY };
+            const segments = computeParallelSegments(source, distance, count);
+            return segments.length ? { segments, source } : null;
+          }}
           onCreate={(distance, count) => {
+            const baseIndex = objects.length; // нумерация «Имя N» продолжается от числа объектов
+            if (selectedObj.type === 'arc') {
+              const a = selectedObj as ArcObject;
+              const arcs = computeParallelArcs(
+                {
+                  centerX: a.centerX,
+                  centerY: a.centerY,
+                  radius: a.radius,
+                  startX: a.startX,
+                  startY: a.startY,
+                  endX: a.endX,
+                  endY: a.endY,
+                  clockwise: a.clockwise,
+                },
+                distance,
+                count
+              );
+              arcs.forEach((arc, i) => {
+                addObject({
+                  type: 'arc',
+                  name: `Дуга R${arc.radius.toFixed(1)} (${baseIndex + i + 1})`,
+                  depth: a.depth,
+                  operationType: a.operationType,
+                  color: a.color,
+                  visible: true,
+                  centerX: arc.centerX,
+                  centerY: arc.centerY,
+                  radius: arc.radius,
+                  startX: arc.startX,
+                  startY: arc.startY,
+                  endX: arc.endX,
+                  endY: arc.endY,
+                  clockwise: arc.clockwise,
+                });
+              });
+              return;
+            }
             const l = selectedObj as LineObject;
             const segments = computeParallelSegments(
               { startX: l.startX, startY: l.startY, endX: l.endX, endY: l.endY },
               distance,
               count
             );
-            if (segments.length === 0) return;
-            // Нумерация «Отрезок N» продолжается от текущего числа объектов (как при рисовании).
-            const baseIndex = objects.length;
             segments.forEach((seg, i) => {
               addObject({
                 type: 'line',
