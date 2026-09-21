@@ -12,9 +12,11 @@ export const INITIAL_MACHINE: MachineSettings = {
     yMin: -2000,
     yMax: 0,
   },
+  // Заготовка листа по умолчанию выключена (как при выключении тумблером в панели:
+  // preset 'none'). Размеры сохранены — включение возвращает лист 1081×1681.
   stockSheet: {
-    enabled: true,
-    preset: 'custom',
+    enabled: false,
+    preset: 'none',
     widthX: 1081,
     widthY: 1681,
     color: '#22c55e',
