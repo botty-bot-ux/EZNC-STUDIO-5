@@ -50,6 +50,41 @@ export function getArcFrom3Points(p1: Point2D, p2: Point2D, p3: Point2D) {
 }
 
 /**
+ * Дуга по «начало + конец + ЦЕНТР под мышью».
+ *
+ * В отличие от 3-точечной дуги (где третий лежало НА самой дуге, а центр уезжал в
+ * сторону), здесь мышь задаёт именно центр: он всегда ровно под курсором. Начало
+ * остаётся там, куда кликнули, а «конец» хорды дотягивается до окружности (сохраняя
+ * направление от центра), чтобы дуга была корректной. Возвращаем и сам конец на
+ * окружности — его пишем в фигуру.
+ */
+export function getArcFromCenter(p1: Point2D, p2: Point2D, center: Point2D) {
+  const r = Math.hypot(p1.x - center.x, p1.y - center.y);
+  if (r < 1e-4) return null; // центр совпал с началом — вырожденная дуга
+
+  // Конец хорды приводим на ту же окружность: сохраняем направление «центр→конец».
+  const ex = p2.x - center.x;
+  const ey = p2.y - center.y;
+  const el = Math.hypot(ex, ey);
+  const endOnCircle: Point2D =
+    el < 1e-6
+      ? { x: center.x + r, y: center.y }
+      : { x: center.x + (ex / el) * r, y: center.y + (ey / el) * r };
+
+  // Точка на дуге «напротив» хорды (вершина прогиба) — чтобы переиспытать проверенную
+  // 3-точечную логику определения направления (clockwise) и радиуса.
+  const mid: Point2D = { x: (p1.x + endOnCircle.x) / 2, y: (p1.y + endOnCircle.y) / 2 };
+  const dm = Math.hypot(mid.x - center.x, mid.y - center.y);
+  const p3: Point2D =
+    dm < 1e-6
+      ? { x: center.x + r, y: center.y }
+      : { x: center.x + ((mid.x - center.x) / dm) * r, y: center.y + ((mid.y - center.y) / dm) * r };
+
+  const arc = getArcFrom3Points(p1, endOnCircle, p3);
+  return { ...arc, endOnCircle };
+}
+
+/**
  * Convert World mm to Canvas px
  */
 export function worldToCanvas(wx: number, wy: number, pan: Point2D, zoom: number): Point2D {

@@ -1,6 +1,6 @@
 import { ActiveTool, CADObject, MachineSettings, ParallelPreviewState, Point2D, ToolpathSegment, UnderlayState, ViewMode } from '../../types';
 import { DragMode } from './canvasHitTest';
-import { HoveredHandle, SnapPointInfo, getArcFrom3Points, worldToCanvas } from './canvasUtils';
+import { HoveredHandle, SnapPointInfo, getArcFromCenter, worldToCanvas } from './canvasUtils';
 import { CanvasPalette, LIGHT_PALETTE } from './canvasPalette';
 
 export interface DrawOptions {
@@ -977,18 +977,20 @@ export function drawDrawingPreview(
         ctx.arc(p1.x, p1.y, r * zoom, 0, Math.PI * 2);
         ctx.stroke();
       } else if (activeTool === 'arc' && drawArcStartPt && drawArcEndPt) {
-        const arcData = getArcFrom3Points(drawArcStartPt, drawArcEndPt, currentMouseProgPt);
-        const cp = wToC(arcData.centerX, arcData.centerY);
-        const rPx = arcData.radius * zoom;
-        const pStart = wToC(drawArcStartPt.x, drawArcStartPt.y);
-        const pEnd = wToC(drawArcEndPt.x, drawArcEndPt.y);
+        const arcData = getArcFromCenter(drawArcStartPt, drawArcEndPt, currentMouseProgPt);
+        if (arcData) {
+          const cp = wToC(arcData.centerX, arcData.centerY);
+          const rPx = arcData.radius * zoom;
+          const pStart = wToC(drawArcStartPt.x, drawArcStartPt.y);
+          const pEnd = wToC(arcData.endOnCircle.x, arcData.endOnCircle.y);
 
-        const a1 = Math.atan2(pStart.y - cp.y, pStart.x - cp.x);
-        const a2 = Math.atan2(pEnd.y - cp.y, pEnd.x - cp.x);
+          const a1 = Math.atan2(pStart.y - cp.y, pStart.x - cp.x);
+          const a2 = Math.atan2(pEnd.y - cp.y, pEnd.x - cp.x);
 
-        ctx.beginPath();
-        ctx.arc(cp.x, cp.y, rPx, a1, a2, !arcData.clockwise);
-        ctx.stroke();
+          ctx.beginPath();
+          ctx.arc(cp.x, cp.y, rPx, a1, a2, !arcData.clockwise);
+          ctx.stroke();
+        }
       }
       ctx.restore();
     }
@@ -1007,23 +1009,26 @@ export function drawDrawingPreview(
       ctx.lineTo(p2.x, p2.y);
       ctx.stroke();
     } else if (drawArcStartPt && drawArcEndPt) {
-      const arcData = getArcFrom3Points(drawArcStartPt, drawArcEndPt, currentMouseProgPt);
-      const cp = wToC(arcData.centerX, arcData.centerY);
-      const rPx = arcData.radius * zoom;
-      const pStart = wToC(drawArcStartPt.x, drawArcStartPt.y);
-      const pEnd = wToC(drawArcEndPt.x, drawArcEndPt.y);
+      const arcData = getArcFromCenter(drawArcStartPt, drawArcEndPt, currentMouseProgPt);
+      if (arcData) {
+        const cp = wToC(arcData.centerX, arcData.centerY);
+        const rPx = arcData.radius * zoom;
+        const pStart = wToC(drawArcStartPt.x, drawArcStartPt.y);
+        const pEnd = wToC(arcData.endOnCircle.x, arcData.endOnCircle.y);
 
-      const a1 = Math.atan2(pStart.y - cp.y, pStart.x - cp.x);
-      const a2 = Math.atan2(pEnd.y - cp.y, pEnd.x - cp.x);
+        const a1 = Math.atan2(pStart.y - cp.y, pStart.x - cp.x);
+        const a2 = Math.atan2(pEnd.y - cp.y, pEnd.x - cp.x);
 
-      ctx.beginPath();
-      ctx.arc(cp.x, cp.y, rPx, a1, a2, !arcData.clockwise);
-      ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(cp.x, cp.y, rPx, a1, a2, !arcData.clockwise);
+        ctx.stroke();
 
-      ctx.fillStyle = '#f43f5e';
-      ctx.beginPath();
-      ctx.arc(cp.x, cp.y, 3, 0, Math.PI * 2);
-      ctx.fill();
+        // Центр — ровно под курсором мыши.
+        ctx.fillStyle = '#f43f5e';
+        ctx.beginPath();
+        ctx.arc(cp.x, cp.y, 3, 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
   } else if (drawStartPt) {
     const p1 = wToC(drawStartPt.x, drawStartPt.y);

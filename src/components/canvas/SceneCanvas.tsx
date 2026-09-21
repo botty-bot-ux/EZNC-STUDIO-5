@@ -32,7 +32,7 @@ import {
   SnapPointInfo,
   canvasToWorld,
   worldToCanvas,
-  getArcFrom3Points,
+  getArcFromCenter,
 } from './canvasUtils';
 import { paletteForTheme } from './canvasPalette';
 import { constrainAngle } from '../../lib/geometry/transform';
@@ -791,21 +791,25 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
         setDrawArcEndPt(clampRayToPosFaces(drawArcStartPt, end));
         setLineLengthInput('');
       } else {
-        const arcData = getArcFrom3Points(drawArcStartPt, drawArcEndPt, snapPt);
-        addObject({
-          name: `Дуга R${arcData.radius.toFixed(1)} (${objects.length + 1})`,
-          type: 'arc',
-          startX: drawArcStartPt.x,
-          startY: drawArcStartPt.y,
-          endX: drawArcEndPt.x,
-          endY: drawArcEndPt.y,
-          centerX: arcData.centerX,
-          centerY: arcData.centerY,
-          radius: arcData.radius,
-          clockwise: arcData.clockwise,
-          depth: 5,
-          operationType: 'cut',
-        });
+        // Третий клик = ЦЕНТР дуги ровно под курсором. Начало остаётся на месте,
+        // конец хорды дотягивается на окружность (arcData.endOnCircle).
+        const arcData = getArcFromCenter(drawArcStartPt, drawArcEndPt, snapPt);
+        if (arcData) {
+          addObject({
+            name: `Дуга R${arcData.radius.toFixed(1)} (${objects.length + 1})`,
+            type: 'arc',
+            startX: drawArcStartPt.x,
+            startY: drawArcStartPt.y,
+            endX: arcData.endOnCircle.x,
+            endY: arcData.endOnCircle.y,
+            centerX: arcData.centerX,
+            centerY: arcData.centerY,
+            radius: arcData.radius,
+            clockwise: arcData.clockwise,
+            depth: 5,
+            operationType: 'cut',
+          });
+        }
         setDrawArcStartPt(null);
         setDrawArcEndPt(null);
       }
