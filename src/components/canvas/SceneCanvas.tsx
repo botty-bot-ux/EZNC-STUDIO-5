@@ -1201,24 +1201,36 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
                 if (chosen.type === 'line_start') patch = { startX: nx, startY: ny };
                 else if (chosen.type === 'line_end') patch = { endX: nx, endY: ny };
                 else if (chosen.type === 'arc_start' && o.type === 'arc') {
-                  // Тянем за конец дуги — перемещаем ВСЮ дугу целиком (центр и оба
-                  // конца), форма и радиус сохраняются, второй конец едет следом.
+                  // Тянем за НАЧАЛО дуги: центр фиксирован, радиус = расстояние до курсора.
+                  // Второй конец НЕ оставляем на месте — он уезжает вдоль своего направления,
+                  // чтобы всегда лежать на окружности (в конце дуги), а не отдельно от неё.
+                  const cx = o.centerX;
+                  const cy = o.centerY;
+                  const newR = Math.hypot(nx - cx, ny - cy);
+                  const ux = o.endX - cx;
+                  const uy = o.endY - cy;
+                  const ul = Math.hypot(ux, uy) || 1;
                   patch = {
-                    centerX: o.centerX + dx,
-                    centerY: o.centerY + dy,
-                    startX: o.startX + dx,
-                    startY: o.startY + dy,
-                    endX: o.endX + dx,
-                    endY: o.endY + dy,
+                    startX: nx,
+                    startY: ny,
+                    radius: newR,
+                    endX: cx + (ux / ul) * newR,
+                    endY: cy + (uy / ul) * newR,
                   };
                 } else if (chosen.type === 'arc_end' && o.type === 'arc') {
+                  // То же для КОНЦА дуги: начало уезжает вдоль своего радиуса на новую окружность.
+                  const cx = o.centerX;
+                  const cy = o.centerY;
+                  const newR = Math.hypot(nx - cx, ny - cy);
+                  const ux = o.startX - cx;
+                  const uy = o.startY - cy;
+                  const ul = Math.hypot(ux, uy) || 1;
                   patch = {
-                    centerX: o.centerX + dx,
-                    centerY: o.centerY + dy,
-                    startX: o.startX + dx,
-                    startY: o.startY + dy,
-                    endX: o.endX + dx,
-                    endY: o.endY + dy,
+                    endX: nx,
+                    endY: ny,
+                    radius: newR,
+                    startX: cx + (ux / ul) * newR,
+                    startY: cy + (uy / ul) * newR,
                   };
                 }
               }
