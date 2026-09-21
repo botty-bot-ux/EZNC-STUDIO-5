@@ -10,19 +10,24 @@ import { useIsMobile } from '../../hooks/useIsMobile';
 // На мобильных фигуры живут в нижней шторке «Фигуры» (см. MobileTabBar), поэтому панель скрывается.
 export const LeftToolbar: React.FC = () => {
   const isMobile = useIsMobile();
-  const { objects, leftPanelOpen, toggleLeftPanel } = useProjectStore(
+  const { objects, leftPanelOpen, toggleLeftPanel, canvasGrabbing } = useProjectStore(
     useShallow((s) => ({
       objects: s.objects,
       leftPanelOpen: s.leftPanelOpen,
       toggleLeftPanel: s.toggleLeftPanel,
+      canvasGrabbing: s.canvasGrabbing,
     }))
   );
 
   if (isMobile) return null;
 
+  // Во время жеста на холсте панель пропускает мышь сквозь себя и слегка гаснет,
+  // чтобы не блокировать рисование/перетаскивание у левого края.
+  const inertClass = canvasGrabbing ? 'pointer-events-none opacity-40' : '';
+
   if (!leftPanelOpen) {
     return (
-      <div className="absolute left-4 top-20 z-20 flex items-center select-none pointer-events-auto">
+      <div className={`absolute left-4 top-20 z-20 flex items-center select-none pointer-events-auto transition-opacity ${inertClass}`}>
         <button
           onClick={toggleLeftPanel}
           title="Показать список фигур"
@@ -40,7 +45,7 @@ export const LeftToolbar: React.FC = () => {
   }
 
   return (
-    <aside className="absolute left-4 top-20 bottom-4 w-72 flex flex-col bg-transparent text-slate-800 dark:text-slate-100 z-20 select-none overflow-hidden transition-all duration-200">
+    <aside className={`absolute left-4 top-20 bottom-4 w-72 flex flex-col bg-transparent text-slate-800 dark:text-slate-100 z-20 select-none overflow-hidden transition-all duration-200 ${inertClass}`}>
       {/* Header */}
       <div className="px-1.5 py-1 flex items-center justify-between gap-2 shrink-0">
         <div className="flex items-center gap-1.5 min-w-0">

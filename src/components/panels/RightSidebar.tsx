@@ -9,17 +9,22 @@ import { useIsMobile } from '../../hooks/useIsMobile';
 
 export const RightSidebar: React.FC = () => {
   const isMobile = useIsMobile();
-  const { activeTab, setActiveTab, warnings, rightPanelOpen, toggleRightPanel } = useProjectStore(
-    useShallow((s) => ({
-      activeTab: s.activeTab,
-      setActiveTab: s.setActiveTab,
-      warnings: s.warnings,
-      rightPanelOpen: s.rightPanelOpen,
-      toggleRightPanel: s.toggleRightPanel,
-    }))
-  );
+  const { activeTab, setActiveTab, warnings, rightPanelOpen, toggleRightPanel, canvasGrabbing } =
+    useProjectStore(
+      useShallow((s) => ({
+        activeTab: s.activeTab,
+        setActiveTab: s.setActiveTab,
+        warnings: s.warnings,
+        rightPanelOpen: s.rightPanelOpen,
+        toggleRightPanel: s.toggleRightPanel,
+        canvasGrabbing: s.canvasGrabbing,
+      }))
+    );
 
   const errorCount = warnings.filter((w) => w.level === 'error').length;
+
+  // Во время жеста на холсте панель пропускает мышь сквозь себя и слегка гаснет.
+  const inertClass = canvasGrabbing ? 'pointer-events-none opacity-40' : '';
 
   // Monaco держим смонтированным после первого открытия вкладки G-кода (см. контент ниже).
   const [gcodeSeen, setGcodeSeen] = React.useState(false);
@@ -35,7 +40,7 @@ export const RightSidebar: React.FC = () => {
       <button
         onClick={toggleRightPanel}
         title="Открыть панель свойств и станка"
-        className="absolute right-4 top-20 z-20 w-11 h-11 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-md flex items-center justify-center cursor-pointer hover:bg-white hover:dark:bg-slate-800 transition-colors text-slate-700 dark:text-slate-200 hover:text-primary"
+        className={`absolute right-4 top-20 z-20 w-11 h-11 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-md flex items-center justify-center cursor-pointer hover:bg-white hover:dark:bg-slate-800 transition-all text-slate-700 dark:text-slate-200 hover:text-primary ${inertClass}`}
       >
         <Sliders className="w-5 h-5 text-accent" />
       </button>
@@ -46,7 +51,7 @@ export const RightSidebar: React.FC = () => {
   const panelWidthClass = 'w-96 md:w-[420px]';
 
   return (
-    <aside className={`absolute right-4 top-20 bottom-4 ${panelWidthClass} bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-md text-slate-800 dark:text-slate-100 flex flex-col select-none z-20 overflow-hidden transition-all duration-200`}>
+    <aside className={`absolute right-4 top-20 bottom-4 ${panelWidthClass} bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-md text-slate-800 dark:text-slate-100 flex flex-col select-none z-20 overflow-hidden transition-all duration-200 ${inertClass}`}>
       {/* Top Header / Collapse Bar */}
       <div className="px-3 py-2 bg-slate-50 dark:bg-slate-800 border-b border-slate-200/80 dark:border-slate-700/80 flex items-center justify-between shrink-0">
         <button

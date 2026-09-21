@@ -93,6 +93,10 @@ interface ProjectStore {
   arcMode: ArcMode;
   // Под-режим построения линии (используется, когда activeTool === 'line').
   lineMode: LineMode;
+  // Идёт жест на холсте (перетаскивание фигуры/грифа или рисование с уже поставленной
+  // первой точкой). Пока true — плавающие боковые панели игнорируют мышь
+  // (pointer-events:none), чтобы не перехватывать события у холста.
+  canvasGrabbing: boolean;
   activeTab: ActiveTab;
   viewMode: ViewMode;
 
@@ -132,6 +136,7 @@ interface ProjectStore {
   setActiveTool: (tool: ActiveTool) => void;
   setArcMode: (mode: ArcMode) => void;
   setLineMode: (mode: LineMode) => void;
+  setCanvasGrabbing: (grabbing: boolean) => void;
   setActiveTab: (tab: ActiveTab) => void;
   setViewMode: (mode: ViewMode) => void;
   setTheme: (theme: Theme) => void;
@@ -313,6 +318,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
     activeTool: 'select',
     arcMode: 'bulge',
     lineMode: 'line',
+    canvasGrabbing: false,
     activeTab: 'gcode',
     viewMode: 'edit',
 
@@ -352,6 +358,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
       })),
     setArcMode: (mode: ArcMode) => set({ arcMode: mode }),
     setLineMode: (mode: LineMode) => set({ lineMode: mode }),
+    setCanvasGrabbing: (grabbing: boolean) => set({ canvasGrabbing: grabbing }),
     setActiveTab: (tab: ActiveTab) =>
       set((state) => ({
         activeTab: tab,

@@ -155,6 +155,7 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
     setArcMode,
     lineMode,
     setLineMode,
+    setCanvasGrabbing,
     snapToGrid,
     setSnapToGrid,
     gridStep,
@@ -189,6 +190,7 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
       setArcMode: s.setArcMode,
       lineMode: s.lineMode,
       setLineMode: s.setLineMode,
+      setCanvasGrabbing: s.setCanvasGrabbing,
       snapToGrid: s.snapToGrid,
       setSnapToGrid: s.setSnapToGrid,
       gridStep: s.gridStep,
@@ -389,6 +391,30 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
       setPolyPts([]);
     }
   }, [activeTool]);
+
+  // Пока идёт жест на холсте (перетаскивание/пан/выделение рамкой или рисование с
+  // поставленной первой точкой) — просим плавающие панели не перехватывать мышь.
+  useEffect(() => {
+    const drawing =
+      (activeTool === 'line' &&
+        (lineMode === 'line' ? !!drawStartPt : polyPts.length > 0)) ||
+      (activeTool === 'arc' && !!drawArcStartPt) ||
+      (activeTool === 'rectangle' && !!drawStartPt) ||
+      (activeTool === 'circle' && !!drawStartPt) ||
+      (activeTool === 'measure' && !!measureStartPt && !measureEndPt);
+    const dragging = dragMode !== 'none';
+    setCanvasGrabbing(dragging || drawing);
+  }, [
+    dragMode,
+    activeTool,
+    lineMode,
+    drawStartPt,
+    drawArcStartPt,
+    polyPts,
+    measureStartPt,
+    measureEndPt,
+    setCanvasGrabbing,
+  ]);
 
   // Mirror the transient vertex-edit drag into the store so the Свойства panel shows the
   // live coordinates while a handle is dragged (store objects stay untouched until mouseup).
@@ -1314,6 +1340,27 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
     setDragIds([]);
     setLiveDrag({ mode: 'none' });
   };
+
+  // Свежий pointerUp для window-страховки (замыкание всегда с актуальным liveDrag/objects).
+  const pointerUpRef = useRef<(e: CanvasPointer) => void>(() => {});
+  pointerUpRef.current = pointerUp;
+
+  // Страховка: если мышь отпустили вне холста (например, над шапкой), завершаем жест,
+  // чтобы перетаскивание не «залипло». Отпускание прямо на холсте обрабатывает onMouseUp.
+  useEffect(() => {
+    if (dragMode === 'none') return;
+    const onWinUp = (ev: MouseEvent) => {
+      if (canvasRef.current && ev.target === canvasRef.current) return;
+      pointerUpRef.current({
+        clientX: ev.clientX,
+        clientY: ev.clientY,
+        shiftKey: ev.shiftKey,
+        ctrlKey: ev.ctrlKey,
+      });
+    };
+    window.addEventListener('mouseup', onWinUp);
+    return () => window.removeEventListener('mouseup', onWinUp);
+  }, [dragMode]);
 
   const handleMouseLeave = () => {
     setCurrentMouseProgPt(null);
