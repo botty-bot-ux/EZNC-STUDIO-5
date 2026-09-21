@@ -8,7 +8,8 @@ interface ExportModalProps {
   result: OptimizationResult | null;
   hasObjects: boolean;
   onOptimize: () => void;
-  onExport: () => void;
+  /** true = файл сохранён → окно закроется само; false = пользователь отменил сохранение. */
+  onExport: () => Promise<boolean>;
   onUndoOptimize: () => void;
 }
 
@@ -108,7 +109,9 @@ export const ExportModal: React.FC<ExportModalProps> = ({
           </button>
 
           <button
-            onClick={onExport}
+            onClick={async () => {
+              if (await onExport()) onClose();
+            }}
             disabled={!hasObjects}
             className="px-5 py-2.5 rounded-xl text-xs font-bold text-primary-fg bg-primary hover:opacity-90 active:opacity-100 disabled:opacity-40 disabled:cursor-not-allowed shadow-sm transition-all cursor-pointer inline-flex items-center gap-1.5"
           >

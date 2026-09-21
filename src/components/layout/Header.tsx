@@ -140,17 +140,19 @@ export const Header: React.FC = () => {
   };
 
   // Export a clean G-code program (.nc) for the machine — no embedded project JSON.
-  const handleExportGcode = async () => {
+  // true = файл сохранён (модалка экспорта закроется), false = отменён/нечего экспортировать.
+  const handleExportGcode = async (): Promise<boolean> => {
     if (!hasObjects) {
       alert('Нет объектов для экспорта.');
-      return;
+      return false;
     }
-    await writeToDisk(
+    const saved = await writeToDisk(
       exportGcode(),
       `${cleanProjectName()}.nc`,
       'Управляющая программа ЧПУ (*.nc)',
       ['.nc', '.gcode', '.cnc', '.tap', '.txt']
     );
+    return saved !== null;
   };
 
   const handleOpenFile = (e: React.ChangeEvent<HTMLInputElement>) => {
