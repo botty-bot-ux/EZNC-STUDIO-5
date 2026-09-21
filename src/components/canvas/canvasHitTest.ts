@@ -21,80 +21,54 @@ export type HandleType = Extract<
 
 /**
  * Finds handle hit (line start/end, arc start/end/center) near mouse point.
+ *
+ * `selectedIds` — массив id выделенных фигур. Если он задан и непуст, грифы этих
+ * фигур имеют приоритет (возвращается ближайший из них), и только если среди
+ * выделенных совпадения нет — ищем по всем видимым. Так можно схватить узел, когда
+ * группа из нескольких фигур уже выделена, и не потерять выделение.
  */
 export function findHandleHit(
   objects: CADObject[],
-  selectedObjectId: string | null,
+  selectedIds: string[] | null | undefined,
   mousePx: Point2D,
   pan: Point2D,
   zoom: number,
   handleHitRadiusPx: number = 14
 ): { objectId: string; type: HandleType } | null {
   const wToC = (x: number, y: number) => worldToCanvas(x, y, pan, zoom);
+  const selSet = new Set(selectedIds ?? []);
 
-  // 1. Prioritize selected object
-  if (selectedObjectId) {
-    const selObj = objects.find((o) => o.id === selectedObjectId);
-    if (selObj && selObj.visible !== false && !selObj.frozen) {
-      if (selObj.type === 'line') {
-        const p1 = wToC(selObj.startX, selObj.startY);
-        const p2 = wToC(selObj.endX, selObj.endY);
+  let bestSelected: { objectId: string; type: HandleType; dist: number } | null = null;
+  let bestAny: { objectId: string; type: HandleType; dist: number } | null = null;
 
-        if (Math.hypot(mousePx.x - p1.x, mousePx.y - p1.y) <= handleHitRadiusPx) {
-          return { objectId: selObj.id, type: 'line_start' };
-        }
-        if (Math.hypot(mousePx.x - p2.x, mousePx.y - p2.y) <= handleHitRadiusPx) {
-          return { objectId: selObj.id, type: 'line_end' };
-        }
-      } else if (selObj.type === 'arc') {
-        const p1 = wToC(selObj.startX, selObj.startY);
-        const p2 = wToC(selObj.endX, selObj.endY);
-        const cp = wToC(selObj.centerX, selObj.centerY);
-
-        if (Math.hypot(mousePx.x - p1.x, mousePx.y - p1.y) <= handleHitRadiusPx) {
-          return { objectId: selObj.id, type: 'arc_start' };
-        }
-        if (Math.hypot(mousePx.x - p2.x, mousePx.y - p2.y) <= handleHitRadiusPx) {
-          return { objectId: selObj.id, type: 'arc_end' };
-        }
-        if (Math.hypot(mousePx.x - cp.x, mousePx.y - cp.y) <= handleHitRadiusPx) {
-          return { objectId: selObj.id, type: 'arc_center' };
-        }
-      }
-    }
-  }
-
-  // 2. Check all visible objects
   for (const obj of objects) {
     if (obj.visible === false || obj.frozen) continue;
+    const candidates: { type: HandleType; x: number; y: number }[] = [];
     if (obj.type === 'line') {
-      const p1 = wToC(obj.startX, obj.startY);
-      const p2 = wToC(obj.endX, obj.endY);
-
-      if (Math.hypot(mousePx.x - p1.x, mousePx.y - p1.y) <= handleHitRadiusPx) {
-        return { objectId: obj.id, type: 'line_start' };
-      }
-      if (Math.hypot(mousePx.x - p2.x, mousePx.y - p2.y) <= handleHitRadiusPx) {
-        return { objectId: obj.id, type: 'line_end' };
-      }
+      candidates.push({ type: 'line_start', x: obj.startX, y: obj.startY });
+      candidates.push({ type: 'line_end', x: obj.endX, y: obj.endY });
     } else if (obj.type === 'arc') {
-      const p1 = wToC(obj.startX, obj.startY);
-      const p2 = wToC(obj.endX, obj.endY);
-      const cp = wToC(obj.centerX, obj.centerY);
-
-      if (Math.hypot(mousePx.x - p1.x, mousePx.y - p1.y) <= handleHitRadiusPx) {
-        return { objectId: obj.id, type: 'arc_start' };
-      }
-      if (Math.hypot(mousePx.x - p2.x, mousePx.y - p2.y) <= handleHitRadiusPx) {
-        return { objectId: obj.id, type: 'arc_end' };
-      }
-      if (Math.hypot(mousePx.x - cp.x, mousePx.y - cp.y) <= handleHitRadiusPx) {
-        return { objectId: obj.id, type: 'arc_center' };
+      candidates.push({ type: 'arc_start', x: obj.startX, y: obj.startY });
+      candidates.push({ type: 'arc_end', x: obj.endX, y: obj.endY });
+      candidates.push({ type: 'arc_center', x: obj.centerX, y: obj.centerY });
+    } else {
+      continue;
+    }
+    for (const c of candidates) {
+      const p = wToC(c.x, c.y);
+      const d = Math.hypot(p.x - mousePx.x, p.y - mousePx.y);
+      if (d > handleHitRadiusPx) continue;
+      if (selSet.has(obj.id)) {
+        if (!bestSelected || d < bestSelected.dist) {
+          bestSelected = { objectId: obj.id, type: c.type, dist: d };
+        }
+      } else if (!bestAny || d < bestAny.dist) {
+        bestAny = { objectId: obj.id, type: c.type, dist: d };
       }
     }
   }
 
-  return null;
+  return bestSelected ?? bestAny;
 }
 
 /**

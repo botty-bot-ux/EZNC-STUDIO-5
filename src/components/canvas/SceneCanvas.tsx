@@ -6,6 +6,7 @@ import { CanvasControls } from './CanvasControls';
 import { CanvasHud } from './CanvasHud';
 import {
   DragMode,
+  HandleType,
   findHandleHit,
   findMagneticSnapPoint,
   findObjectBodyHit,
@@ -119,10 +120,12 @@ function translateObjectFull(obj: CADObject, dx: number, dy: number): CADObject 
 
 // Live, uncommitted drag state. During a drag we only touch this local state and
 // redraw from it; the store is mutated exactly once on mouseup (see handleMouseUp).
+// `edit` — групповое перемещение узла: патчим все подходящие фигуры сразу (см. pointerMove),
+// чтобы при нескольких выделенных фигурах с общим узлом он тянулся за всеми.
 type LiveDrag =
   | { mode: 'none' }
   | { mode: 'translate'; dx: number; dy: number; ids: string[] }
-  | { mode: 'edit'; id: string; patch: Partial<CADObject> };
+  | { mode: 'edit'; items: Array<{ id: string; patch: Partial<CADObject> }> };
 
 export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -136,7 +139,6 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
     setSelectedObjectIds,
     toggleObjectSelection,
     addObject,
-    updateObject,
     updateObjectsBulk,
     deleteSelectedObjects,
     copySelectedObjects,
@@ -167,7 +169,6 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
       setSelectedObjectIds: s.setSelectedObjectIds,
       toggleObjectSelection: s.toggleObjectSelection,
       addObject: s.addObject,
-      updateObject: s.updateObject,
       updateObjectsBulk: s.updateObjectsBulk,
       deleteSelectedObjects: s.deleteSelectedObjects,
       copySelectedObjects: s.copySelectedObjects,
@@ -350,9 +351,16 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
 
   // Mirror the transient vertex-edit drag into the store so the Свойства panel shows the
   // live coordinates while a handle is dragged (store objects stay untouched until mouseup).
+  // Панель показывает только «якорь» — ту фигуру, чей гриф реально схвачен мышью.
   useEffect(() => {
-    setLiveEdit(liveDrag.mode === 'edit' ? { id: liveDrag.id, patch: liveDrag.patch } : null);
-  }, [liveDrag, setLiveEdit]);
+    if (liveDrag.mode === 'edit' && liveDrag.items.length > 0) {
+      const anchor =
+        liveDrag.items.find((i) => i.id === selectedObjectId) ?? liveDrag.items[0];
+      setLiveEdit({ id: anchor.id, patch: anchor.patch });
+    } else {
+      setLiveEdit(null);
+    }
+  }, [liveDrag, selectedObjectId, setLiveEdit]);
 
   // Mirror the ruler into the store so the Свойства panel shows a live readout instead of
   // a floating window.
@@ -376,9 +384,12 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
       );
     }
     if (liveDrag.mode === 'edit') {
-      return objects.map((o) =>
-        o.id === liveDrag.id ? ({ ...o, ...liveDrag.patch } as CADObject) : o
-      );
+      const map = new Map(liveDrag.items.map((i) => [i.id, i.patch]));
+      if (map.size === 0) return objects;
+      return objects.map((o) => {
+        const p = map.get(o.id);
+        return p ? ({ ...o, ...p } as CADObject) : o;
+      });
     }
     // Живое превью из модуля «Переместить» (до подтверждения): сдвигаем выбранную группу.
     if (liveMove && liveMove.ids.length > 0 && (liveMove.dx !== 0 || liveMove.dy !== 0)) {
@@ -814,16 +825,28 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
     // SELECT TOOL: Handle dragging or Object body dragging or Selection Box
     if (activeTool === 'select') {
       // 1. Check Handle Hit
-      const handleHit = findHandleHit(objects, selectedObjectId, mousePx, pan, zoom);
+      const handleHit = findHandleHit(objects, selectedObjectIds, mousePx, pan, zoom);
       if (handleHit) {
         const targetObj = objects.find((o) => o.id === handleHit.objectId);
         if (targetObj) {
-          setSelectedObjectId(targetObj.id);
+          // Если фигура с этим грифом уже в выделении — оставляем группу нетронутой
+          // (переставив якорь в конец, чтобы панель показывала именно её координаты).
+          // Иначе — схлопываем выделение до этой фигуры, как и при клике по телу.
+          let group: string[];
+          if (selectedObjectIds.includes(targetObj.id)) {
+            group = [...selectedObjectIds.filter((id) => id !== targetObj.id), targetObj.id];
+            setSelectedObjectIds(group);
+          } else {
+            group = [targetObj.id];
+            setSelectedObjectIds(group);
+          }
+          // Замороженные не участвуют в групповом перемещении узла.
+          const frozen = new Set(objects.filter((o) => o.frozen).map((o) => o.id));
           setDragMode(handleHit.type);
           setDragStartCanvasPt(mousePx);
           setDragStartWorldPt(snapPt);
           setDragObjInitial({ ...targetObj });
-          setDragIds([]);
+          setDragIds(group.filter((id) => !frozen.has(id)));
           setLiveDrag({ mode: 'none' });
           return;
         }
@@ -1007,50 +1030,98 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
         const dx = anchorPt.x - dragStartWorldPt.x;
         const dy = anchorPt.y - dragStartWorldPt.y;
         setLiveDrag({ mode: 'translate', dx, dy, ids: dragIds });
-      } else if (selectedObjectId && dragObjInitial) {
-        if (dragMode === 'line_start' || dragMode === 'line_end') {
-          // Shift = 45°/90°, Ctrl = только 90° — относительно неподвижной второй точки линии.
-          let pt = snapPt;
-          if (dragObjInitial.type === 'line' && (e.shiftKey || e.ctrlKey)) {
-            const anchor =
-              dragMode === 'line_start'
-                ? { x: dragObjInitial.endX, y: dragObjInitial.endY }
-                : { x: dragObjInitial.startX, y: dragObjInitial.startY };
-            pt = constrainAngle(anchor, snapPt, e.shiftKey ? 45 : 90);
-          }
-          // Стенка: конец не вытягивается за грани +X/+Y (соскальзывает вдоль грани).
-          pt = clampToPosFaces(pt);
-          setLiveDrag(
+      } else if (dragIds.length > 0 && dragObjInitial) {
+        const base = dragObjInitial;
+
+        // Мировая точка схваченного грифа на якоре ДО начала драга — относительно неё
+        // считаем смещение, которое применим ко всем «совпадающим» узлам группы.
+        let anchorOriginal: Point2D | null = null;
+        if (base.type === 'line' && (dragMode === 'line_start' || dragMode === 'line_end')) {
+          anchorOriginal =
             dragMode === 'line_start'
-              ? { mode: 'edit', id: selectedObjectId, patch: { startX: pt.x, startY: pt.y } }
-              : { mode: 'edit', id: selectedObjectId, patch: { endX: pt.x, endY: pt.y } }
-          );
-        } else if (dragObjInitial.type === 'arc') {
-          const base = dragObjInitial;
-          if (dragMode === 'arc_start') {
-            const s = clampToPosFaces(snapPt);
-            const r = Math.hypot(s.x - base.centerX, s.y - base.centerY);
-            setLiveDrag({ mode: 'edit', id: selectedObjectId, patch: { startX: s.x, startY: s.y, radius: r } });
-          } else if (dragMode === 'arc_end') {
-            const s = clampToPosFaces(snapPt);
-            const r = Math.hypot(s.x - base.centerX, s.y - base.centerY);
-            setLiveDrag({ mode: 'edit', id: selectedObjectId, patch: { endX: s.x, endY: s.y, radius: r } });
-          } else if (dragMode === 'arc_center') {
-            const dx = snapPt.x - base.centerX;
-            const dy = snapPt.y - base.centerY;
-            setLiveDrag({
-              mode: 'edit',
-              id: selectedObjectId,
-              patch: {
-                centerX: snapPt.x,
-                centerY: snapPt.y,
-                startX: base.startX + dx,
-                startY: base.startY + dy,
-                endX: base.endX + dx,
-                endY: base.endY + dy,
-              },
-            });
+              ? { x: base.startX, y: base.startY }
+              : { x: base.endX, y: base.endY };
+        } else if (base.type === 'arc') {
+          if (dragMode === 'arc_start') anchorOriginal = { x: base.startX, y: base.startY };
+          else if (dragMode === 'arc_end') anchorOriginal = { x: base.endX, y: base.endY };
+          else if (dragMode === 'arc_center') anchorOriginal = { x: base.centerX, y: base.centerY };
+        }
+
+        if (anchorOriginal) {
+          // Целевая точка якоря = snap + ограничения Shift/Ctrl (для концов линии) + «стенка».
+          let target: Point2D = snapPt;
+          if (base.type === 'line' && (dragMode === 'line_start' || dragMode === 'line_end') && (e.shiftKey || e.ctrlKey)) {
+            const pivot =
+              dragMode === 'line_start'
+                ? { x: base.endX, y: base.endY }
+                : { x: base.startX, y: base.startY };
+            target = constrainAngle(pivot, snapPt, e.shiftKey ? 45 : 90);
           }
+          target = clampToPosFaces(target);
+          const dx = target.x - anchorOriginal.x;
+          const dy = target.y - anchorOriginal.y;
+
+          // Порог «тот же самый узел»: радиус захвата грифа, пересчитанный в мм.
+          const tol = 14 / zoom;
+          const isCenterDrag = dragMode === 'arc_center';
+          const idset = new Set(dragIds);
+          const items: Array<{ id: string; patch: Partial<CADObject> }> = [];
+
+          for (const o of objects) {
+            if (!idset.has(o.id)) continue;
+            let patch: Partial<CADObject> | null = null;
+
+            if (isCenterDrag) {
+              // arc_center: тянем только те дуги, чей центр совпадает с якорем.
+              if (
+                o.type === 'arc' &&
+                Math.hypot(o.centerX - anchorOriginal.x, o.centerY - anchorOriginal.y) <= tol
+              ) {
+                patch = {
+                  centerX: o.centerX + dx,
+                  centerY: o.centerY + dy,
+                  startX: o.startX + dx,
+                  startY: o.startY + dy,
+                  endX: o.endX + dx,
+                  endY: o.endY + dy,
+                };
+              }
+            } else {
+              // «Концевой» перетяг: у каждой фигуры берём тот конец (start/line или arc),
+              // который ближе всего к схваченному узлу якоря и находится в пределах tol.
+              const cand: Array<{ type: HandleType; x: number; y: number }> = [];
+              if (o.type === 'line') {
+                cand.push({ type: 'line_start', x: o.startX, y: o.startY });
+                cand.push({ type: 'line_end', x: o.endX, y: o.endY });
+              } else if (o.type === 'arc') {
+                cand.push({ type: 'arc_start', x: o.startX, y: o.startY });
+                cand.push({ type: 'arc_end', x: o.endX, y: o.endY });
+              }
+              let chosen: { type: HandleType; x: number; y: number } | null = null;
+              let bestD = Infinity;
+              for (const c of cand) {
+                const d = Math.hypot(c.x - anchorOriginal.x, c.y - anchorOriginal.y);
+                if (d <= tol && d < bestD) {
+                  bestD = d;
+                  chosen = c;
+                }
+              }
+              if (chosen) {
+                const nx = chosen.x + dx;
+                const ny = chosen.y + dy;
+                if (chosen.type === 'line_start') patch = { startX: nx, startY: ny };
+                else if (chosen.type === 'line_end') patch = { endX: nx, endY: ny };
+                else if (chosen.type === 'arc_start' && o.type === 'arc') {
+                  patch = { startX: nx, startY: ny, radius: Math.hypot(nx - o.centerX, ny - o.centerY) };
+                } else if (chosen.type === 'arc_end' && o.type === 'arc') {
+                  patch = { endX: nx, endY: ny, radius: Math.hypot(nx - o.centerX, ny - o.centerY) };
+                }
+              }
+            }
+            if (patch) items.push({ id: o.id, patch });
+          }
+
+          setLiveDrag({ mode: 'edit', items });
         }
       }
       return;
@@ -1058,7 +1129,7 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
 
     // 4. Hover detection when not dragging
     if (activeTool === 'select') {
-      const handleHit = findHandleHit(objects, selectedObjectId, mousePx, pan, zoom);
+      const handleHit = findHandleHit(objects, selectedObjectIds, mousePx, pan, zoom);
       if (handleHit) {
         setHoveredHandle({ objectId: handleHit.objectId, type: handleHit.type });
       } else {
@@ -1115,8 +1186,9 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
         .map((o) => ({ id: o.id, patch: shiftCADObject(o, liveDrag.dx, liveDrag.dy) }));
       if (updates.length > 0) updateObjectsBulk(updates, true);
     } else if (liveDrag.mode === 'edit') {
-      // Commit a single handle edit once (pushes one history entry).
-      updateObject(liveDrag.id, liveDrag.patch, true);
+      // Коммитим групповое редактирование узлов одной историей: либо один совпадающий
+      // узел (соло-фигура), либо сразу пачка узлов у всех выделенных фигур.
+      if (liveDrag.items.length > 0) updateObjectsBulk(liveDrag.items, true);
     }
     // pan / plain click (liveDrag.mode === 'none'): no store write, no history entry.
 
