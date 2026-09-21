@@ -32,7 +32,7 @@ import {
   SnapPointInfo,
   canvasToWorld,
   worldToCanvas,
-  getArcFromCenter,
+  getArcFromBulge,
 } from './canvasUtils';
 import { paletteForTheme } from './canvasPalette';
 import { constrainAngle } from '../../lib/geometry/transform';
@@ -791,17 +791,18 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
         setDrawArcEndPt(clampRayToPosFaces(drawArcStartPt, end));
         setLineLengthInput('');
       } else {
-        // Третий клик = ЦЕНТР дуги ровно под курсором. Начало остаётся на месте,
-        // конец хорды дотягивается на окружность (arcData.endOnCircle).
-        const arcData = getArcFromCenter(drawArcStartPt, drawArcEndPt, snapPt);
+        // Третий клик = ВЕРШИНА ГОРБА дуги под курсором. Начало и конец остаются
+        // там, где их кликнули, а мышь тянет прогиб: ближе к хорде — пололее,
+        // дальше — круглее.
+        const arcData = getArcFromBulge(drawArcStartPt, drawArcEndPt, snapPt);
         if (arcData) {
           addObject({
             name: `Дуга R${arcData.radius.toFixed(1)} (${objects.length + 1})`,
             type: 'arc',
             startX: drawArcStartPt.x,
             startY: drawArcStartPt.y,
-            endX: arcData.endOnCircle.x,
-            endY: arcData.endOnCircle.y,
+            endX: drawArcEndPt.x,
+            endY: drawArcEndPt.y,
             centerX: arcData.centerX,
             centerY: arcData.centerY,
             radius: arcData.radius,

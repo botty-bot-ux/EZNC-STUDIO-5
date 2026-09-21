@@ -50,38 +50,37 @@ export function getArcFrom3Points(p1: Point2D, p2: Point2D, p3: Point2D) {
 }
 
 /**
- * Дуга по «начало + конец + ЦЕНТР под мышью».
+ * Дуга по «начало + конец + вершина горба под мышью».
  *
- * В отличие от 3-точечной дуги (где третий лежало НА самой дуге, а центр уезжал в
- * сторону), здесь мышь задаёт именно центр: он всегда ровно под курсором. Начало
- * остаётся там, куда кликнули, а «конец» хорды дотягивается до окружности (сохраняя
- * направление от центра), чтобы дуга была корректной. Возвращаем и сам конец на
- * окружности — его пишем в фигуру.
+ * Мышь задаёт не центр и не точку где попало на дуге, а именно ВЕРШИНУ прогиба
+ * («горб») — верхнюю точку дуги над серединой хорды. Проекция курсора на
+ * перпендикуляр к хорде даёт высоту прогиба (сагитту), а сама вершина всегда
+ * лежит на серединном перпендикуляре, поэтому дуга симметрична. Чем ближе мышь
+ * к хорде — тем пололее дуга; чем дальше — тем круглее. Возвращаем и саму
+ * вершину на дуге — её можно нарисовать под курсором.
  */
-export function getArcFromCenter(p1: Point2D, p2: Point2D, center: Point2D) {
-  const r = Math.hypot(p1.x - center.x, p1.y - center.y);
-  if (r < 1e-4) return null; // центр совпал с началом — вырожденная дуга
+export function getArcFromBulge(p1: Point2D, p2: Point2D, mouse: Point2D) {
+  const mx = (p1.x + p2.x) / 2;
+  const my = (p1.y + p2.y) / 2;
 
-  // Конец хорды приводим на ту же окружность: сохраняем направление «центр→конец».
-  const ex = p2.x - center.x;
-  const ey = p2.y - center.y;
-  const el = Math.hypot(ex, ey);
-  const endOnCircle: Point2D =
-    el < 1e-6
-      ? { x: center.x + r, y: center.y }
-      : { x: center.x + (ex / el) * r, y: center.y + (ey / el) * r };
+  const cx = p2.x - p1.x;
+  const cy = p2.y - p1.y;
+  const chord = Math.hypot(cx, cy);
+  if (chord < 1e-4) return null; // начало и конец совпали
 
-  // Точка на дуге «напротив» хорды (вершина прогиба) — чтобы переиспытать проверенную
-  // 3-точечную логику определения направления (clockwise) и радиуса.
-  const mid: Point2D = { x: (p1.x + endOnCircle.x) / 2, y: (p1.y + endOnCircle.y) / 2 };
-  const dm = Math.hypot(mid.x - center.x, mid.y - center.y);
-  const p3: Point2D =
-    dm < 1e-6
-      ? { x: center.x + r, y: center.y }
-      : { x: center.x + ((mid.x - center.x) / dm) * r, y: center.y + ((mid.y - center.y) / dm) * r };
+  // Единичная нормаль к хорде (направление «вверх горба»).
+  const nx = -cy / chord;
+  const ny = cx / chord;
 
-  const arc = getArcFrom3Points(p1, endOnCircle, p3);
-  return { ...arc, endOnCircle };
+  // Знаковая высота прогиба = проекция (мышь − середина хорды) на нормаль.
+  let h = (mouse.x - mx) * nx + (mouse.y - my) * ny;
+  if (Math.abs(h) < 1e-3) h = h < 0 ? -1e-3 : 1e-3; // не даём дуге стать прямой
+
+  // Вершина горба на серединном перпендикуляре.
+  const apex: Point2D = { x: mx + nx * h, y: my + ny * h };
+
+  const arc = getArcFrom3Points(p1, p2, apex);
+  return { ...arc, apex };
 }
 
 /**

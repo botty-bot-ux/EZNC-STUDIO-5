@@ -1,6 +1,6 @@
 import { ActiveTool, CADObject, MachineSettings, ParallelPreviewState, Point2D, ToolpathSegment, UnderlayState, ViewMode } from '../../types';
 import { DragMode } from './canvasHitTest';
-import { HoveredHandle, SnapPointInfo, getArcFromCenter, worldToCanvas } from './canvasUtils';
+import { HoveredHandle, SnapPointInfo, getArcFromBulge, worldToCanvas } from './canvasUtils';
 import { CanvasPalette, LIGHT_PALETTE } from './canvasPalette';
 
 export interface DrawOptions {
@@ -977,12 +977,12 @@ export function drawDrawingPreview(
         ctx.arc(p1.x, p1.y, r * zoom, 0, Math.PI * 2);
         ctx.stroke();
       } else if (activeTool === 'arc' && drawArcStartPt && drawArcEndPt) {
-        const arcData = getArcFromCenter(drawArcStartPt, drawArcEndPt, currentMouseProgPt);
+        const arcData = getArcFromBulge(drawArcStartPt, drawArcEndPt, currentMouseProgPt);
         if (arcData) {
           const cp = wToC(arcData.centerX, arcData.centerY);
           const rPx = arcData.radius * zoom;
           const pStart = wToC(drawArcStartPt.x, drawArcStartPt.y);
-          const pEnd = wToC(arcData.endOnCircle.x, arcData.endOnCircle.y);
+          const pEnd = wToC(drawArcEndPt.x, drawArcEndPt.y);
 
           const a1 = Math.atan2(pStart.y - cp.y, pStart.x - cp.x);
           const a2 = Math.atan2(pEnd.y - cp.y, pEnd.x - cp.x);
@@ -1009,12 +1009,12 @@ export function drawDrawingPreview(
       ctx.lineTo(p2.x, p2.y);
       ctx.stroke();
     } else if (drawArcStartPt && drawArcEndPt) {
-      const arcData = getArcFromCenter(drawArcStartPt, drawArcEndPt, currentMouseProgPt);
+      const arcData = getArcFromBulge(drawArcStartPt, drawArcEndPt, currentMouseProgPt);
       if (arcData) {
         const cp = wToC(arcData.centerX, arcData.centerY);
         const rPx = arcData.radius * zoom;
         const pStart = wToC(drawArcStartPt.x, drawArcStartPt.y);
-        const pEnd = wToC(arcData.endOnCircle.x, arcData.endOnCircle.y);
+        const pEnd = wToC(drawArcEndPt.x, drawArcEndPt.y);
 
         const a1 = Math.atan2(pStart.y - cp.y, pStart.x - cp.x);
         const a2 = Math.atan2(pEnd.y - cp.y, pEnd.x - cp.x);
@@ -1023,10 +1023,11 @@ export function drawDrawingPreview(
         ctx.arc(cp.x, cp.y, rPx, a1, a2, !arcData.clockwise);
         ctx.stroke();
 
-        // Центр — ровно под курсором мыши.
+        // Вершина горба — ровно под курсором мыши.
+        const apex = wToC(arcData.apex.x, arcData.apex.y);
         ctx.fillStyle = '#f43f5e';
         ctx.beginPath();
-        ctx.arc(cp.x, cp.y, 3, 0, Math.PI * 2);
+        ctx.arc(apex.x, apex.y, 3, 0, Math.PI * 2);
         ctx.fill();
       }
     }
