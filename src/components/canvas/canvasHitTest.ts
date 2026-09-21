@@ -71,6 +71,29 @@ export function findHandleHit(
   return bestSelected ?? bestAny;
 }
 
+/** Кратчайшее расстояние точка → отрезок (перпендикуляр с «зажимом» внутрь сегмента). */
+function distanceToSegment(p: Point2D, a: Point2D, b: Point2D): number {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const len2 = dx * dx + dy * dy;
+  if (len2 === 0) return Math.hypot(p.x - a.x, p.y - a.y);
+  let t = ((p.x - a.x) * dx + (p.y - a.y) * dy) / len2;
+  t = Math.max(0, Math.min(1, t));
+  return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
+}
+
+/** Лежит ли направление из центра дуги в точку p внутри её охвата (по направлению обхода). */
+function angleInArcSweep(arc: { startX: number; startY: number; endX: number; endY: number; centerX: number; centerY: number; clockwise: boolean }, p: Point2D): boolean {
+  const TAU = Math.PI * 2;
+  const norm = (x: number) => ((x % TAU) + TAU) % TAU;
+  const a0 = Math.atan2(arc.startY - arc.centerY, arc.startX - arc.centerX);
+  const a1 = Math.atan2(arc.endY - arc.centerY, arc.endX - arc.centerX);
+  const t = Math.atan2(p.y - arc.centerY, p.x - arc.centerX);
+  const EPS_SWEEP = 1e-9;
+  if (arc.clockwise) return norm(a0 - t) <= norm(a0 - a1) + EPS_SWEEP;
+  return norm(t - a0) <= norm(a1 - a0) + EPS_SWEEP;
+}
+
 /**
  * Finds CAD object hit by clicking/hovering on its body.
  */
@@ -103,15 +126,25 @@ export function findObjectBodyHit(
         return obj.id;
       }
     } else if (obj.type === 'line') {
-      const d1 = Math.hypot(rawWorldPt.x - obj.startX, rawWorldPt.y - obj.startY);
-      const d2 = Math.hypot(rawWorldPt.x - obj.endX, rawWorldPt.y - obj.endY);
-      const lineLen = Math.hypot(obj.endX - obj.startX, obj.endY - obj.startY);
-      if (d1 + d2 >= lineLen - hitTolerance && d1 + d2 <= lineLen + hitTolerance) {
+      // Раньше стояла проверка «d1+d2 ≈ длина» — это эллипс вокруг отрезка, из-за чего
+      // линия «чувствовалась» за десятки мм в стороне. Теперь честное расстояние до
+      // самого сегмента: зона сопоставима с концевыми точками (12px против 14px у грифа).
+      const d = distanceToSegment(
+        rawWorldPt,
+        { x: obj.startX, y: obj.startY },
+        { x: obj.endX, y: obj.endY }
+      );
+      if (d <= hitTolerance) {
         return obj.id;
       }
     } else if (obj.type === 'arc') {
       const dist = Math.hypot(rawWorldPt.x - obj.centerX, rawWorldPt.y - obj.centerY);
-      if (Math.abs(dist - obj.radius) <= hitTolerance) {
+      // Кольцо радиуса + угол внутри охвата дуги: без проверки угла срабатывало
+      // на ВСЮ окружность «сыра», а не на свой сектор.
+      if (
+        Math.abs(dist - obj.radius) <= hitTolerance &&
+        angleInArcSweep(obj, rawWorldPt)
+      ) {
         return obj.id;
       }
     }
