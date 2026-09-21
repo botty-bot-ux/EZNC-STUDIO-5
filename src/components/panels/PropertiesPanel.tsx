@@ -1,7 +1,7 @@
 import React from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { Circle, CircleDot, Eye, EyeOff, GitCompareArrows, Layers, LineDotRightHorizontal, Lock, Move, Ruler, Sliders, Spline, Square, Trash2, Unlock } from 'lucide-react';
-import { useProjectStore } from '../../store/useProjectStore';
+import { useProjectStore, useSelectedObjectId } from '../../store/useProjectStore';
 import { computeParallelArcs, computeParallelSegments } from '../../lib/geometry/transform';
 import { ArcObject, CircleObject, LineObject, ParallelPreviewState, PointHoleObject, RectangleObject } from '../../types';
 import { ArcProperties } from './properties/ArcProperties';
@@ -14,7 +14,6 @@ import { ParallelDialog } from '../modals/ParallelDialog';
 
 export const PropertiesPanel: React.FC = () => {
   const {
-    selectedObjectId,
     selectedObjectIds,
     objects,
     updateObject,
@@ -28,7 +27,6 @@ export const PropertiesPanel: React.FC = () => {
     liveMeasure,
   } = useProjectStore(
     useShallow((s) => ({
-      selectedObjectId: s.selectedObjectId,
       selectedObjectIds: s.selectedObjectIds,
       objects: s.objects,
       updateObject: s.updateObject,
@@ -42,6 +40,8 @@ export const PropertiesPanel: React.FC = () => {
       liveMeasure: s.liveMeasure,
     }))
   );
+  // «Основная» фигура — производная от selectedObjectIds (последний id).
+  const selectedObjectId = useSelectedObjectId();
 
   const [moveOpen, setMoveOpen] = React.useState(false);
   const [parallelOpen, setParallelOpen] = React.useState(false);

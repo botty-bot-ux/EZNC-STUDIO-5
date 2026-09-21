@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { useProjectStore } from '../../store/useProjectStore';
+import { useProjectStore, useSelectedObjectId } from '../../store/useProjectStore';
 import { CADObject, Point2D } from '../../types';
 import { CanvasControls } from './CanvasControls';
 import { CanvasHud } from './CanvasHud';
@@ -135,7 +135,6 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
 
   const {
     objects,
-    selectedObjectId,
     selectedObjectIds,
     setSelectedObjectId,
     setSelectedObjectIds,
@@ -170,7 +169,6 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
   } = useProjectStore(
     useShallow((s) => ({
       objects: s.objects,
-      selectedObjectId: s.selectedObjectId,
       selectedObjectIds: s.selectedObjectIds,
       setSelectedObjectId: s.setSelectedObjectId,
       setSelectedObjectIds: s.setSelectedObjectIds,
@@ -204,6 +202,8 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
       theme: s.theme,
     }))
   );
+  // «Основная» фигура — производная от selectedObjectIds (последний id).
+  const selectedObjectId = useSelectedObjectId();
 
   // Canvas Pan & Zoom
   const [pan, setPan] = useState<Point2D>({ x: 350, y: 350 });

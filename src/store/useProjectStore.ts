@@ -72,11 +72,12 @@ interface ProjectStore {
   operations: OperationItem[];
   templates: PostprocessorTemplates;
 
-  selectedObjectId: string | null;
+  // selectedObjectIds — ЕДИНСТВЕННЫЙ источник истины о выделении; «основная»
+  // фигура (для панели свойств и грифов) = последний id. Доступна через хук
+  // useSelectedObjectId() в конце файла. Раньше дублировалась полем
+  // selectedObjectId, которое расходилось с массивом при загрузке проектов.
   selectedObjectIds: string[];
   selectedOperationId: string | null;
-  // Which kind of entity the right-side Свойства inspector should render.
-  inspectorTarget: 'object' | 'operation' | 'tool';
   // Transient interaction state surfaced to the Свойства panel during a drag / measure.
   // Kept out of `objects` so it never triggers history, autosave or G-code regen.
   liveEdit: { id: string; patch: Partial<CADObject> } | null;
@@ -149,7 +150,6 @@ interface ProjectStore {
   toggleObjectSelection: (id: string) => void;
   selectAllObjects: () => void;
   setSelectedOperationId: (id: string | null) => void;
-  setInspectorTarget: (target: 'object' | 'operation' | 'tool') => void;
   setLiveEdit: (v: { id: string; patch: Partial<CADObject> } | null) => void;
   setLiveMeasure: (v: { start: Point2D; end: Point2D } | null) => void;
   setLiveMove: (v: { ids: string[]; dx: number; dy: number } | null) => void;
@@ -329,10 +329,8 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
     operations: initOperations,
     templates: initTemplates,
 
-    selectedObjectId: null,
     selectedObjectIds: [],
     selectedOperationId: null,
-    inspectorTarget: 'object',
     liveEdit: null,
     liveMeasure: null,
     liveMove: null,
@@ -412,9 +410,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
 
     setSelectedObjectId: (id: string | null) =>
       set((state) => ({
-        selectedObjectId: id,
         selectedObjectIds: id ? [id] : [],
-        inspectorTarget: 'object',
         ...(id
           ? { activeTab: 'properties' as ActiveTab, rightPanelOpen: true, viewMode: state.viewMode === 'gcode' ? 'edit' : state.viewMode }
           : {}),
@@ -423,8 +419,6 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
     setSelectedObjectIds: (ids: string[]) =>
       set((state) => ({
         selectedObjectIds: ids,
-        selectedObjectId: ids.length > 0 ? ids[ids.length - 1] : null,
-        inspectorTarget: 'object',
         ...(ids.length > 0
           ? { activeTab: 'properties' as ActiveTab, rightPanelOpen: true, viewMode: state.viewMode === 'gcode' ? 'edit' : state.viewMode }
           : {}),
@@ -436,8 +430,6 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
       const newIds = exists ? cur.filter((i) => i !== id) : [...cur, id];
       set({
         selectedObjectIds: newIds,
-        selectedObjectId: newIds.length > 0 ? newIds[newIds.length - 1] : null,
-        inspectorTarget: 'object',
         ...(newIds.length > 0 ? { activeTab: 'properties' as ActiveTab, rightPanelOpen: true } : {}),
       });
     },
@@ -446,24 +438,13 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
       const visibleIds = get().objects.filter((o) => o.visible !== false).map((o) => o.id);
       set({
         selectedObjectIds: visibleIds,
-        selectedObjectId: visibleIds.length > 0 ? visibleIds[visibleIds.length - 1] : null,
-        inspectorTarget: 'object',
       });
     },
 
     setSelectedOperationId: (id: string | null) =>
       set({
         selectedOperationId: id,
-        inspectorTarget: 'operation',
       }),
-
-    setInspectorTarget: (target: 'object' | 'operation' | 'tool') =>
-      set((state) => ({
-        inspectorTarget: target,
-        activeTab: 'properties',
-        rightPanelOpen: true,
-        viewMode: state.viewMode === 'gcode' ? 'edit' : state.viewMode,
-      })),
 
     setLiveEdit: (v) => set({ liveEdit: v }),
     setLiveMeasure: (v) => set({ liveMeasure: v }),
@@ -582,7 +563,6 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
       syncAndSave({
         objects: newObjs,
         operations: ops,
-        selectedObjectId: newObj.id,
         selectedObjectIds: [newObj.id],
       });
     },
@@ -640,7 +620,6 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
       syncAndSave({
         objects: newObjs,
         operations: newOps,
-        selectedObjectId: remainingSelected.length > 0 ? remainingSelected[remainingSelected.length - 1] : null,
         selectedObjectIds: remainingSelected,
       });
     },
@@ -660,7 +639,6 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
       syncAndSave({
         objects: newObjs,
         operations: newOps,
-        selectedObjectId: null,
         selectedObjectIds: [],
       });
     },
@@ -710,7 +688,6 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
       syncAndSave({
         objects: newObjs,
         operations: newOps,
-        selectedObjectId: copy.id,
         selectedObjectIds: [copy.id],
       });
     },
@@ -760,7 +737,6 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
         objects: [...get().objects, ...newObjs],
         operations: newOps,
         clipboardSeq: seq,
-        selectedObjectId: newObjs[newObjs.length - 1]?.id ?? null,
         selectedObjectIds: newObjs.map((o) => o.id),
       });
     },
@@ -784,7 +760,6 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
       syncAndSave({
         operations: [...get().operations, op],
         selectedOperationId: op.id,
-        inspectorTarget: 'operation',
       });
     },
 
@@ -923,7 +898,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
         objects: [],
         operations: [],
         manualGcodeDirty: false,
-        selectedObjectId: null,
+        selectedObjectIds: [],
         selectedOperationId: null,
         underlay: DEFAULT_UNDERLAY,
         activeTool: 'select',
@@ -942,7 +917,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
             operations: parsed.operations || [],
             templates: parsed.postprocessorTemplates || DEFAULT_TEMPLATES,
             manualGcodeDirty: false,
-            selectedObjectId: null,
+            selectedObjectIds: [],
             selectedOperationId: null,
             underlay: DEFAULT_UNDERLAY,
           });
@@ -968,7 +943,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
           operations: extracted.operations || [],
           templates: extracted.postprocessorTemplates || DEFAULT_TEMPLATES,
           manualGcodeDirty: false,
-          selectedObjectId: null,
+          selectedObjectIds: [],
           selectedOperationId: null,
           underlay: DEFAULT_UNDERLAY,
         });
@@ -1005,7 +980,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
           manualGcodeDirty: true,
           objects: importedCadObjects.length > 0 ? importedCadObjects : get().objects,
           operations: newOps.length > 0 ? newOps : get().operations,
-          selectedObjectId: null,
+          selectedObjectIds: [],
           selectedOperationId: null,
           underlay: DEFAULT_UNDERLAY,
           viewMode: 'preview',
@@ -1088,3 +1063,17 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
     },
   };
 });
+
+// --- Производные селекторы выделения ---
+// selectedObjectIds — единственный источник истины; «основная» фигура (для
+// панели Свойств, грифов и подсветки) = ПОСЛЕДНИЙ id. Индекс в конце массива
+// выбран потому, что так исторически проставлялось удалённое поле selectedObjectId.
+
+/** React-хук: id основной выбранной фигуры или null. */
+export const useSelectedObjectId = (): string | null =>
+  useProjectStore((s) => getLastSelectedId(s.selectedObjectIds));
+
+/** Чистая функция для императивных мест (onCreateEditor, обработчики). */
+export function getLastSelectedId(ids: string[]): string | null {
+  return ids.length > 0 ? ids[ids.length - 1] : null;
+}

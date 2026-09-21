@@ -34,9 +34,10 @@ export const GcodeEditor: React.FC = () => {
       }
 
       if (foundId) {
-        const { objects, selectedObjectId, setSelectedObjectId } = useProjectStore.getState();
+        const { objects, selectedObjectIds, setSelectedObjectId } = useProjectStore.getState();
         const exists = objects.some((o) => o.id === foundId);
-        if (exists && selectedObjectId !== foundId) {
+        const lastId = selectedObjectIds.length > 0 ? selectedObjectIds[selectedObjectIds.length - 1] : null;
+        if (exists && lastId !== foundId) {
           setSelectedObjectId(foundId);
         }
       }

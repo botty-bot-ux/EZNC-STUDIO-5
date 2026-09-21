@@ -22,23 +22,19 @@ export default function App() {
     }))
   );
   const {
-    selectedObjectId,
     selectedObjectIds,
     deleteSelectedObjects,
     undo,
     redo,
     setActiveTool,
-    setSelectedObjectId,
     setSelectedObjectIds,
   } = useProjectStore(
     useShallow((s) => ({
-      selectedObjectId: s.selectedObjectId,
       selectedObjectIds: s.selectedObjectIds,
       deleteSelectedObjects: s.deleteSelectedObjects,
       undo: s.undo,
       redo: s.redo,
       setActiveTool: s.setActiveTool,
-      setSelectedObjectId: s.setSelectedObjectId,
       setSelectedObjectIds: s.setSelectedObjectIds,
     }))
   );
@@ -57,7 +53,6 @@ export default function App() {
           document.activeElement.blur();
         }
         setActiveTool('select');
-        setSelectedObjectId(null);
         setSelectedObjectIds([]);
         return;
       }
@@ -83,7 +78,7 @@ export default function App() {
         e.preventDefault();
         redo();
       } else if (e.key === 'Delete' || e.key === 'Backspace') {
-        if (selectedObjectIds.length > 0 || selectedObjectId) {
+        if (selectedObjectIds.length > 0) {
           e.preventDefault();
           deleteSelectedObjects();
         }
@@ -93,13 +88,11 @@ export default function App() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [
-    selectedObjectId,
     selectedObjectIds,
     deleteSelectedObjects,
     undo,
     redo,
     setActiveTool,
-    setSelectedObjectId,
     setSelectedObjectIds,
   ]);
 
