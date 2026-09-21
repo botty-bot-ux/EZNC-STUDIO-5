@@ -20,6 +20,7 @@ import {
 } from '../types';
 import { generateGcode } from '../lib/gcode/generator';
 import { extractProjectDataFromNC, parseGcodeToCadObjects, parseGcodeToSegments } from '../lib/gcode/parser';
+import { OBJECT_MARKER_LINE_RE } from '../lib/gcode/constants';
 import { DEFAULT_TEMPLATES } from '../lib/postprocessor/templates';
 import { analyzeProjectWarnings } from '../lib/utils/warnings';
 import { optimizeCADObjects, OptimizationResult } from '../lib/geometry/optimizer';
@@ -1034,7 +1035,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
       const gcode = get().generatedGcode || get().manualGcode;
       return gcode
         .split('\n')
-        .filter((line) => !/^\s*;\s*\[ID:/i.test(line))
+        .filter((line) => !OBJECT_MARKER_LINE_RE.test(line))
         .join('\n')
         .replace(/\n{3,}/g, '\n\n')
         .trimStart();

@@ -26,4 +26,4 @@ Package manager is **bun** (`bun.lock` is the committed lockfile). Use `bun inst
 - `metadata.json` declares `server-side Gemini`, but `src/` has **no** Gemini/`GEMINI_API_KEY` usage yet; env is only documented in `.env.example`.
 - PWA: `public/sw.js` registers and serves cache-first from `/sw.js` and `manifest.json` with **absolute** paths — will not resolve under the GitHub Pages subpath, so PWA is effectively broken when deployed to gh-pages. Keep this in mind before touching SW/PWA.
 - Vite HMR/file-watching is disabled when `DISABLE_HMR=true` (AI Studio artifact).
-- No tests exist; no test framework configured.
+- Tests: `bun run test` (vitest, one-shot; run it after touching `src/lib/gcode/`). The G-code wire format shared by generator and parser lives in `src/lib/gcode/constants.ts` (object markers, embedded-project tag, numeric assumptions) — change it there, never as duplicated literals in `generator.ts`/`parser.ts`. `src/lib/gcode/gcode.test.ts` pins the round-trip contract and drill-cycle golden output.

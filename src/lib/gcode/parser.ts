@@ -1,4 +1,16 @@
 import { CADObject, Point2D, ProjectData, ToolpathSegment } from '../../types';
+import {
+  DEFAULT_DEPTH_MM,
+  DEFAULT_IMPORT_RADIUS_MM,
+  DEFAULT_POINT_DIAMETER_MM,
+  DEFAULT_SAFE_Z_MM,
+  EPS_CLOSE_MM,
+  EPS_CLOSED_POLYLINE_MM,
+  EPS_POINT_MM,
+  MARKER_SHAPE_TYPES,
+  OBJECT_LABEL,
+  PROJECT_JSON_TAG,
+} from './constants';
 
 /**
  * Extracts embedded project JSON data from an .nc file header comment block if present.
@@ -19,8 +31,9 @@ export function extractProjectDataFromNC(content: string): ProjectData | null {
     }
   }
 
-  // 2. Embedded comment check "; NCSTUDIO_PROJECT:{...}"
-  const match = content.match(/;\s*NCSTUDIO_PROJECT:\s*(\{.*\})/m);
+  // 2. Embedded comment check "; NCSTUDIO_PROJECT:{...}" — тег берётся из общего контракта
+  const jsonRegex = new RegExp(`;\\s*${PROJECT_JSON_TAG}:\\s*(\\{.*\\})`, 'm');
+  const match = content.match(jsonRegex);
   if (match && match[1]) {
     try {
       const parsed = JSON.parse(match[1]) as ProjectData;
@@ -32,6 +45,143 @@ export function extractProjectDataFromNC(content: string): ProjectData | null {
     }
   }
 
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// Общий разбор одной строки G-кода. Раньше этот токен-цикл дословно копировался
+// в parseGcodeToCadObjects и parseGcodeToSegments; теперь он здесь в единственном
+// экземпляре —modal-состояние (G90/G91, активное движение, подача) мутируется
+// на месте, а строка возвращает лишь рамку-результат.
+// ---------------------------------------------------------------------------
+
+interface MotionState {
+  x: number;
+  y: number;
+  z: number;
+  feed: number | undefined;
+  absolute: boolean;
+  motion: 'G0' | 'G1' | 'G2' | 'G3' | null;
+}
+
+interface LineFrame {
+  targetX: number;
+  targetY: number;
+  targetZ: number;
+  arcI: number;
+  arcJ: number;
+  /** Строка несёт хотя бы один адрес X/Y/Z (т.е. это перемещение). */
+  moved: boolean;
+}
+
+const createMotionState = (): MotionState => ({
+  x: 0,
+  y: 0,
+  z: DEFAULT_SAFE_Z_MM,
+  feed: undefined,
+  absolute: true,
+  motion: null,
+});
+
+/** Снять комментарии (…) и ;…, нормализовать регистр. Пустая строка → null. */
+function stripLineComments(raw: string): string | null {
+  let line = raw.trim();
+  line = line.replace(/\(.*?\)/g, '');
+  const commentIdx = line.indexOf(';');
+  if (commentIdx !== -1) {
+    line = line.substring(0, commentIdx);
+  }
+  line = line.trim().toUpperCase();
+  return line || null;
+}
+
+function scanLineTokens(line: string, st: MotionState): LineFrame {
+  const tokens = line.split(/\s+/);
+  let nextX = st.x;
+  let nextY = st.y;
+  let nextZ = st.z;
+  let arcI = 0;
+  let arcJ = 0;
+  let hasX = false;
+  let hasY = false;
+  let hasZ = false;
+
+  for (const token of tokens) {
+    if (token === 'G90') st.absolute = true;
+    if (token === 'G91') st.absolute = false;
+
+    if (token === 'G0' || token === 'G00') st.motion = 'G0';
+    if (token === 'G1' || token === 'G01') st.motion = 'G1';
+    if (token === 'G2' || token === 'G02') st.motion = 'G2';
+    if (token === 'G3' || token === 'G03') st.motion = 'G3';
+
+    const cmd = token[0];
+    const val = parseFloat(token.substring(1));
+    if (isNaN(val)) continue;
+
+    if (cmd === 'X') {
+      nextX = st.absolute ? val : st.x + val;
+      hasX = true;
+    } else if (cmd === 'Y') {
+      nextY = st.absolute ? val : st.y + val;
+      hasY = true;
+    } else if (cmd === 'Z') {
+      nextZ = st.absolute ? val : st.z + val;
+      hasZ = true;
+    } else if (cmd === 'I') {
+      arcI = val;
+    } else if (cmd === 'J') {
+      arcJ = val;
+    } else if (cmd === 'F') {
+      st.feed = val;
+    }
+  }
+
+  return { targetX: nextX, targetY: nextY, targetZ: nextZ, arcI, arcJ, moved: hasX || hasY || hasZ };
+}
+
+/** Сегмент текущего модального движения (rapid/feed/arc) от st до рамки f; null — если движения нет. */
+function makeMotionSegment(st: MotionState, f: LineFrame, id: string): ToolpathSegment | null {
+  if (st.motion === 'G0') {
+    return {
+      id,
+      type: 'rapid',
+      startX: st.x,
+      startY: st.y,
+      startZ: st.z,
+      endX: f.targetX,
+      endY: f.targetY,
+      endZ: f.targetZ,
+    };
+  }
+  if (st.motion === 'G1') {
+    return {
+      id,
+      type: 'feed',
+      startX: st.x,
+      startY: st.y,
+      startZ: st.z,
+      endX: f.targetX,
+      endY: f.targetY,
+      endZ: f.targetZ,
+      feed: st.feed,
+    };
+  }
+  if (st.motion === 'G2' || st.motion === 'G3') {
+    return {
+      id,
+      type: st.motion === 'G2' ? 'arc_cw' : 'arc_ccw',
+      startX: st.x,
+      startY: st.y,
+      startZ: st.z,
+      endX: f.targetX,
+      endY: f.targetY,
+      endZ: f.targetZ,
+      centerX: st.x + f.arcI,
+      centerY: st.y + f.arcJ,
+      feed: st.feed,
+    };
+  }
   return null;
 }
 
@@ -67,12 +217,7 @@ export function parseGcodeToCadObjects(
   let currentMeta: RawObjectBlock['meta'] | undefined = undefined;
   let currentSegments: ToolpathSegment[] = [];
 
-  let curX = 0;
-  let curY = 0;
-  let curZ = 10;
-  let curFeed: number | undefined = undefined;
-  let isAbsolute = true;
-  let activeMotion: 'G0' | 'G1' | 'G2' | 'G3' | null = null;
+  const st = createMotionState();
 
   const pushCurrentBlock = () => {
     if (currentSegments.length > 0) {
@@ -88,10 +233,12 @@ export function parseGcodeToCadObjects(
     const line = rawLine.trim();
     if (!line.startsWith(';')) return null;
 
-    const typePattern = '(point|line|polyline|rectangle|circle|arc)';
+    // Формат/лейбл — из общего контракта constants.ts (тот же, что пишет генератор).
+    // скобки вокруг типов обязательны: маркер выглядит как «... (circle)».
+    const types = `\\((${MARKER_SHAPE_TYPES})\\)`;
 
     // Compact format: ;[ID: id] name (type) OR ;[ID: id] (name) (type) OR ;[ID: id] ОБЪЕКТ: name (type)
-    const compactRegex = new RegExp(`^;\\s*\\[ID:\\s*([^\\]]+)\\]\\s*(?:ОБЪЕКТ:\\s*)?(?:\\((.*?)\\)|(.*?))\\s*\\(${typePattern}\\)`, 'i');
+    const compactRegex = new RegExp(`^;\\s*\\[ID:\\s*([^\\]]+)\\]\\s*(?:${OBJECT_LABEL}\\s*)?(?:\\((.*?)\\)|(.*?))\\s*${types}`, 'i');
     let match = line.match(compactRegex);
     if (match) {
       const id = match[1].trim();
@@ -101,7 +248,7 @@ export function parseGcodeToCadObjects(
     }
 
     // Legacy format: ; ОБЪЕКТ: name (type) [ID: id]
-    const legacyRegex = new RegExp(`^;\\s*ОБЪЕКТ:\\s*(.*?)\\s*\\(${typePattern}\\)(?:\\s*\\[ID:\\s*([^\\]]+)\\])?`, 'i');
+    const legacyRegex = new RegExp(`^;\\s*${OBJECT_LABEL}\\s*(.*?)\\s*${types}(?:\\s*\\[ID:\\s*([^\\]]+)\\])?`, 'i');
     match = line.match(legacyRegex);
     if (match) {
       const name = match[1].trim();
@@ -132,110 +279,29 @@ export function parseGcodeToCadObjects(
       continue;
     }
 
-    let line = rawLine.trim();
-    line = line.replace(/\(.*?\)/g, '');
-    const commentIdx = line.indexOf(';');
-    if (commentIdx !== -1) {
-      line = line.substring(0, commentIdx);
-    }
-    line = line.trim().toUpperCase();
+    const line = stripLineComments(rawLine);
     if (!line) continue;
 
-    const tokens = line.split(/\s+/);
-    let nextX = curX;
-    let nextY = curY;
-    let nextZ = curZ;
-    let arcI = 0;
-    let arcJ = 0;
-    let hasX = false;
-    let hasY = false;
-    let hasZ = false;
+    const frame = scanLineTokens(line, st);
 
-    for (const token of tokens) {
-      if (token === 'G90') isAbsolute = true;
-      if (token === 'G91') isAbsolute = false;
-
-      if (token === 'G0' || token === 'G00') activeMotion = 'G0';
-      if (token === 'G1' || token === 'G01') activeMotion = 'G1';
-      if (token === 'G2' || token === 'G02') activeMotion = 'G2';
-      if (token === 'G3' || token === 'G03') activeMotion = 'G3';
-
-      const cmd = token[0];
-      const val = parseFloat(token.substring(1));
-      if (isNaN(val)) continue;
-
-      if (cmd === 'X') {
-        nextX = isAbsolute ? val : curX + val;
-        hasX = true;
-      } else if (cmd === 'Y') {
-        nextY = isAbsolute ? val : curY + val;
-        hasY = true;
-      } else if (cmd === 'Z') {
-        nextZ = isAbsolute ? val : curZ + val;
-        hasZ = true;
-      } else if (cmd === 'I') {
-        arcI = val;
-      } else if (cmd === 'J') {
-        arcJ = val;
-      } else if (cmd === 'F') {
-        curFeed = val;
-      }
-    }
-
-    if (hasX || hasY || hasZ) {
+    if (frame.moved) {
       // Clean .nc без маркеров ;[ID:]: каждый репозиционирующий быстрый ход G00
       // со смещением по XY, идущий после режущих сегментов, начинает новый контур.
       if (
         !hasAnyMarker &&
-        activeMotion === 'G0' &&
+        st.motion === 'G0' &&
         currentSegments.length > 0 &&
-        Math.hypot(nextX - curX, nextY - curY) > 0.001
+        Math.hypot(frame.targetX - st.x, frame.targetY - st.y) > EPS_POINT_MM
       ) {
         pushCurrentBlock();
       }
 
-      if (activeMotion === 'G0') {
-        currentSegments.push({
-          id: `seg_${currentSegments.length}`,
-          type: 'rapid',
-          startX: curX,
-          startY: curY,
-          startZ: curZ,
-          endX: nextX,
-          endY: nextY,
-          endZ: nextZ,
-        });
-      } else if (activeMotion === 'G1') {
-        currentSegments.push({
-          id: `seg_${currentSegments.length}`,
-          type: 'feed',
-          startX: curX,
-          startY: curY,
-          startZ: curZ,
-          endX: nextX,
-          endY: nextY,
-          endZ: nextZ,
-          feed: curFeed,
-        });
-      } else if (activeMotion === 'G2' || activeMotion === 'G3') {
-        currentSegments.push({
-          id: `seg_${currentSegments.length}`,
-          type: activeMotion === 'G2' ? 'arc_cw' : 'arc_ccw',
-          startX: curX,
-          startY: curY,
-          startZ: curZ,
-          endX: nextX,
-          endY: nextY,
-          endZ: nextZ,
-          centerX: curX + arcI,
-          centerY: curY + arcJ,
-          feed: curFeed,
-        });
-      }
+      const seg = makeMotionSegment(st, frame, `seg_${currentSegments.length}`);
+      if (seg) currentSegments.push(seg);
 
-      curX = nextX;
-      curY = nextY;
-      curZ = nextZ;
+      st.x = frame.targetX;
+      st.y = frame.targetY;
+      st.z = frame.targetZ;
     }
   }
 
@@ -273,7 +339,7 @@ export function parseGcodeToCadObjects(
     }
     const isArcSeg = (s: ToolpathSegment) => s.type === 'arc_cw' || s.type === 'arc_ccw';
     const isPlunge = (s: ToolpathSegment) =>
-      s.type === 'feed' && Math.hypot(s.endX - s.startX, s.endY - s.startY) < 0.001;
+      s.type === 'feed' && Math.hypot(s.endX - s.startX, s.endY - s.startY) < EPS_POINT_MM;
     const cutting = block.segments.filter(
       (s) => s.type === 'feed' || s.type === 'arc_cw' || s.type === 'arc_ccw'
     );
@@ -318,7 +384,7 @@ export function parseGcodeToCadObjects(
         maxDepth = Math.max(maxDepth, Math.abs(s.endZ));
       }
       if (s.feed) {
-        if (Math.hypot(s.endX - s.startX, s.endY - s.startY) < 0.001) {
+        if (Math.hypot(s.endX - s.startX, s.endY - s.startY) < EPS_POINT_MM) {
           feedPlunge = s.feed;
         } else {
           feedCut = s.feed;
@@ -326,7 +392,7 @@ export function parseGcodeToCadObjects(
       }
     }
 
-    const depth = maxDepth || 5;
+    const depth = maxDepth || DEFAULT_DEPTH_MM;
 
     const pts: Point2D[] = [];
     for (const s of cuttingSegs) {
@@ -334,7 +400,7 @@ export function parseGcodeToCadObjects(
         pts.push({ x: s.startX, y: s.startY });
       }
       const last = pts[pts.length - 1];
-      if (Math.hypot(s.endX - last.x, s.endY - last.y) > 0.001) {
+      if (Math.hypot(s.endX - last.x, s.endY - last.y) > EPS_POINT_MM) {
         pts.push({ x: s.endX, y: s.endY });
       }
     }
@@ -356,7 +422,7 @@ export function parseGcodeToCadObjects(
         const firstArc = cuttingSegs.find((s) => s.type === 'arc_cw' || s.type === 'arc_ccw');
         if (
           firstArc &&
-          Math.hypot(firstArc.startX - firstArc.endX, firstArc.startY - firstArc.endY) < 0.01
+          Math.hypot(firstArc.startX - firstArc.endX, firstArc.startY - firstArc.endY) < EPS_CLOSE_MM
         ) {
           targetType = 'circle';
         } else {
@@ -405,8 +471,8 @@ export function parseGcodeToCadObjects(
       const arcSeg = cuttingSegs.find((s) => s.type === 'arc_cw' || s.type === 'arc_ccw');
       const centerX = arcSeg?.centerX ?? (matchedExisting?.type === 'circle' ? matchedExisting.centerX : pts[0]?.x ?? 0);
       const centerY = arcSeg?.centerY ?? (matchedExisting?.type === 'circle' ? matchedExisting.centerY : pts[0]?.y ?? 0);
-      const startPt = pts[0] || { x: centerX + 10, y: centerY };
-      const radius = Math.hypot(startPt.x - centerX, startPt.y - centerY) || 10;
+      const startPt = pts[0] || { x: centerX + DEFAULT_IMPORT_RADIUS_MM, y: centerY };
+      const radius = Math.hypot(startPt.x - centerX, startPt.y - centerY) || DEFAULT_IMPORT_RADIUS_MM;
 
       result.push({
         ...(matchedExisting && matchedExisting.type === 'circle' ? matchedExisting : {}),
@@ -430,7 +496,7 @@ export function parseGcodeToCadObjects(
       const endY = pts[pts.length - 1]?.y ?? 50;
       const centerX = arcSeg?.centerX ?? (matchedExisting?.type === 'arc' ? matchedExisting.centerX : startX);
       const centerY = arcSeg?.centerY ?? (matchedExisting?.type === 'arc' ? matchedExisting.centerY : startY);
-      const radius = Math.hypot(startX - centerX, startY - centerY) || 10;
+      const radius = Math.hypot(startX - centerX, startY - centerY) || DEFAULT_IMPORT_RADIUS_MM;
       const clockwise = arcSeg ? arcSeg.type === 'arc_cw' : true;
 
       result.push({
@@ -482,7 +548,7 @@ export function parseGcodeToCadObjects(
         type: 'point',
         x: pt.x,
         y: pt.y,
-        diameter: matchedExisting && matchedExisting.type === 'point' ? matchedExisting.diameter : 3,
+        diameter: matchedExisting && matchedExisting.type === 'point' ? matchedExisting.diameter : DEFAULT_POINT_DIAMETER_MM,
         drillMode: matchedExisting && matchedExisting.type === 'point' ? matchedExisting.drillMode : '11mm',
         depth,
         operationType: matchedExisting?.operationType || 'drill',
@@ -493,7 +559,7 @@ export function parseGcodeToCadObjects(
     } else {
       const closed =
         pts.length > 2 &&
-        Math.hypot(pts[0].x - pts[pts.length - 1].x, pts[0].y - pts[pts.length - 1].y) < 0.1;
+        Math.hypot(pts[0].x - pts[pts.length - 1].x, pts[0].y - pts[pts.length - 1].y) < EPS_CLOSED_POLYLINE_MM;
 
       result.push({
         ...(matchedExisting && matchedExisting.type === 'polyline' ? matchedExisting : {}),
@@ -516,14 +582,14 @@ export function parseGcodeToCadObjects(
 
 function isRectanglePoints(pts: Point2D[]): boolean {
   if (pts.length !== 5) return false;
-  if (Math.hypot(pts[0].x - pts[4].x, pts[0].y - pts[4].y) > 0.01) return false;
+  if (Math.hypot(pts[0].x - pts[4].x, pts[0].y - pts[4].y) > EPS_CLOSE_MM) return false;
 
   for (let i = 0; i < 4; i++) {
     const p1 = pts[i];
     const p2 = pts[i + 1];
     const dx = p2.x - p1.x;
     const dy = p2.y - p1.y;
-    if (Math.abs(dx) > 0.01 && Math.abs(dy) > 0.01) return false;
+    if (Math.abs(dx) > EPS_CLOSE_MM && Math.abs(dy) > EPS_CLOSE_MM) return false;
   }
   return true;
 }
@@ -550,110 +616,21 @@ export function parseGcodeToSegments(gcode: string): ToolpathSegment[] {
   const segments: ToolpathSegment[] = [];
   const lines = gcode.split('\n');
 
-  let curX = 0;
-  let curY = 0;
-  let curZ = 10;
-  let curFeed: number | undefined = undefined;
-  let isAbsolute = true;
-  let activeMotion: 'G0' | 'G1' | 'G2' | 'G3' | null = null;
+  const st = createMotionState();
 
   for (let idx = 0; idx < lines.length; idx++) {
-    let line = lines[idx].trim();
-    // Strip comments in () or after ;
-    line = line.replace(/\(.*?\)/g, '');
-    const commentIndex = line.indexOf(';');
-    if (commentIndex !== -1) {
-      line = line.substring(0, commentIndex);
-    }
-    line = line.trim().toUpperCase();
+    const line = stripLineComments(lines[idx]);
     if (!line) continue;
 
-    const tokens = line.split(/\s+/);
+    const frame = scanLineTokens(line, st);
+    if (!frame.moved) continue;
 
-    let nextX = curX;
-    let nextY = curY;
-    let nextZ = curZ;
-    let arcI = 0;
-    let arcJ = 0;
-    let hasX = false;
-    let hasY = false;
-    let hasZ = false;
+    const seg = makeMotionSegment(st, frame, `parse_${segments.length}`);
+    if (seg) segments.push(seg);
 
-    for (const token of tokens) {
-      if (token === 'G90') isAbsolute = true;
-      if (token === 'G91') isAbsolute = false;
-
-      if (token === 'G0' || token === 'G00') activeMotion = 'G0';
-      if (token === 'G1' || token === 'G01') activeMotion = 'G1';
-      if (token === 'G2' || token === 'G02') activeMotion = 'G2';
-      if (token === 'G3' || token === 'G03') activeMotion = 'G3';
-
-      const cmd = token[0];
-      const val = parseFloat(token.substring(1));
-      if (isNaN(val)) continue;
-
-      if (cmd === 'X') {
-        nextX = isAbsolute ? val : curX + val;
-        hasX = true;
-      } else if (cmd === 'Y') {
-        nextY = isAbsolute ? val : curY + val;
-        hasY = true;
-      } else if (cmd === 'Z') {
-        nextZ = isAbsolute ? val : curZ + val;
-        hasZ = true;
-      } else if (cmd === 'I') {
-        arcI = val;
-      } else if (cmd === 'J') {
-        arcJ = val;
-      } else if (cmd === 'F') {
-        curFeed = val;
-      }
-    }
-
-    if (hasX || hasY || hasZ) {
-      if (activeMotion === 'G0') {
-        segments.push({
-          id: `parse_${segments.length}`,
-          type: 'rapid',
-          startX: curX,
-          startY: curY,
-          startZ: curZ,
-          endX: nextX,
-          endY: nextY,
-          endZ: nextZ,
-        });
-      } else if (activeMotion === 'G1') {
-        segments.push({
-          id: `parse_${segments.length}`,
-          type: 'feed',
-          startX: curX,
-          startY: curY,
-          startZ: curZ,
-          endX: nextX,
-          endY: nextY,
-          endZ: nextZ,
-          feed: curFeed,
-        });
-      } else if (activeMotion === 'G2' || activeMotion === 'G3') {
-        segments.push({
-          id: `parse_${segments.length}`,
-          type: activeMotion === 'G2' ? 'arc_cw' : 'arc_ccw',
-          startX: curX,
-          startY: curY,
-          startZ: curZ,
-          endX: nextX,
-          endY: nextY,
-          endZ: nextZ,
-          centerX: curX + arcI,
-          centerY: curY + arcJ,
-          feed: curFeed,
-        });
-      }
-
-      curX = nextX;
-      curY = nextY;
-      curZ = nextZ;
-    }
+    st.x = frame.targetX;
+    st.y = frame.targetY;
+    st.z = frame.targetZ;
   }
 
   return segments;

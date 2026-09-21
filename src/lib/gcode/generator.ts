@@ -8,6 +8,7 @@ import {
   ToolpathSegment,
 } from '../../types';
 import { formatNum, transformProgramToMachine } from '../geometry/transform';
+import { formatObjectMarker } from './constants';
 
 export interface GenerationResult {
   gcode: string;
@@ -196,7 +197,8 @@ export function generateGcode(
 
   // PROCESS VISIBLE OBJECTS DIRECTLY
   for (const obj of visibleObjects) {
-    gcodeLines.push(`\n;[ID: ${obj.id}] ${obj.name} (${obj.type})`);
+    // Маркер объекта — из общего контракта constants.ts (его же читает парсер).
+    gcodeLines.push(`\n${formatObjectMarker(obj.id, obj.name, obj.type)}`);
 
     const linkedOp = operations.find((op) => op.enabled && op.linkedObjectIds.includes(obj.id));
 
@@ -221,202 +223,108 @@ export function generateGcode(
       const zSafe = safeZ || 5.0;
       const totalD = ptObj.depth || 33.0;
 
+      // Три режима сверления имеют одну и ту же геометрию цикла: G00 к отверстию
+      // (с X-смещением для дуговых режимов), одна/несколько подач на глубину и
+      // G00 наружу. Различаются только смещение и «пики» (stages) — раньше это
+      // было три скопированных блока по 40 строк; вывод посимвольно тот же.
+      //  3mm  — погружение      G01 Z-{totalD} F{feed}
+      //  11mm — 2 дуги-шага     G02 I1.5 J0.0 Z-{z1} F{feed} / G02 I1.5 J0.0 Z-{z2} (без F)
+      //  9mm  — одна дуга       G02 I0.5 J0.0 Z-{totalD} F{feed}
+      type DrillStage =
+        | { kind: 'plunge'; depth: number }
+        | { kind: 'arc'; depth: number; radius: number };
+
+      let offset: number;
+      let stages: DrillStage[];
       if (is3mm) {
-        // Mode 3mm template (direct plunge drilling to depth):
-        // G00 X0.0 Y0.0 Z5.0
-        // G01 Z-{totalD} F{feedRate}
-        // G00 Z5.0
-        const startX = holePt.x;
-        const startY = holePt.y;
-        const zFinal = totalD;
-
-        const xStr = formatNum(startX, 1);
-        const yStr = formatNum(startY, 1);
-        const zSafeStr = formatNum(zSafe, 1);
-        const zFinalStr = formatNum(zFinal, 1);
-        const fStr = formatNum(feedRate, 1);
-
-        gcodeLines.push(`G00 X${xStr} Y${yStr} Z${zSafeStr}`);
-        segments.push({
-          id: `seg_${segments.length}`,
-          type: 'rapid',
-          startX: currentPos.x,
-          startY: currentPos.y,
-          startZ: currentPos.z,
-          endX: startX,
-          endY: startY,
-          endZ: zSafe,
-          objectId: obj.id,
-        });
-        currentPos = { x: startX, y: startY, z: zSafe };
-
-        gcodeLines.push(`G01 Z-${zFinalStr} F${fStr}`);
-        segments.push({
-          id: `seg_${segments.length}`,
-          type: 'drill',
-          startX: startX,
-          startY: startY,
-          startZ: zSafe,
-          endX: startX,
-          endY: startY,
-          endZ: -zFinal,
-          objectId: obj.id,
-        });
-        currentPos = { x: startX, y: startY, z: -zFinal };
-
-        gcodeLines.push(`G00 Z${zSafeStr}`);
-        segments.push({
-          id: `seg_${segments.length}`,
-          type: 'rapid',
-          startX: startX,
-          startY: startY,
-          startZ: -zFinal,
-          endX: startX,
-          endY: startY,
-          endZ: zSafe,
-          objectId: obj.id,
-        });
-        currentPos = { x: startX, y: startY, z: zSafe };
+        offset = 0;
+        stages = [{ kind: 'plunge', depth: totalD }];
       } else if (is11mm) {
-        // Mode 11mm template:
-        // G00 X-1.5 Y0.0 Z5.0
-        // G02 I1.5 J0.0 Z-16.0 F1000.0
-        // G02 I1.5 J0.0 Z-33.0
-        // G00 Z5.0
-        const offset = 1.5;
-        const startX = holePt.x - offset;
-        const startY = holePt.y;
-
+        offset = 1.5;
         const z1 = totalD > 16 ? 16.0 : Number((totalD / 2).toFixed(1));
-        const z2 = totalD;
-
-        const xStr = formatNum(startX, 1);
-        const yStr = formatNum(startY, 1);
-        const zSafeStr = formatNum(zSafe, 1);
-        const z1Str = formatNum(z1, 1);
-        const z2Str = formatNum(z2, 1);
-        const fStr = formatNum(feedRate, 1);
-
-        gcodeLines.push(`G00 X${xStr} Y${yStr} Z${zSafeStr}`);
-        segments.push({
-          id: `seg_${segments.length}`,
-          type: 'rapid',
-          startX: currentPos.x,
-          startY: currentPos.y,
-          startZ: currentPos.z,
-          endX: startX,
-          endY: startY,
-          endZ: zSafe,
-          objectId: obj.id,
-        });
-        currentPos = { x: startX, y: startY, z: zSafe };
-
-        gcodeLines.push(`G02 I1.5 J0.0 Z-${z1Str} F${fStr}`);
-        segments.push({
-          id: `seg_${segments.length}`,
-          type: 'arc_cw',
-          startX: startX,
-          startY: startY,
-          startZ: zSafe,
-          endX: startX,
-          endY: startY,
-          endZ: -z1,
-          centerX: holePt.x,
-          centerY: holePt.y,
-          objectId: obj.id,
-        });
-        currentPos = { x: startX, y: startY, z: -z1 };
-
-        gcodeLines.push(`G02 I1.5 J0.0 Z-${z2Str}`);
-        segments.push({
-          id: `seg_${segments.length}`,
-          type: 'arc_cw',
-          startX: startX,
-          startY: startY,
-          startZ: -z1,
-          endX: startX,
-          endY: startY,
-          endZ: -z2,
-          centerX: holePt.x,
-          centerY: holePt.y,
-          objectId: obj.id,
-        });
-        currentPos = { x: startX, y: startY, z: -z2 };
-
-        gcodeLines.push(`G00 Z${zSafeStr}`);
-        segments.push({
-          id: `seg_${segments.length}`,
-          type: 'rapid',
-          startX: startX,
-          startY: startY,
-          startZ: -z2,
-          endX: startX,
-          endY: startY,
-          endZ: zSafe,
-          objectId: obj.id,
-        });
-        currentPos = { x: startX, y: startY, z: zSafe };
+        stages = [
+          { kind: 'arc', depth: z1, radius: 1.5 },
+          { kind: 'arc', depth: totalD, radius: 1.5 },
+        ];
       } else {
-        // Mode 9mm template:
-        // G00 X-0.5 Y0.0 Z5.0
-        // G02 I0.5 J0.0 Z-33.0 F1000.0
-        // G00 Z5.0
-        const offset = 0.5;
-        const startX = holePt.x - offset;
-        const startY = holePt.y;
-
-        const zFinal = totalD;
-
-        const xStr = formatNum(startX, 1);
-        const yStr = formatNum(startY, 1);
-        const zSafeStr = formatNum(zSafe, 1);
-        const zFinalStr = formatNum(zFinal, 1);
-        const fStr = formatNum(feedRate, 1);
-
-        gcodeLines.push(`G00 X${xStr} Y${yStr} Z${zSafeStr}`);
-        segments.push({
-          id: `seg_${segments.length}`,
-          type: 'rapid',
-          startX: currentPos.x,
-          startY: currentPos.y,
-          startZ: currentPos.z,
-          endX: startX,
-          endY: startY,
-          endZ: zSafe,
-          objectId: obj.id,
-        });
-        currentPos = { x: startX, y: startY, z: zSafe };
-
-        gcodeLines.push(`G02 I0.5 J0.0 Z-${zFinalStr} F${fStr}`);
-        segments.push({
-          id: `seg_${segments.length}`,
-          type: 'arc_cw',
-          startX: startX,
-          startY: startY,
-          startZ: zSafe,
-          endX: startX,
-          endY: startY,
-          endZ: -zFinal,
-          centerX: holePt.x,
-          centerY: holePt.y,
-          objectId: obj.id,
-        });
-        currentPos = { x: startX, y: startY, z: -zFinal };
-
-        gcodeLines.push(`G00 Z${zSafeStr}`);
-        segments.push({
-          id: `seg_${segments.length}`,
-          type: 'rapid',
-          startX: startX,
-          startY: startY,
-          startZ: -zFinal,
-          endX: startX,
-          endY: startY,
-          endZ: zSafe,
-          objectId: obj.id,
-        });
-        currentPos = { x: startX, y: startY, z: zSafe };
+        offset = 0.5;
+        stages = [{ kind: 'arc', depth: totalD, radius: 0.5 }];
       }
+
+      const startX = holePt.x - offset;
+      const startY = holePt.y;
+      const zSafeStr = formatNum(zSafe, 1);
+      const fStr = formatNum(feedRate, 1);
+
+      // Подход: G00 в точку начала цикла на безопасном Z.
+      gcodeLines.push(`G00 X${formatNum(startX, 1)} Y${formatNum(startY, 1)} Z${zSafeStr}`);
+      segments.push({
+        id: `seg_${segments.length}`,
+        type: 'rapid',
+        startX: currentPos.x,
+        startY: currentPos.y,
+        startZ: currentPos.z,
+        endX: startX,
+        endY: startY,
+        endZ: zSafe,
+        objectId: obj.id,
+      });
+      currentPos = { x: startX, y: startY, z: zSafe };
+
+      // Пику (погружения). F пишется только на первом проходе — как и раньше.
+      stages.forEach((stage, si) => {
+        const dStr = formatNum(stage.depth, 1);
+        const sX = currentPos.x;
+        const sY = currentPos.y;
+        const sZ = currentPos.z;
+        if (stage.kind === 'plunge') {
+          gcodeLines.push(`G01 Z-${dStr} F${fStr}`);
+          segments.push({
+            id: `seg_${segments.length}`,
+            type: 'drill',
+            startX: sX,
+            startY: sY,
+            startZ: sZ,
+            endX: startX,
+            endY: startY,
+            endZ: -stage.depth,
+            objectId: obj.id,
+          });
+        } else {
+          gcodeLines.push(
+            `G02 I${formatNum(stage.radius, 1)} J0.0 Z-${dStr}${si === 0 ? ` F${fStr}` : ''}`
+          );
+          segments.push({
+            id: `seg_${segments.length}`,
+            type: 'arc_cw',
+            startX: sX,
+            startY: sY,
+            startZ: sZ,
+            endX: startX,
+            endY: startY,
+            endZ: -stage.depth,
+            centerX: holePt.x,
+            centerY: holePt.y,
+            objectId: obj.id,
+          });
+        }
+        currentPos = { x: startX, y: startY, z: -stage.depth };
+      });
+
+      // Отвод наружу.
+      gcodeLines.push(`G00 Z${zSafeStr}`);
+      segments.push({
+        id: `seg_${segments.length}`,
+        type: 'rapid',
+        startX: currentPos.x,
+        startY: currentPos.y,
+        startZ: currentPos.z,
+        endX: startX,
+        endY: startY,
+        endZ: zSafe,
+        objectId: obj.id,
+      });
+      currentPos = { x: startX, y: startY, z: zSafe };
       downZ = null; // drilling always finishes lifted at safeZ
     }
     // 2. LINE OBJECT
