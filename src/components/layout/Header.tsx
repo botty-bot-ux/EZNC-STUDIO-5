@@ -437,6 +437,26 @@ export const Header: React.FC = () => {
           >
             <Ruler className={`w-4 h-4 ${activeTool === 'measure' ? 'text-primary-fg' : 'text-accent'}`} />
           </button>
+
+          <div className="w-px h-5 bg-slate-200 dark:bg-slate-700 mx-0.5 shrink-0" />
+
+          <button
+            onClick={undo}
+            disabled={undoCount === 0}
+            title="Отменить (Ctrl+Z)"
+            className="p-2 rounded-lg text-slate-600 dark:text-slate-300 disabled:opacity-30 hover:text-slate-900 hover:dark:text-slate-100 hover:bg-slate-50 hover:dark:bg-slate-800/60 transition-all"
+          >
+            <Undo className="w-4 h-4" />
+          </button>
+
+          <button
+            onClick={redo}
+            disabled={redoCount === 0}
+            title="Повторить (Ctrl+Y)"
+            className="p-2 rounded-lg text-slate-600 dark:text-slate-300 disabled:opacity-30 hover:text-slate-900 hover:dark:text-slate-100 hover:bg-slate-50 hover:dark:bg-slate-800/60 transition-all"
+          >
+            <Redo className="w-4 h-4" />
+          </button>
         </div>
       </div>
 
