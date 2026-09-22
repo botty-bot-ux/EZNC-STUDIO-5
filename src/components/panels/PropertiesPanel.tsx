@@ -1,6 +1,6 @@
 import React from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { Circle, CircleDot, Eye, EyeOff, GitCompareArrows, Layers, LineDotRightHorizontal, Lock, Move, Ruler, Sliders, Spline, Square, Trash2, Unlock } from 'lucide-react';
+import { Circle, CircleDot, Eye, EyeOff, GitCompareArrows, Layers, LineDotRightHorizontal, Lock, Maximize2, Move, Ruler, Sliders, Spline, Square, Trash2, Unlock } from 'lucide-react';
 import { useProjectStore, useSelectedObjectId } from '../../store/useProjectStore';
 import { ArcObject, CircleObject, LineObject, PointHoleObject, RectangleObject } from '../../types';
 import { ArcProperties } from './properties/ArcProperties';
@@ -19,6 +19,8 @@ interface SelectionActionsProps {
   onToggleVisible: () => void;
   onToggleFrozen: () => void;
   onMove: () => void;
+  /** Кнопка «Масштабировать» (растяжение по X/Y) — для размороженных фигур. */
+  onScale?: () => void;
   onDelete: () => void;
   /** Кнопка «Параллельная линия/дуга» — только для одиночной линии/дуги. */
   parallel?: { title: string; onClick: () => void };
@@ -31,6 +33,7 @@ const SelectionActions: React.FC<SelectionActionsProps> = ({
   onToggleVisible,
   onToggleFrozen,
   onMove,
+  onScale,
   onDelete,
   parallel,
 }) => (
@@ -60,6 +63,15 @@ const SelectionActions: React.FC<SelectionActionsProps> = ({
         className="p-1.5 rounded-lg text-slate-400 dark:text-slate-500 hover:text-primary hover:bg-slate-100 hover:dark:bg-slate-700 transition-all"
       >
         <Move className="w-4 h-4" />
+      </button>
+    )}
+    {!frozen && onScale && (
+      <button
+        onClick={onScale}
+        title="Масштабировать (растяжение по горизонтали/вертикали)"
+        className="p-1.5 rounded-lg text-slate-400 dark:text-slate-500 hover:text-primary hover:bg-slate-100 hover:dark:bg-slate-700 transition-all"
+      >
+        <Maximize2 className="w-4 h-4" />
       </button>
     )}
     {parallel && (
@@ -160,6 +172,7 @@ export const PropertiesPanel: React.FC = () => {
             onToggleVisible={() => updateSelectedObjects({ visible: !allVisible })}
             onToggleFrozen={() => updateSelectedObjects({ frozen: !allFrozen })}
             onMove={() => setShapeDialog({ kind: 'move' })}
+            onScale={() => setShapeDialog({ kind: 'scale' })}
             onDelete={deleteSelectedObjects}
           />
         </div>
@@ -235,6 +248,10 @@ export const PropertiesPanel: React.FC = () => {
           onToggleVisible={() => updateObject(selectedObj.id, { visible: selectedObj.visible === false })}
           onToggleFrozen={() => updateObject(selectedObj.id, { frozen: selectedObj.frozen !== true })}
           onMove={() => setShapeDialog({ kind: 'move' })}
+          onScale={
+            // Одиночную точку растяжать бессмысленно (якорь = сама точка) — кнопки нет.
+            selectedObj.type === 'point' ? undefined : () => setShapeDialog({ kind: 'scale' })
+          }
           onDelete={() => deleteObject(selectedObj.id)}
           parallel={
             selectedObj.type === 'line' || selectedObj.type === 'arc'

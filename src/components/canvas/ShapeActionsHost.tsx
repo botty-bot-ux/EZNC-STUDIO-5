@@ -2,9 +2,14 @@ import React, { useEffect } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useProjectStore } from '../../store/useProjectStore';
 import { ArcObject, LineObject } from '../../types';
-import { computeParallelArcs, computeParallelSegments } from '../../lib/geometry/transform';
+import {
+  computeObjectBounds,
+  computeParallelArcs,
+  computeParallelSegments,
+} from '../../lib/geometry/transform';
 import { MoveDialog } from '../modals/MoveDialog';
 import { ParallelDialog } from '../modals/ParallelDialog';
+import { ScaleDialog } from '../modals/ScaleDialog';
 
 /**
  * Хост модалок действий с фигурами на уровне App. Открывается по store.shapeDialog
@@ -12,17 +17,25 @@ import { ParallelDialog } from '../modals/ParallelDialog';
  * Живёт выше обоих, чтобы модалка не зависела от того, открыта ли панель свойств.
  */
 export const ShapeActionsHost: React.FC = () => {
-  const { shapeDialog, objects, selectedObjectIds, addObject, moveSelectedObjectsBy, setShapeDialog } =
-    useProjectStore(
-      useShallow((s) => ({
-        shapeDialog: s.shapeDialog,
-        objects: s.objects,
-        selectedObjectIds: s.selectedObjectIds,
-        addObject: s.addObject,
-        moveSelectedObjectsBy: s.moveSelectedObjectsBy,
-        setShapeDialog: s.setShapeDialog,
-      }))
-    );
+  const {
+    shapeDialog,
+    objects,
+    selectedObjectIds,
+    addObject,
+    moveSelectedObjectsBy,
+    scaleSelectedObjectsBy,
+    setShapeDialog,
+  } = useProjectStore(
+    useShallow((s) => ({
+      shapeDialog: s.shapeDialog,
+      objects: s.objects,
+      selectedObjectIds: s.selectedObjectIds,
+      addObject: s.addObject,
+      moveSelectedObjectsBy: s.moveSelectedObjectsBy,
+      scaleSelectedObjectsBy: s.scaleSelectedObjectsBy,
+      setShapeDialog: s.setShapeDialog,
+    }))
+  );
 
   const selObjs = objects.filter((o) => selectedObjectIds.includes(o.id));
   // «Основная» фигура = последний id выделения (как в панели Свойств).
@@ -50,6 +63,36 @@ export const ShapeActionsHost: React.FC = () => {
         ids={selObjs.filter((o) => !o.frozen).map((o) => o.id)}
         onClose={close}
         onApply={moveSelectedObjectsBy}
+      />
+    );
+  }
+
+  if (shapeDialog.kind === 'scale') {
+    const movable = selObjs.filter((o) => !o.frozen);
+    // Якорь — центр общей рамки выделения: фигура растягивается симметрично
+    // относительно середины, группа не «уезжает» в сторону.
+    let anchor = { x: 0, y: 0 };
+    if (movable.length > 0) {
+      let minX = Infinity;
+      let minY = Infinity;
+      let maxX = -Infinity;
+      let maxY = -Infinity;
+      for (const o of movable) {
+        const b = computeObjectBounds(o);
+        minX = Math.min(minX, b.minX);
+        minY = Math.min(minY, b.minY);
+        maxX = Math.max(maxX, b.maxX);
+        maxY = Math.max(maxY, b.maxY);
+      }
+      anchor = { x: (minX + maxX) / 2, y: (minY + maxY) / 2 };
+    }
+    return (
+      <ScaleDialog
+        isOpen
+        ids={movable.map((o) => o.id)}
+        anchor={anchor}
+        onClose={close}
+        onApply={scaleSelectedObjectsBy}
       />
     );
   }

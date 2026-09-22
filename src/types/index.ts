@@ -127,6 +127,15 @@ export interface ParallelPreviewState {
   sourceArc?: ParallelArc; // исходная дуга (для стрелки направления)
 }
 
+// Живое превью модуля «Масштабировать»: выбранные фигуры растянуты относительно
+// якоря anchor (центр рамки выделения) с множителями sx/sy. Только отрисовка.
+export interface LiveScaleState {
+  ids: string[];
+  anchor: Point2D;
+  sx: number;
+  sy: number;
+}
+
 // Фоновая референсная картинка («подложка»/чертёж). Только на сессию — не сохраняется и не влияет на G-код.
 export interface UnderlayState {
   src: string | null; // data-URL загруженного изображения

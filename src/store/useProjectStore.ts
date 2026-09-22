@@ -5,6 +5,7 @@ import {
   ArcMode,
   CADObject,
   LineMode,
+  LiveScaleState,
   MachineSettings,
   MobileSheet,
   NewCADObjectInput,
@@ -24,7 +25,7 @@ import { OBJECT_MARKER_LINE_RE } from '../lib/gcode/constants';
 import { DEFAULT_TEMPLATES } from '../lib/postprocessor/templates';
 import { analyzeProjectWarnings } from '../lib/utils/warnings';
 import { optimizeCADObjects, OptimizationResult } from '../lib/geometry/optimizer';
-import { translateCADObject } from '../lib/geometry/transform';
+import { scaleCADObject, translateCADObject } from '../lib/geometry/transform';
 import {
   INITIAL_MACHINE,
   INITIAL_OBJECTS,
@@ -78,11 +79,11 @@ interface ProjectStore {
   // selectedObjectId, которое расходилось с массивом при загрузке проектов.
   selectedObjectIds: string[];
   selectedOperationId: string | null;
-  // Модалки действий с фигурами («Переместить», «Параллельная …») живут на уровне
-  // App (ShapeActionsHost) и открываются по запросу — из панели Свойств и из
-  // правого-кликового меню на холсте.
-  shapeDialog: { kind: 'move' | 'parallel' } | null;
-  setShapeDialog: (d: { kind: 'move' | 'parallel' } | null) => void;
+  // Модалки действий с фигурами («Переместить», «Масштабировать», «Параллельная …»)
+  // живут на уровне App (ShapeActionsHost) и открываются по запросу — из панели
+  // Свойств и из правого-кликового меню на холсте.
+  shapeDialog: { kind: 'move' | 'scale' | 'parallel' } | null;
+  setShapeDialog: (d: { kind: 'move' | 'scale' | 'parallel' } | null) => void;
   // Transient interaction state surfaced to the Свойства panel during a drag / measure.
   // Kept out of `objects` so it never triggers history, autosave or G-code regen.
   liveEdit: { id: string; patch: Partial<CADObject> } | null;
@@ -90,6 +91,9 @@ interface ProjectStore {
   // Живое превью перемещения группы (модуль «Переместить»): смещение выбранных фигур на
   // холсте до подтверждения. Только отрисовка — не трогает objects/историю/G-код.
   liveMove: { ids: string[]; dx: number; dy: number } | null;
+  // Живое превью модуля «Масштабировать»: растяжение выбранных фигур относительно
+  // якоря до подтверждения. Только отрисовка — не трогает objects/историю/G-код.
+  liveScale: LiveScaleState | null;
   // Живое превью модуля «Параллельная линия»: штриховые копии будущих линий на холсте
   // до подтверждения. Только отрисовка — не трогает objects/историю/G-код.
   parallelPreview: ParallelPreviewState | null;
@@ -161,6 +165,7 @@ interface ProjectStore {
   setLiveEdit: (v: { id: string; patch: Partial<CADObject> } | null) => void;
   setLiveMeasure: (v: { start: Point2D; end: Point2D } | null) => void;
   setLiveMove: (v: { ids: string[]; dx: number; dy: number } | null) => void;
+  setLiveScale: (v: LiveScaleState | null) => void;
   setParallelPreview: (v: ParallelPreviewState | null) => void;
 
   // Подложка (фоновая референсная картинка) — только на сессию.
@@ -187,6 +192,8 @@ interface ProjectStore {
   pasteClipboard: () => void;
   // Точное перемещение выделения на относительный сдвиг (dx, dy) в мм.
   moveSelectedObjectsBy: (dx: number, dy: number) => void;
+  // Точное растяжение (масштабирование) выделения относительно якоря с множителями sx/sy.
+  scaleSelectedObjectsBy: (anchor: Point2D, sx: number, sy: number) => void;
 
   addOperation: (op: OperationItem) => void;
   updateOperation: (id: string, partial: Partial<OperationItem>) => void;
@@ -343,6 +350,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
     liveEdit: null,
     liveMeasure: null,
     liveMove: null,
+    liveScale: null,
     parallelPreview: null,
     underlay: DEFAULT_UNDERLAY,
     activeTool: 'select',
@@ -486,6 +494,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
     setLiveEdit: (v) => set({ liveEdit: v }),
     setLiveMeasure: (v) => set({ liveMeasure: v }),
     setLiveMove: (v) => set({ liveMove: v }),
+    setLiveScale: (v) => set({ liveScale: v }),
     setParallelPreview: (v) => set({ parallelPreview: v }),
     setShapeDialog: (d) => set({ shapeDialog: d }),
 
@@ -790,6 +799,24 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
       if (!Number.isFinite(dx) || !Number.isFinite(dy) || (dx === 0 && dy === 0)) return;
       pushHistory();
       const newObjs = get().objects.map((o) => (ids.has(o.id) ? translateCADObject(o, dx, dy) : o));
+      syncAndSave({ objects: newObjs });
+    },
+
+    // Точное растяжение всего выделения относительно якоря (обычно — центр рамки
+    // выделения). Замороженные фигуры не трогаются; sx/sy близкие к 1 игнорируются.
+    // Одна запись истории, пересчёт G-кода.
+    scaleSelectedObjectsBy: (anchor: Point2D, sx: number, sy: number) => {
+      const movable = new Set(
+        get().objects.filter((o) => o.frozen !== true).map((o) => o.id)
+      );
+      const ids = new Set(get().selectedObjectIds.filter((id) => movable.has(id)));
+      if (ids.size === 0) return;
+      if (!Number.isFinite(sx) || !Number.isFinite(sy)) return;
+      if (Math.abs(sx - 1) < 1e-9 && Math.abs(sy - 1) < 1e-9) return;
+      pushHistory();
+      const newObjs = get().objects.map((o) =>
+        ids.has(o.id) ? scaleCADObject(o, anchor, sx, sy) : o
+      );
       syncAndSave({ objects: newObjs });
     },
 

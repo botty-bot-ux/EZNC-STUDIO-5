@@ -38,7 +38,7 @@ import {
   buildArc,
 } from './canvasUtils';
 import { paletteForTheme } from './canvasPalette';
-import { constrainAngle } from '../../lib/geometry/transform';
+import { constrainAngle, scaleCADObject } from '../../lib/geometry/transform';
 import { useIsMobile } from '../../hooks/useIsMobile';
 
 /** Point at distance `len` from `origin` along angle `ang` (radians). */
@@ -162,6 +162,7 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
     setLiveEdit,
     setLiveMeasure,
     liveMove,
+    liveScale,
     parallelPreview,
     underlay,
     updateUnderlay,
@@ -196,6 +197,7 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
       setLiveEdit: s.setLiveEdit,
       setLiveMeasure: s.setLiveMeasure,
       liveMove: s.liveMove,
+      liveScale: s.liveScale,
       parallelPreview: s.parallelPreview,
       underlay: s.underlay,
       updateUnderlay: s.updateUnderlay,
@@ -469,8 +471,16 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
         idset.has(o.id) ? translateObjectFull(o, liveMove.dx, liveMove.dy) : o
       );
     }
+    // Живое превью из модуля «Масштабировать» (до подтверждения): растягиваем группу
+    // относительно якоря.
+    if (liveScale && liveScale.ids.length > 0 && (liveScale.sx !== 1 || liveScale.sy !== 1)) {
+      const idset = new Set(liveScale.ids);
+      return objects.map((o) =>
+        idset.has(o.id) ? scaleCADObject(o, liveScale.anchor, liveScale.sx, liveScale.sy) : o
+      );
+    }
     return objects;
-  }, [objects, liveDrag, liveMove]);
+  }, [objects, liveDrag, liveMove, liveScale]);
 
   // Auto-fit canvas view
   const fitView = () => {

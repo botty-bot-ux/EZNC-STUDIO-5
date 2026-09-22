@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Eye, EyeOff, GitCompareArrows, Lock, Move, Trash2, Unlock } from 'lucide-react';
+import { Eye, EyeOff, GitCompareArrows, Lock, Maximize2, Move, Trash2, Unlock } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useProjectStore } from '../../store/useProjectStore';
 
@@ -12,7 +12,8 @@ interface ShapeContextMenuProps {
 
 /**
  * Правый клик по фигуре на холсте: те же действия, что в шапке панели «Свойства»
- * (показать/скрыть, заморозить, переместить, параллельная линия/дуга, удалить).
+ * (показать/скрыть, заморозить, переместить, масштабировать, параллельная
+ * линия/дуга, удалить).
  * Работает по текущему выделению: клик по невыделенной фигуре сначала выделяет её.
  */
 export const ShapeContextMenu: React.FC<ShapeContextMenuProps> = ({ x, y, onClose }) => {
@@ -61,6 +62,8 @@ export const ShapeContextMenu: React.FC<ShapeContextMenuProps> = ({ x, y, onClos
   const allFrozen = selObjs.every((o) => o.frozen === true);
   const primary = selObjs[selObjs.length - 1];
   const showParallel = !plural && !primary.frozen && (primary.type === 'line' || primary.type === 'arc');
+  // Одиночную точку растяжать бессмысленно (якорь = сама точка) — пункта нет.
+  const showScale = plural || primary.type !== 'point';
 
   const run = (fn: () => void) => () => {
     fn();
@@ -68,7 +71,7 @@ export const ShapeContextMenu: React.FC<ShapeContextMenuProps> = ({ x, y, onClos
   };
 
   const MENU_W = 232;
-  const MENU_H = 260;
+  const MENU_H = 296;
   const left = Math.max(8, Math.min(x, window.innerWidth - MENU_W - 8));
   const top = Math.max(8, Math.min(y, window.innerHeight - MENU_H - 8));
 
@@ -115,6 +118,13 @@ export const ShapeContextMenu: React.FC<ShapeContextMenuProps> = ({ x, y, onClos
           Icon={Move}
           label="Переместить"
           onClick={run(() => setShapeDialog({ kind: 'move' }))}
+        />
+      )}
+      {!allFrozen && showScale && (
+        <Item
+          Icon={Maximize2}
+          label="Масштабировать"
+          onClick={run(() => setShapeDialog({ kind: 'scale' }))}
         />
       )}
       {showParallel && (
