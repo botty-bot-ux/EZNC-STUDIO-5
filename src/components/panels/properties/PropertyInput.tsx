@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useId, useState } from 'react';
 import { useScrub } from '../../ui/useScrub';
 import { ScrubChevrons } from '../../ui/ScrubChevrons';
 import { parseDecimalOrNull } from '../../../lib/utils/num';
@@ -32,15 +32,24 @@ export const PropertyInput: React.FC<PropertyInputProps> = ({
   // Локальный черновик: даёт набирать дробь/запятую, не «съедая» ввод. Вне редактирования
   // показываем значение из props (при заданном decimals — округлённым до нужного числа знаков).
   const [draft, setDraft] = useState<string | null>(null);
+  const id = useId();
+
+  // toFixed принимает только целое 0..100, иначе RangeError — приводим безопасно.
+  const dec =
+    typeof decimals === 'number' && Number.isFinite(decimals)
+      ? Math.max(0, Math.min(100, Math.trunc(decimals)))
+      : null;
 
   // Вне редактирования показываем значение из props: при decimals — округлённое и с запятой
   // как десятичным разделителем (привычнее для русскоязычного интерфейса).
   const display =
     draft !== null
       ? draft
-      : decimals != null
-        ? Number(value).toFixed(decimals).replace('.', ',')
-        : String(value);
+      : !Number.isFinite(value)
+        ? ''
+        : dec != null
+          ? value.toFixed(dec).replace('.', ',')
+          : String(value);
 
   const handleChange = (raw: string) => {
     setDraft(raw);
@@ -52,7 +61,7 @@ export const PropertyInput: React.FC<PropertyInputProps> = ({
     if (draft !== null) {
       const n = parseDecimalOrNull(draft);
       let next = n !== null ? n : fallbackValue;
-      if (decimals != null) next = Number(next.toFixed(decimals));
+      if (dec != null) next = Number(next.toFixed(dec));
       onChange(next);
     }
     setDraft(null);
@@ -62,13 +71,13 @@ export const PropertyInput: React.FC<PropertyInputProps> = ({
   const stepNum = typeof step === 'string' ? parseFloat(step.replace(',', '.')) : step;
   const hasStepper = typeof stepNum === 'number' && Number.isFinite(stepNum) && stepNum > 0;
 
-  // Общая функция сдвига на `deltaSteps` шагов (клик = ±1; drag = накопленное число шагов).
+  // Общая функция сдвига на `deltaSteps` шагов (клик = ±1; drag = инкремент шагов с прошлого события).
   // Считаем от актуального черновика, если он есть, иначе от props.value.
   const shift = (deltaSteps: number) => {
     if (!hasStepper) return;
     const base = draft !== null ? parseDecimalOrNull(draft) ?? value : value;
     let next = base + deltaSteps * (stepNum as number);
-    if (decimals != null) next = Number(next.toFixed(decimals));
+    if (dec != null) next = Number(next.toFixed(dec));
     setDraft(null);
     onChange(next);
   };
@@ -80,12 +89,14 @@ export const PropertyInput: React.FC<PropertyInputProps> = ({
   return (
     <div className="flex items-center gap-1.5 w-full">
       <label
+        htmlFor={id}
         className="text-[13px] text-slate-500 dark:text-slate-400 font-medium whitespace-nowrap shrink-0 min-w-[32px]"
         title={label}
       >
         {label}
       </label>
       <input
+        id={id}
         type="text"
         inputMode="decimal"
         value={display}
