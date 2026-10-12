@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Suspense } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { X } from 'lucide-react';
 import { Header } from './components/layout/Header';
@@ -14,12 +14,23 @@ import { ShapeActionsHost } from './components/canvas/ShapeActionsHost';
 import { useProjectStore } from './store/useProjectStore';
 import { useIsMobile } from './hooks/useIsMobile';
 
+// three.js тяжёлый — грузим 3D-сцену отдельным чанком только при первом открытии
+// 3D-вида, чтобы лёгкий 2D-редактор стартовал без WebGL-библиотек.
+const Scene3D = React.lazy(() => import('./components/canvas3d/Scene3D'));
+
+const Scene3DFallback: React.FC = () => (
+  <div className="absolute inset-0 flex items-center justify-center bg-slate-200 text-sm text-slate-500 dark:bg-slate-900 dark:text-slate-400">
+    Загрузка 3D…
+  </div>
+);
+
 export default function App() {
   const isMobile = useIsMobile();
-  const { mobileSheet, setMobileSheet } = useProjectStore(
+  const { mobileSheet, setMobileSheet, renderMode } = useProjectStore(
     useShallow((s) => ({
       mobileSheet: s.mobileSheet,
       setMobileSheet: s.setMobileSheet,
+      renderMode: s.renderMode,
     }))
   );
   const {
@@ -114,13 +125,23 @@ export default function App() {
     if (mobileSheet === 'gcode') setGcodeSeen(true);
   }, [mobileSheet]);
 
+  // Активное представление области холста: 2D-редактор или 3D-симуляция съёма.
+  const viewport =
+    renderMode === '3d' ? (
+      <Suspense fallback={<Scene3DFallback />}>
+        <Scene3D />
+      </Suspense>
+    ) : (
+      <SceneCanvas />
+    );
+
   // ───────────────────── Мобильная раскладка (телефон) ─────────────────────
   if (isMobile) {
     return (
       <div className="relative h-dvh w-screen bg-[#f8fafc] dark:bg-[#0f172a] text-slate-800 dark:text-slate-100 overflow-hidden font-sans">
         {/* Canvas fills entire viewport, extends behind the floating header */}
         <main className="absolute inset-0 bg-[#f8fafc] dark:bg-[#0f172a] overflow-hidden">
-          <SceneCanvas />
+          {viewport}
         </main>
 
         {/* Header floats on top */}
@@ -170,14 +191,14 @@ export default function App() {
     <div className="relative h-dvh w-screen bg-[#f8fafc] dark:bg-[#0f172a] text-slate-800 dark:text-slate-100 overflow-hidden font-sans">
       {/* Canvas fills entire viewport, extends behind the floating header */}
       <main className="absolute inset-0 bg-[#f8fafc] dark:bg-[#0f172a] overflow-hidden">
-        <SceneCanvas />
+        {viewport}
       </main>
 
       {/* Header floats on top (h-16, transparent) */}
       <Header />
 
-      {/* Floating Left Layers Toolbar Overlay */}
-      <LeftToolbar />
+      {/* Floating Left Layers Toolbar Overlay — только в 2D-редакторе */}
+      {renderMode === '2d' && <LeftToolbar />}
 
       {/* Floating Right Inspector, Machine & G-code Editor Overlay */}
       <RightSidebar />

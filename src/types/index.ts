@@ -227,6 +227,11 @@ export type ActiveTab = 'machine' | 'gcode' | 'properties';
 export type MobileSheet = 'none' | 'figures' | ActiveTab;
 export type ViewMode = 'edit' | 'preview' | 'gcode';
 
+// Какое представление смонтировано в области холста: 2D-редактор (<canvas> 2D) или
+// 3D-сцена с симуляцией съёма фрезой. Ортогонально ViewMode: последний описывает,
+// ЧТО рисует 2D-холст, а RenderMode — КАКОЙ рендерер активен. Сессионное, не сохраняется.
+export type RenderMode = '2d' | '3d';
+
 export interface ToolpathSegment {
   id: string;
   type: 'rapid' | 'feed' | 'arc_cw' | 'arc_ccw' | 'drill';

@@ -24,6 +24,8 @@ export default defineConfig(() => {
             if (!id.includes('node_modules')) return;
             if (id.includes('@monaco-editor') || id.includes('monaco-editor')) return 'vendor-monaco';
             if (id.includes('zustand')) return 'vendor-zustand';
+            // three + @react-three — до проверки '/react': путь '@react-three' содержит 'react'.
+            if (id.includes('three') || id.includes('@react-three')) return 'vendor-three';
             if (id.includes('/react') || id.includes('scheduler')) return 'vendor-react';
           },
         },

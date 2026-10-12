@@ -35,7 +35,7 @@ export const NewProjectModal: React.FC<NewProjectModalProps> = ({
     mode: ProjectMode;
     title: string;
     subtitle: string;
-    Icon: React.ElementType;
+    Icon: React.ComponentType<{ className?: string }>;
     iconClass: string;
   }> = [
     {

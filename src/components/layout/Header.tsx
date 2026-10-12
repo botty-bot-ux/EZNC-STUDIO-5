@@ -46,6 +46,8 @@ export const Header: React.FC = () => {
     machine,
     theme,
     toggleTheme,
+    renderMode,
+    setRenderMode,
   } = useProjectStore(
     useShallow((s) => ({
       projectName: s.projectName,
@@ -66,6 +68,8 @@ export const Header: React.FC = () => {
       machine: s.machine,
       theme: s.theme,
       toggleTheme: s.toggleTheme,
+      renderMode: s.renderMode,
+      setRenderMode: s.setRenderMode,
     }))
   );
 
@@ -199,6 +203,29 @@ export const Header: React.FC = () => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [newProjectOpen, setNewProjectOpen] = useState(false);
 
+  // Переключатель представления: 2D-редактор ↔ 3D-симуляция съёма фрезой.
+  const viewToggle = (
+    <div className="flex items-center bg-slate-100/90 dark:bg-slate-800/90 p-1 rounded-xl border border-slate-200/90 dark:border-slate-700 shadow-inner shrink-0">
+      {(['2d', '3d'] as const).map((m) => {
+        const active = renderMode === m;
+        return (
+          <button
+            key={m}
+            onClick={() => setRenderMode(m)}
+            title={m === '2d' ? '2D-редактор' : '3D-симуляция съёма фрезой'}
+            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              active
+                ? 'bg-primary text-primary-fg'
+                : 'text-slate-600 dark:text-slate-300 hover:bg-white hover:dark:bg-slate-800'
+            }`}
+          >
+            {m.toUpperCase()}
+          </button>
+        );
+      })}
+    </div>
+  );
+
   // ─────────────── Мобильный компактный Header: 2 ряда ───────────────
   if (isMobile) {
     const menuItems = [
@@ -243,6 +270,8 @@ export const Header: React.FC = () => {
             {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
           </button>
 
+          {viewToggle}
+
           <button
             onClick={() => setMenuOpen((v) => !v)}
             title="Меню проекта"
@@ -252,7 +281,8 @@ export const Header: React.FC = () => {
           </button>
         </div>
 
-        {/* Row 2: инструменты черчения + undo/redo */}
+        {/* Row 2: инструменты черчения + undo/redo — скрыты в 3D (там нет правки) */}
+        {renderMode === '2d' && (
         <div className="flex items-center gap-1 bg-slate-100/90 dark:bg-slate-800/90 px-1 py-0.5 rounded-xl border border-slate-200/90 dark:border-slate-700 overflow-x-auto">
           {TOOL_DEFS.filter((t) => t.show).map(({ id, Icon, mobileTitle }) => {
             const active = activeTool === id;
@@ -279,6 +309,7 @@ export const Header: React.FC = () => {
             <Redo className="w-4 h-4" />
           </button>
         </div>
+        )}
 
         {/* Выпадающее меню файловых действий */}
         {menuOpen && (
@@ -380,10 +411,13 @@ export const Header: React.FC = () => {
             {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
           </button>
         </div>
+
+        {viewToggle}
       </div>
 
-      {/* Middle section: Drawing Tools Toolbar */}
+      {/* Middle section: Drawing Tools Toolbar — ряд инструментов скрыт в 3D */}
       <div className="flex-1 flex items-center justify-center">
+        {renderMode === '2d' && (
         <div className="flex items-center gap-1 bg-slate-100/90 dark:bg-slate-800/90 p-1 rounded-xl border border-slate-200/90 dark:border-slate-700 shadow-inner">
           {TOOL_DEFS.filter((t) => t.show).map(({ id, Icon, title }) => {
             const active = activeTool === id;
@@ -423,6 +457,7 @@ export const Header: React.FC = () => {
             <Redo className="w-4 h-4" />
           </button>
         </div>
+        )}
       </div>
 
       {/* Right section: Export action & Warnings */}

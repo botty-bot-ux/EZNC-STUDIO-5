@@ -14,6 +14,7 @@ import {
   Point2D,
   PostprocessorTemplates,
   ProjectData,
+  RenderMode,
   ToolpathSegment,
   UnderlayState,
   ViewMode,
@@ -110,6 +111,8 @@ interface ProjectStore {
   canvasGrabbing: boolean;
   activeTab: ActiveTab;
   viewMode: ViewMode;
+  // Какое представление активно в области холста: 2D-редактор или 3D-сцена симуляции.
+  renderMode: RenderMode;
 
   theme: Theme;
 
@@ -153,6 +156,7 @@ interface ProjectStore {
   setCanvasGrabbing: (grabbing: boolean) => void;
   setActiveTab: (tab: ActiveTab) => void;
   setViewMode: (mode: ViewMode) => void;
+  setRenderMode: (mode: RenderMode) => void;
   setTheme: (theme: Theme) => void;
   toggleTheme: () => void;
   setSnapToGrid: (snap: boolean) => void;
@@ -359,6 +363,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
     canvasGrabbing: false,
     activeTab: 'gcode',
     viewMode: 'edit',
+    renderMode: '2d',
 
     theme: initialTheme,
 
@@ -424,6 +429,9 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
         activeTab: mode === 'gcode' ? 'gcode' : state.activeTab === 'gcode' ? 'machine' : state.activeTab,
         rightPanelOpen: mode === 'gcode' ? true : state.rightPanelOpen,
       })),
+    // Переключение 2D/3D — чистый UI-переезд: не правим objects/историю/автосейв,
+    // не трогаем viewMode/activeTab. 3D-сцена читает текущее состояние как потребитель.
+    setRenderMode: (mode: RenderMode) => set({ renderMode: mode }),
     setSnapToGrid: (snap: boolean) => set({ snapToGrid: snap }),
     setGridStep: (step: number) => set({ gridStep: step }),
 
