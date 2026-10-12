@@ -18,6 +18,7 @@ interface FigureRowProps {
   index: number;
   totalCount: number;
   isSelected: boolean;
+  isActive?: boolean; // слой, который сейчас прорезается в 3D-симуляции
   onSelect: (e?: React.MouseEvent) => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
@@ -27,11 +28,13 @@ interface FigureRowProps {
 
 // Строка фигуры в левом дереве: текст на прозрачном фоне.
 // Выбранная фигура подсвечивается синим. Действия — при наведении.
+// isActive (слой в текущем прогоне симуляции) — янтарная подсветка + пульс-точка.
 export const LayerItemAccordion: React.FC<FigureRowProps> = ({
   obj,
   index,
   totalCount,
   isSelected,
+  isActive = false,
   onSelect,
   onMoveUp,
   onMoveDown,
@@ -61,14 +64,22 @@ export const LayerItemAccordion: React.FC<FigureRowProps> = ({
   return (
     <div
       onClick={onSelect}
-      className={`group flex items-center gap-1.5 px-1.5 py-1 rounded-md cursor-pointer select-none transition-colors ${
-        isSelected ? 'bg-primary/10' : 'hover:bg-slate-500/5 hover:dark:bg-slate-500/5'
+      className={`group relative flex items-center gap-1.5 px-1.5 py-1 rounded-md cursor-pointer select-none transition-colors ${
+        isActive
+          ? 'bg-amber-400/15 ring-1 ring-inset ring-amber-400/60'
+          : isSelected
+          ? 'bg-primary/10'
+          : 'hover:bg-slate-500/5 hover:dark:bg-slate-500/5'
       }`}
     >
+      {isActive && (
+        <span className="absolute -left-0.5 top-1/2 -translate-y-1/2 h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+      )}
+
       <TypeIcon
-        className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-primary' : 'text-slate-400 dark:text-slate-500'} ${
-          isVisible ? '' : 'opacity-40'
-        }`}
+        className={`w-3.5 h-3.5 shrink-0 ${
+          isActive ? 'text-amber-600 dark:text-amber-400' : isSelected ? 'text-primary' : 'text-slate-400 dark:text-slate-500'
+        } ${isVisible ? '' : 'opacity-40'}`}
       />
 
       <span

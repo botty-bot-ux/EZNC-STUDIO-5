@@ -36,6 +36,8 @@ interface GroovePiece {
 interface MotionSeg {
   a: THREE.Vector3; // старт (в сцене)
   b: THREE.Vector3; // конец (в сцене)
+  lenXY: number; // горизонтальная длина сегмента, мм — для постоянной скорости реза
+  objectId?: string; // фигура/слой, к которому относится сегмент (для подсветки)
 }
 
 interface Built {
@@ -98,7 +100,8 @@ function buildScene(segs: ToolpathSegment[], toolDiameter: number): Built | null
   segs.forEach((s, idx) => {
     const [ax, ay, az] = toScene(s.startX, s.startY, s.startZ);
     const [bx, by, bz] = toScene(s.endX, s.endY, s.endZ);
-    motion.push({ a: new THREE.Vector3(ax, ay, az), b: new THREE.Vector3(bx, by, bz) });
+    const lenXY = Math.hypot(s.endX - s.startX, s.endY - s.startY);
+    motion.push({ a: new THREE.Vector3(ax, ay, az), b: new THREE.Vector3(bx, by, bz), lenXY, objectId: s.objectId });
 
     if (!isGroove(s)) return;
 
@@ -146,7 +149,7 @@ function revealedCount(segIndexOfGroove: number[], currentSeg: number): number {
 interface Clock {
   prog: number;
   playing: boolean;
-  speed: number; // сегментов в секунду
+  speed: number; // мм/с — постоянная скорость перемещения фрезы по XY
   done: boolean;
   total: number;
 }
@@ -155,11 +158,13 @@ interface SceneContentsProps {
   built: Built | null;
   toolDiameter: number;
   clockRef: React.MutableRefObject<Clock>;
+  onActiveLayer: (id: string | null) => void;
 }
 
-const SceneContents: React.FC<SceneContentsProps> = ({ built, toolDiameter, clockRef }) => {
+const SceneContents: React.FC<SceneContentsProps> = ({ built, toolDiameter, clockRef, onActiveLayer }) => {
   const instRef = React.useRef<THREE.InstancedMesh>(null);
   const cutterRef = React.useRef<THREE.Mesh>(null);
+  const lastActiveIdRef = React.useRef<string | null>(null);
 
   // Разложить предрассчитанные матрицы пазов по буферу инстансов (один раз на построение).
   React.useLayoutEffect(() => {
@@ -171,7 +176,9 @@ const SceneContents: React.FC<SceneContentsProps> = ({ built, toolDiameter, cloc
     clockRef.current.total = built.motion.length;
     clockRef.current.prog = 0;
     clockRef.current.done = false;
-  }, [built, clockRef]);
+    lastActiveIdRef.current = null;
+    onActiveLayer(null);
+  }, [built, clockRef, onActiveLayer]);
 
   useFrame((_, delta) => {
     const clock = clockRef.current;
@@ -180,7 +187,11 @@ const SceneContents: React.FC<SceneContentsProps> = ({ built, toolDiameter, cloc
     const total = built.motion.length;
 
     if (clock.playing && !clock.done) {
-      clock.prog += delta * clock.speed;
+      // Постоянная скорость фрезы по XY: длинный сегмент идёт дольше короткого.
+      // Вертикальные врезки (lenXY≈0) считаем за минимум, чтобы не вставали.
+      const cur = built.motion[Math.min(Math.floor(clock.prog), total - 1)];
+      const eff = Math.max(cur.lenXY, 20);
+      clock.prog += (delta * clock.speed) / eff;
       if (clock.prog >= total) {
         clock.prog = total;
         clock.done = true;
@@ -192,6 +203,13 @@ const SceneContents: React.FC<SceneContentsProps> = ({ built, toolDiameter, cloc
     if (mesh) {
       const reveal = revealedCount(built.segIndexOfGroove, clock.prog > 0 ? currentSeg : -1);
       if (mesh.count !== reveal) mesh.count = reveal;
+    }
+
+    // Активный слой = фигура текущего сегмента; пишем в стор только при смене.
+    const activeId = clock.prog > 0 ? built.motion[currentSeg].objectId ?? null : null;
+    if (activeId !== lastActiveIdRef.current) {
+      lastActiveIdRef.current = activeId;
+      onActiveLayer(activeId);
     }
 
     // Фреза: интерполяция внутри текущего сегмента.
@@ -271,17 +289,18 @@ GhostPath.displayName = 'GhostPath';
 // ─────────────────────────────── обёртка + UI ───────────────────────────────
 
 const Scene3D: React.FC = () => {
-  // Только стабильные значения из стора (ссылка/примитив) — иначе селектор вернёт
-  // новый объект каждый вызов и useSyncExternalStore уйдёт в бесконечный ре-рендер.
+  // Только стабильные значения из стора (ссылка/примитив/функция) — иначе селектор
+  // вернёт новый объект каждый вызов и useSyncExternalStore уйдёт в ре-рендер-цикл.
   const segments = useProjectStore((s) => s.toolpathSegments);
   const toolDiameter = useProjectStore((s) => s.machine.toolDiameter ?? 3);
+  const setSimActiveLayerId = useProjectStore((s) => s.setSimActiveLayerId);
 
   const built = React.useMemo(() => buildScene(segments, toolDiameter), [segments, toolDiameter]);
 
   // Единый источник «часов» симуляции — мутабельный ref, вне undoable-стора.
-  const clockRef = React.useRef<Clock>({ prog: 0, playing: false, speed: 60, done: false, total: 0 });
+  const clockRef = React.useRef<Clock>({ prog: 0, playing: false, speed: 150, done: false, total: 0 });
   const [playing, setPlaying] = React.useState(false);
-  const [speed, setSpeed] = React.useState(60);
+  const [speed, setSpeed] = React.useState(150);
   const [, forceRender] = React.useState(0);
   const progLabelRef = React.useRef<HTMLSpanElement>(null);
 
@@ -347,7 +366,7 @@ const Scene3D: React.FC = () => {
         dpr={[1, 2]}
         gl={{ antialias: true, powerPreference: 'high-performance' }}
       >
-        <SceneContents built={built} toolDiameter={toolDiameter} clockRef={clockRef} />
+        <SceneContents built={built} toolDiameter={toolDiameter} clockRef={clockRef} onActiveLayer={setSimActiveLayerId} />
         <OrbitControls makeDefault target={[center.x, center.y, center.z]} maxPolarAngle={Math.PI / 2.05} />
       </Canvas>
 
@@ -394,13 +413,14 @@ const Scene3D: React.FC = () => {
             Скорость
             <input
               type="range"
-              min={10}
-              max={300}
+              min={20}
+              max={600}
               step={10}
               value={speed}
               onChange={(e) => setSpeed(Number(e.target.value))}
-              className="w-24 accent-[var(--color-primary,#2563eb)]"
+              className="w-28 accent-[var(--color-primary,#2563eb)]"
             />
+            <span className="w-[64px] font-mono text-slate-500 dark:text-slate-400">{speed} мм/с</span>
           </label>
 
           <span ref={progLabelRef} className="min-w-[64px] text-right font-mono text-xs text-slate-500 dark:text-slate-400">

@@ -113,6 +113,10 @@ interface ProjectStore {
   viewMode: ViewMode;
   // Какое представление активно в области холста: 2D-редактор или 3D-сцена симуляции.
   renderMode: RenderMode;
+  // ID фигуры/слоя, который сейчас прорезается в 3D-симуляции. Транзиентное
+  // превью-состояние (как liveMove/parallelPreview): не в objects, не в истории,
+  // не в автосейве. Пишется из useFrame только при СМЕНИ слоя.
+  simActiveLayerId: string | null;
 
   theme: Theme;
 
@@ -157,6 +161,7 @@ interface ProjectStore {
   setActiveTab: (tab: ActiveTab) => void;
   setViewMode: (mode: ViewMode) => void;
   setRenderMode: (mode: RenderMode) => void;
+  setSimActiveLayerId: (id: string | null) => void;
   setTheme: (theme: Theme) => void;
   toggleTheme: () => void;
   setSnapToGrid: (snap: boolean) => void;
@@ -364,6 +369,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
     activeTab: 'gcode',
     viewMode: 'edit',
     renderMode: '2d',
+    simActiveLayerId: null,
 
     theme: initialTheme,
 
@@ -432,6 +438,8 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
     // Переключение 2D/3D — чистый UI-переезд: не правим objects/историю/автосейв,
     // не трогаем viewMode/activeTab. 3D-сцена читает текущее состояние как потребитель.
     setRenderMode: (mode: RenderMode) => set({ renderMode: mode }),
+    // Транзиентный «активный слой» симуляции — только для подсветки в списке фигур.
+    setSimActiveLayerId: (id: string | null) => set({ simActiveLayerId: id }),
     setSnapToGrid: (snap: boolean) => set({ snapToGrid: snap }),
     setGridStep: (step: number) => set({ gridStep: step }),
 

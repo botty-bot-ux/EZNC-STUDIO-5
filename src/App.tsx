@@ -197,8 +197,9 @@ export default function App() {
       {/* Header floats on top (h-16, transparent) */}
       <Header />
 
-      {/* Floating Left Layers Toolbar Overlay — только в 2D-редакторе */}
-      {renderMode === '2d' && <LeftToolbar />}
+      {/* Floating Left Layers Toolbar Overlay — виден и в 2D, и в 3D
+          (в 3D показывает список слоёв с подсветкой текущего в симуляции) */}
+      <LeftToolbar />
 
       {/* Floating Right Inspector, Machine & G-code Editor Overlay */}
       <RightSidebar />

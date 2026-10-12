@@ -8,6 +8,7 @@ export const FiguresList: React.FC = () => {
   const {
     objects,
     selectedObjectIds,
+    simActiveLayerId,
     setSelectedObjectId,
     toggleObjectSelection,
     deleteObject,
@@ -18,6 +19,7 @@ export const FiguresList: React.FC = () => {
     useShallow((s) => ({
       objects: s.objects,
       selectedObjectIds: s.selectedObjectIds,
+      simActiveLayerId: s.simActiveLayerId,
       setSelectedObjectId: s.setSelectedObjectId,
       toggleObjectSelection: s.toggleObjectSelection,
       deleteObject: s.deleteObject,
@@ -64,6 +66,7 @@ export const FiguresList: React.FC = () => {
             index={idx}
             totalCount={objects.length}
             isSelected={isSelected}
+            isActive={simActiveLayerId === obj.id}
             onSelect={(e) => {
               if (e && (e.ctrlKey || e.shiftKey || e.metaKey)) {
                 toggleObjectSelection(obj.id);
