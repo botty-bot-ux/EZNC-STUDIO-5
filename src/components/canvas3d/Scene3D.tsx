@@ -384,12 +384,21 @@ const Scene3D: React.FC = () => {
         gl={{ antialias: true, powerPreference: 'high-performance' }}
       >
         <SceneContents built={built} toolDiameter={toolDiameter} clockRef={clockRef} onActiveLayer={setSimActiveLayerId} />
-        <OrbitControls makeDefault target={[center.x, center.y, center.z]} maxPolarAngle={Math.PI / 2.05} />
+        <OrbitControls
+          makeDefault
+          target={[center.x, center.y, center.z]}
+          maxPolarAngle={Math.PI / 2.05}
+          mouseButtons={{
+            LEFT: THREE.MOUSE.ROTATE,
+            MIDDLE: THREE.MOUSE.PAN,
+            RIGHT: THREE.MOUSE.DOLLY,
+          }}
+        />
       </Canvas>
 
       {/* Верхняя подсказка — в 3D-режиме инструментов черчения нет. */}
       <div className="pointer-events-none absolute left-1/2 top-20 -translate-x-1/2 rounded-full bg-slate-900/70 px-3 py-1 text-xs font-medium text-slate-100 backdrop-blur dark:bg-slate-950/70">
-        3D-просмотр · ЛКМ — вращение · колесо — зум · ПКМ — панорама
+        3D-просмотр · ЛКМ — вращение · колесо — зум · нажатое колесо — панорама
       </div>
 
       {/* Панель симуляции (play/pause/reset/speed) — вне холста, живёт в ref-часах. */}
