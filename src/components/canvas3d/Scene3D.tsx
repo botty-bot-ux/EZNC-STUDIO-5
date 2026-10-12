@@ -371,6 +371,65 @@ const GhostPath: React.FC<{ built: Built }> = React.memo(({ built }) => {
 });
 GhostPath.displayName = 'GhostPath';
 
+// ─────────── сетка-«пол» под листом (повторяет двухуровневую сетку 2D) ───────────
+
+// Линии сетки по границам станка: минор каждые `step`, мажор каждые 5·step.
+// Мир CAD (x,y) → сцена (x, floorY, −y). major=true → только мажорные линии.
+function buildGridLines(
+  xMin: number,
+  xMax: number,
+  yMin: number,
+  yMax: number,
+  step: number,
+  floorY: number,
+  major: boolean
+): Float32Array {
+  const pts: number[] = [];
+  let i = 0;
+  for (let wx = Math.ceil(xMin / step) * step; wx <= xMax + 1e-6; wx += step, i++) {
+    if ((i % 5 === 0) !== major) continue;
+    pts.push(wx, floorY, -yMin, wx, floorY, -yMax);
+  }
+  i = 0;
+  for (let wy = Math.ceil(yMin / step) * step; wy <= yMax + 1e-6; wy += step, i++) {
+    if ((i % 5 === 0) !== major) continue;
+    pts.push(xMin, floorY, -wy, xMax, floorY, -wy);
+  }
+  return new Float32Array(pts);
+}
+
+interface FloorGridProps {
+  bounds: { xMin: number; xMax: number; yMin: number; yMax: number };
+  step: number;
+  floorY: number;
+}
+
+const FloorGrid: React.FC<FloorGridProps> = React.memo(({ bounds, step, floorY }) => {
+  const xMin = Math.min(bounds.xMin, bounds.xMax);
+  const xMax = Math.max(bounds.xMin, bounds.xMax);
+  const yMin = Math.min(bounds.yMin, bounds.yMax);
+  const yMax = Math.max(bounds.yMin, bounds.yMax);
+  const minor = React.useMemo(() => buildGridLines(xMin, xMax, yMin, yMax, step, floorY, false), [xMin, xMax, yMin, yMax, step, floorY]);
+  const major = React.useMemo(() => buildGridLines(xMin, xMax, yMin, yMax, step, floorY, true), [xMin, xMax, yMin, yMax, step, floorY]);
+  return (
+    <>
+      <lineSegments frustumCulled={false}>
+        <bufferGeometry>
+          <bufferAttribute attach="attributes-position" args={[minor, 3]} />
+        </bufferGeometry>
+        <lineBasicMaterial color="#94a3b8" transparent opacity={0.6} />
+      </lineSegments>
+      <lineSegments frustumCulled={false}>
+        <bufferGeometry>
+          <bufferAttribute attach="attributes-position" args={[major, 3]} />
+        </bufferGeometry>
+        <lineBasicMaterial color="#475569" transparent opacity={0.95} />
+      </lineSegments>
+    </>
+  );
+});
+FloorGrid.displayName = 'FloorGrid';
+
 // ─────────────────────────────── обёртка + UI ───────────────────────────────
 
 const Scene3D: React.FC = () => {
@@ -425,6 +484,13 @@ const Scene3D: React.FC = () => {
   const camDist = built ? built.span * 1.15 : 2000;
   const center = built ? new THREE.Vector3(built.board.cx, 0, built.board.cz) : new THREE.Vector3(0, 0, 0);
 
+  // Сетка-пол: шаг подбираем по габариту рабочей зоны (≈не более ~40 ячеек по
+  // большей оси), как в 2D подбираем динамический step; пол — чуть ниже дна листа.
+  const gb = machine.bounds;
+  const gExtent = Math.max(Math.abs(gb.xMax - gb.xMin), Math.abs(gb.yMax - gb.yMin));
+  const gridStep = [10, 20, 25, 50, 100, 200, 250, 500].find((c) => gExtent / c <= 40) ?? 500;
+  const floorY = built ? built.board.cy - built.board.h / 2 - 1 : -1;
+
   return (
     <div className="absolute inset-0 bg-gradient-to-b from-slate-200 to-slate-300 dark:from-slate-800 dark:to-slate-900">
       <Canvas
@@ -432,6 +498,7 @@ const Scene3D: React.FC = () => {
         dpr={[1, 2]}
         gl={{ antialias: true, powerPreference: 'high-performance' }}
       >
+        <FloorGrid bounds={machine.bounds} step={gridStep} floorY={floorY} />
         <SceneContents
           built={built}
           toolDiameter={toolDiameter}
