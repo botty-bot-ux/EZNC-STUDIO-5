@@ -175,9 +175,11 @@ interface SceneContentsProps {
   toolDiameter: number;
   clockRef: React.MutableRefObject<Clock>;
   onActiveLayer: (id: string | null) => void;
+  labelRef: React.RefObject<HTMLSpanElement | null>;
+  onDone: () => void;
 }
 
-const SceneContents: React.FC<SceneContentsProps> = ({ built, toolDiameter, clockRef, onActiveLayer }) => {
+const SceneContents: React.FC<SceneContentsProps> = ({ built, toolDiameter, clockRef, onActiveLayer, labelRef, onDone }) => {
   const instRef = React.useRef<THREE.InstancedMesh>(null);
   const cutterRef = React.useRef<THREE.Mesh>(null);
   const lastActiveIdRef = React.useRef<string | null>(null);
@@ -212,6 +214,7 @@ const SceneContents: React.FC<SceneContentsProps> = ({ built, toolDiameter, cloc
         clock.prog = total;
         clock.done = true;
         clock.playing = false;
+        onDone();
       }
     }
 
@@ -219,6 +222,11 @@ const SceneContents: React.FC<SceneContentsProps> = ({ built, toolDiameter, cloc
     if (mesh) {
       const reveal = revealedCount(built.segIndexOfGroove, clock.prog > 0 ? currentSeg : -1);
       if (mesh.count !== reveal) mesh.count = reveal;
+    }
+
+    // Подпись прогресса обновляем прямо из useFrame — один владелец цикла анимации.
+    if (labelRef.current) {
+      labelRef.current.textContent = `${Math.min(Math.floor(clock.prog), total)} / ${total}`;
     }
 
     // Активный слой = фигура текущего сегмента; пишем в стор только при смене.
@@ -282,21 +290,26 @@ const SceneContents: React.FC<SceneContentsProps> = ({ built, toolDiameter, cloc
 };
 
 const GhostPath: React.FC<{ built: Built }> = React.memo(({ built }) => {
-  const geom = React.useMemo(() => {
-    const pts: number[] = [];
+  const positions = React.useMemo(() => {
+    const pts = new Float32Array(built.motion.length * 6);
+    let i = 0;
     for (const seg of built.motion) {
-      pts.push(seg.a.x, seg.a.y, seg.a.z, seg.b.x, seg.b.y, seg.b.z);
+      pts[i++] = seg.a.x;
+      pts[i++] = seg.a.y;
+      pts[i++] = seg.a.z;
+      pts[i++] = seg.b.x;
+      pts[i++] = seg.b.y;
+      pts[i++] = seg.b.z;
     }
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
-    return g;
+    return pts;
   }, [built]);
 
-  React.useEffect(() => () => geom.dispose(), [geom]);
-
   return (
-    <lineSegments geometry={geom}>
-      <lineBasicMaterial color={new THREE.Color('#64748b')} transparent opacity={0.5} />
+    <lineSegments frustumCulled={false}>
+      <bufferGeometry>
+        <bufferAttribute attach="attributes-position" args={[positions, 3]} />
+      </bufferGeometry>
+      <lineBasicMaterial color="#64748b" transparent opacity={0.5} />
     </lineSegments>
   );
 });
@@ -353,26 +366,6 @@ const Scene3D: React.FC = () => {
     forceRender((v) => v + 1);
   };
 
-  // Лёгкий отдельный rAF только для подписи прогресса — пишет textContent напрямую,
-  // не дёргая React и не заставляя ре-рендериться поддерево <Canvas>.
-  React.useEffect(() => {
-    let raf = 0;
-    const tick = () => {
-      const el = progLabelRef.current;
-      const c = clockRef.current;
-      if (el) {
-        const cur = Math.min(Math.floor(c.prog), c.total);
-        el.textContent = `${cur} / ${c.total}`;
-      }
-      // useFrame гасит clockRef.playing при завершении, а React-состояние «playing»
-      // остаётся — синхронизируем иконку (setPlaying с тем же значением = no-op).
-      if (c.done) setPlaying(false);
-      raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, []);
-
   const camDist = built ? built.span * 1.15 : 2000;
   const center = built ? new THREE.Vector3(built.board.cx, 0, built.board.cz) : new THREE.Vector3(0, 0, 0);
 
@@ -383,7 +376,14 @@ const Scene3D: React.FC = () => {
         dpr={[1, 2]}
         gl={{ antialias: true, powerPreference: 'high-performance' }}
       >
-        <SceneContents built={built} toolDiameter={toolDiameter} clockRef={clockRef} onActiveLayer={setSimActiveLayerId} />
+        <SceneContents
+          built={built}
+          toolDiameter={toolDiameter}
+          clockRef={clockRef}
+          onActiveLayer={setSimActiveLayerId}
+          labelRef={progLabelRef}
+          onDone={() => setPlaying(false)}
+        />
         <OrbitControls
           makeDefault
           target={[center.x, center.y, center.z]}
