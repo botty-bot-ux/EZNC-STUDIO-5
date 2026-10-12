@@ -16,8 +16,6 @@ import { MachineSettings, ToolpathSegment } from '../../types';
 // three.js — Y-up, поэтому мировая глубина уходит в −Y сцены, а мировой Y → −Z.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const toScene = (x: number, y: number, z: number): [number, number, number] => [x, z, -y];
-
 // Паз рисуем только там, где фреза реально снимает материал: горизонтальные
 // подачи/дуги с смещением по XY и сверловка (тип 'drill'). Чистые вертикальные
 // plunges (feed без движения по XY) — это врезка в одной точке, паза не дают.
@@ -161,15 +159,30 @@ function buildScene(segs: ToolpathSegment[], toolDiameter: number, machine: Mach
   for (const s of segs) {
     const cut = isGroove(s);
     const pts = samplePoints(s);
+    // Общая граница соседних шагов одного сегмента (b шага i == a шага i+1) держим
+    // одним Vector3: несём конец прошлого шага как начало текущего. a/b читаются
+    // только как скаляры (.x/.y/.z) в useFrame и GhostPath, поэтому расшаривание
+    // безопасно и режет число new THREE.Vector3 примерно вдвое на длинных путях.
+    // Сбрасываем на каждом сегменте — стык между сегментами не гарантирует непрерывность.
+    let carry: THREE.Vector3 | null = null;
     for (let i = 0; i < pts.length - 1; i++) {
       const p0 = pts[i];
       const p1 = pts[i + 1];
-      const [ax, ay, az] = toScene(p0.x, p0.y, p0.z);
-      const [bx, by, bz] = toScene(p1.x, p1.y, p1.z);
+      // мир→сцена (x,y,z)→(x,z,−y): инлайн вместо toScene, чтобы не аллоцировать
+      // промежуточный массив на каждом из десятков тысяч шагов.
+      const ax = p0.x;
+      const ay = p0.z;
+      const az = -p0.y;
+      const bx = p1.x;
+      const by = p1.z;
+      const bz = -p1.y;
       const stepIndex = steps.length;
+      const a = carry ?? new THREE.Vector3(ax, ay, az);
+      const b = new THREE.Vector3(bx, by, bz);
+      carry = b;
       steps.push({
-        a: new THREE.Vector3(ax, ay, az),
-        b: new THREE.Vector3(bx, by, bz),
+        a,
+        b,
         lenXY: Math.hypot(p1.x - p0.x, p1.y - p0.y),
         cut,
         objectId: s.objectId,
@@ -238,6 +251,10 @@ const SceneContents: React.FC<SceneContentsProps> = ({ built, toolDiameter, cloc
   const instRef = React.useRef<THREE.InstancedMesh>(null);
   const cutterRef = React.useRef<THREE.Mesh>(null);
   const lastActiveIdRef = React.useRef<string | null>(null);
+  // Активный слой копили микрозадачей вне кадра (см. useFrame): pending — желаемое
+  // значение, queued — гарантия не более одной записи в очереди.
+  const pendingActiveIdRef = React.useRef<string | null>(null);
+  const activeLayerQueuedRef = React.useRef(false);
 
   // Разложить предрассчитанные матрицы пазов по буферу инстансов (один раз на построение).
   React.useLayoutEffect(() => {
@@ -250,6 +267,7 @@ const SceneContents: React.FC<SceneContentsProps> = ({ built, toolDiameter, cloc
     clockRef.current.prog = 0;
     clockRef.current.done = false;
     lastActiveIdRef.current = null;
+    pendingActiveIdRef.current = null;
     onActiveLayer(null);
   }, [built, clockRef, onActiveLayer]);
 
@@ -289,7 +307,17 @@ const SceneContents: React.FC<SceneContentsProps> = ({ built, toolDiameter, cloc
     const activeId = clock.prog > 0 ? built.steps[currentStep].objectId ?? null : null;
     if (activeId !== lastActiveIdRef.current) {
       lastActiveIdRef.current = activeId;
-      onActiveLayer(activeId);
+      // Уводим запись в стор из горячего кадра: синхронный onActiveLayer ре-рендерит
+      // панель слоёв прямо внутри useFrame. Копим желаемое значение и льём одним
+      // queueMicrotask (не более одной записи в очереди) уже после тика кадра.
+      pendingActiveIdRef.current = activeId;
+      if (!activeLayerQueuedRef.current) {
+        activeLayerQueuedRef.current = true;
+        queueMicrotask(() => {
+          activeLayerQueuedRef.current = false;
+          onActiveLayer(pendingActiveIdRef.current);
+        });
+      }
     }
 
     // Фреза: интерполяция внутри текущего шага.
