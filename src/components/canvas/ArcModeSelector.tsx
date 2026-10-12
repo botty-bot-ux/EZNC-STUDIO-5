@@ -19,7 +19,7 @@ const OPTIONS: ArcModeOption[] = [
   {
     id: 'bulge',
     label: 'Горб',
-    hint: 'Хорда + высота: старт → конец, затем мышь тянет вершину прогиба (ближе к хорде — пололее).',
+    hint: 'Хорда + высота: старт → конец, затем мышь тянет вершину прогиба (ближе к хорде — положе).',
     Icon: TrendingUp,
   },
   {
@@ -41,7 +41,7 @@ interface ArcModeSelectorProps {
  */
 export const ArcModeSelector: React.FC<ArcModeSelectorProps> = ({ value, onChange }) => {
   return (
-    <div className="absolute top-3 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-1 rounded-2xl shadow-md text-slate-700 dark:text-slate-200 max-w-[95vw]">
+    <div role="radiogroup" aria-label="Способ построения дуги" className="absolute top-3 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-1 rounded-2xl shadow-md text-slate-700 dark:text-slate-200 max-w-[95vw]">
       <span className="px-2 text-[11px] font-semibold text-slate-400 dark:text-slate-500 shrink-0">
         Дуга:
       </span>
@@ -50,6 +50,9 @@ export const ArcModeSelector: React.FC<ArcModeSelectorProps> = ({ value, onChang
         return (
           <button
             key={id}
+            type="button"
+            role="radio"
+            aria-checked={active}
             title={hint}
             onClick={() => onChange(id)}
             className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer shrink-0 ${

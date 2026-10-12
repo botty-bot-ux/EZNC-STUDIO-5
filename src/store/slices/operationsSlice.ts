@@ -31,7 +31,7 @@ export function createOperationsSlice(
       // Editing depth at the operation level must flow into the linked holes.
       const merged = newOps.find((op) => op.id === id);
       let payload: Partial<ProjectStore> = { operations: newOps };
-      if (merged && typeof partial.finalDepth === 'number' && merged.linkedObjectIds.length > 0) {
+      if (merged && Number.isFinite(partial.finalDepth) && merged.linkedObjectIds.length > 0) {
         const linked = new Set(merged.linkedObjectIds);
         const newObjs = get().objects.map((o) =>
           linked.has(o.id) && o.type === 'point' ? ({ ...o, depth: partial.finalDepth } as CADObject) : o

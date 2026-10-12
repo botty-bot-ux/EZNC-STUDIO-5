@@ -59,17 +59,30 @@ export function createSelectionSlice(
       const newIds = exists ? cur.filter((i) => i !== id) : [...cur, id];
       set((state) => ({
         selectedObjectIds: newIds,
-        ...(newIds.length > 0 && !state.panelDismissed
-          ? { activeTab: 'properties' as ActiveTab, rightPanelOpen: true }
+        ...(newIds.length > 0
+          ? {
+              ...(state.panelDismissed
+                ? {}
+                : { activeTab: 'properties' as ActiveTab, rightPanelOpen: true }),
+              viewMode: state.viewMode === 'gcode' ? 'edit' : state.viewMode,
+            }
           : {}),
       }));
     },
 
     selectAllObjects: () => {
       const visibleIds = get().objects.filter((o) => o.visible !== false).map((o) => o.id);
-      set({
+      set((state) => ({
         selectedObjectIds: visibleIds,
-      });
+        ...(visibleIds.length > 0
+          ? {
+              ...(state.panelDismissed
+                ? {}
+                : { activeTab: 'properties' as ActiveTab, rightPanelOpen: true }),
+              viewMode: state.viewMode === 'gcode' ? 'edit' : state.viewMode,
+            }
+          : {}),
+      }));
     },
 
     setSelectedOperationId: (id: string | null) =>
