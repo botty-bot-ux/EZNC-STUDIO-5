@@ -527,11 +527,17 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
 
     const width = container.clientWidth;
     const height = container.clientHeight;
-    canvas.width = width;
-    canvas.height = height;
+    // Ретина/HiDPI: backing store ×devicePixelRatio, CSS-размер фиксирован, а базовый
+    // трансформ масштабирует рисование — всё дальше идёт в CSS-пикселях как раньше.
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.round(width * dpr);
+    canvas.height = Math.round(height * dpr);
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
     // Clear
     ctx.clearRect(0, 0, width, height);

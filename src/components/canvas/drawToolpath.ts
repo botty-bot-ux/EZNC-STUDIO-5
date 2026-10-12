@@ -7,6 +7,7 @@ export function drawToolpathSegments(
   pan: Point2D,
   zoom: number
 ) {
+  ctx.save();
   for (const seg of segments) {
     const pStart = worldToCanvas(seg.startX, seg.startY, pan, zoom);
     const pEnd = worldToCanvas(seg.endX, seg.endY, pan, zoom);
@@ -41,4 +42,5 @@ export function drawToolpathSegments(
       ctx.fill();
     }
   }
+  ctx.restore();
 }

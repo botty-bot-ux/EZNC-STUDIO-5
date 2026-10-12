@@ -73,6 +73,7 @@ export function drawDrawingPreview(
     }
   }
 
+  ctx.save();
   ctx.strokeStyle = '#f43f5e';
   ctx.lineWidth = 2;
   ctx.setLineDash([4, 4]);
@@ -194,5 +195,5 @@ export function drawDrawingPreview(
     }
   }
 
-  ctx.setLineDash([]);
+  ctx.restore();
 }
