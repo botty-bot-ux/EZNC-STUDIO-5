@@ -1,7 +1,7 @@
 import React from 'react';
 import * as THREE from 'three';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { OrbitControls } from '@react-three/drei';
+import { OrbitControls, Text } from '@react-three/drei';
 import { useProjectStore } from '../../store/useProjectStore';
 import { MachineSettings, ToolpathSegment } from '../../types';
 
@@ -430,6 +430,41 @@ const FloorGrid: React.FC<FloorGridProps> = React.memo(({ bounds, step, floorY }
 });
 FloorGrid.displayName = 'FloorGrid';
 
+// ─────────── подписи размеров заготовки на осях X / Y (на полу) ───────────
+
+interface BoardDimensionsProps {
+  board: { cx: number; cz: number; w: number; d: number };
+  floorY: number;
+}
+
+const BoardDimensions: React.FC<BoardDimensionsProps> = React.memo(({ board, floorY }) => {
+  const w = Math.round(board.w);
+  const d = Math.round(board.d);
+  // Вынос за габарит листа и размер шрифта — от масштаба плиты (мир в мм).
+  const off = Math.max(board.w, board.d) * 0.05;
+  const fs = Math.max(50, Math.round(Math.max(board.w, board.d) * 0.045));
+  const color = '#0f172a';
+  return (
+    <>
+      {/* X — ребро вдоль сцены-X (ширина листа widthX), по переднему краю пола. */}
+      <group position={[board.cx, floorY + 1, board.cz + board.d / 2 + off]} rotation={[-Math.PI / 2, 0, 0]}>
+        <Text fontSize={fs} color={color} anchorX="center" anchorY="middle">
+          {`X · ${w} мм`}
+        </Text>
+      </group>
+      {/* Y — ребро вдоль сцены-Z (глубина листа widthY), по правому краю пола. */}
+      <group position={[board.cx + board.w / 2 + off, floorY + 1, board.cz]} rotation={[-Math.PI / 2, 0, 0]}>
+        <group rotation={[0, 0, Math.PI / 2]}>
+          <Text fontSize={fs} color={color} anchorX="center" anchorY="middle">
+            {`Y · ${d} мм`}
+          </Text>
+        </group>
+      </group>
+    </>
+  );
+});
+BoardDimensions.displayName = 'BoardDimensions';
+
 // ─────────────────────────────── обёртка + UI ───────────────────────────────
 
 const Scene3D: React.FC = () => {
@@ -443,9 +478,9 @@ const Scene3D: React.FC = () => {
   const built = React.useMemo(() => buildScene(segments, toolDiameter, machine), [segments, toolDiameter, machine]);
 
   // Единый источник «часов» симуляции — мутабельный ref, вне undoable-стора.
-  const clockRef = React.useRef<Clock>({ prog: 0, playing: false, speed: 150, done: false, total: 0 });
+  const clockRef = React.useRef<Clock>({ prog: 0, playing: false, speed: 300, done: false, total: 0 });
   const [playing, setPlaying] = React.useState(false);
-  const [speed, setSpeed] = React.useState(150);
+  const [speed, setSpeed] = React.useState(300);
   const [, forceRender] = React.useState(0);
   const progLabelRef = React.useRef<HTMLSpanElement>(null);
 
@@ -499,6 +534,7 @@ const Scene3D: React.FC = () => {
         gl={{ antialias: true, powerPreference: 'high-performance' }}
       >
         <FloorGrid bounds={machine.bounds} step={gridStep} floorY={floorY} />
+        {built && <BoardDimensions board={built.board} floorY={floorY} />}
         <SceneContents
           built={built}
           toolDiameter={toolDiameter}
@@ -562,9 +598,9 @@ const Scene3D: React.FC = () => {
             Скорость
             <input
               type="range"
-              min={20}
-              max={600}
-              step={10}
+              min={40}
+              max={1200}
+              step={20}
               value={speed}
               onChange={(e) => setSpeed(Number(e.target.value))}
               className="w-28 accent-[var(--color-primary,#2563eb)]"
