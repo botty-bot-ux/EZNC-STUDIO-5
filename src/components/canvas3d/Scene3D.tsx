@@ -65,7 +65,7 @@ function buildScene(segs: ToolpathSegment[], toolDiameter: number, machine: Mach
     maxY = Math.max(maxY, s.startY, s.endY);
     minZ = Math.min(minZ, s.startZ, s.endZ);
   }
-  if (!Number.isFinite(minX)) return null;
+  if (![minX, maxX, minY, maxY, minZ].every(Number.isFinite)) return null;
 
   // Толщина листа = «Глубина реза Z» (machine.cutDepth), но не тоньше самого
   // глубокого вреза (иначе паз торчал бы за дно) и не меньше заготовки-минимума.
@@ -141,10 +141,10 @@ function buildScene(segs: ToolpathSegment[], toolDiameter: number, machine: Mach
     let delta = a1 - a0;
     if (cw) {
       while (delta > 0) delta -= Math.PI * 2;
-      if (delta === 0) delta = -Math.PI * 2; // полная окружность
+      if (Math.abs(delta) < 1e-9) delta = -Math.PI * 2; // полная окружность
     } else {
       while (delta < 0) delta += Math.PI * 2;
-      if (delta === 0) delta = Math.PI * 2;
+      if (Math.abs(delta) < 1e-9) delta = Math.PI * 2; // полная окружность
     }
     const n = Math.max(2, Math.ceil((Math.abs(delta) * r) / sampleStep));
     for (let i = 0; i <= n; i++) {
@@ -305,7 +305,7 @@ const SceneContents: React.FC<SceneContentsProps> = ({ built, toolDiameter, cloc
         THREE.MathUtils.lerp(seg.a.z, seg.b.z, t)
       );
       const spinning = clock.playing && !clock.done;
-      cutter.rotation.y += delta * (spinning ? 12 : 0);
+      if (spinning) cutter.rotation.y = (cutter.rotation.y + delta * 12) % (Math.PI * 2);
     }
   });
 
@@ -336,8 +336,8 @@ const SceneContents: React.FC<SceneContentsProps> = ({ built, toolDiameter, cloc
         </instancedMesh>
       )}
 
-      {/* Фреза (всегда видна на текущей позиции, крутится только при съёме) */}
-      <mesh ref={cutterRef}>
+      {/* Фреза (видна только когда есть траектория; крутится лишь при съёме) */}
+      <mesh ref={cutterRef} visible={!!built}>
         <cylinderGeometry args={[toolDiameter / 2, toolDiameter / 2, 60, 24]} />
         <meshStandardMaterial color="#cbd5e1" roughness={0.3} metalness={0.9} />
       </mesh>
