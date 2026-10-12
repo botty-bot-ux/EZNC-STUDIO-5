@@ -467,6 +467,11 @@ BoardDimensions.displayName = 'BoardDimensions';
 
 // ─────────────────────────────── обёртка + UI ───────────────────────────────
 
+// Скорость симуляции — дискретные множители; «×1» = базовая подача 1000 мм/с.
+type SpeedMul = 0.5 | 1 | 2 | 5;
+const BASE_MM_S = 1000;
+const SPEED_STEPS: SpeedMul[] = [0.5, 1, 2, 5];
+
 const Scene3D: React.FC = () => {
   // Только стабильные значения из стора (ссылка/примитив/функция) — иначе селектор
   // вернёт новый объект каждый вызов и useSyncExternalStore уйдёт в ре-рендер-цикл.
@@ -478,9 +483,9 @@ const Scene3D: React.FC = () => {
   const built = React.useMemo(() => buildScene(segments, toolDiameter, machine), [segments, toolDiameter, machine]);
 
   // Единый источник «часов» симуляции — мутабельный ref, вне undoable-стора.
-  const clockRef = React.useRef<Clock>({ prog: 0, playing: false, speed: 300, done: false, total: 0 });
+  const clockRef = React.useRef<Clock>({ prog: 0, playing: false, speed: BASE_MM_S, done: false, total: 0 });
   const [playing, setPlaying] = React.useState(false);
-  const [speed, setSpeed] = React.useState(300);
+  const [speedMul, setSpeedMul] = React.useState<SpeedMul>(1);
   const [, forceRender] = React.useState(0);
   const progLabelRef = React.useRef<HTMLSpanElement>(null);
 
@@ -494,8 +499,8 @@ const Scene3D: React.FC = () => {
   }, [built]);
 
   React.useEffect(() => {
-    clockRef.current.speed = speed;
-  }, [speed]);
+    clockRef.current.speed = speedMul * BASE_MM_S;
+  }, [speedMul]);
 
   const togglePlay = () => {
     const c = clockRef.current;
@@ -594,19 +599,25 @@ const Scene3D: React.FC = () => {
 
           <div className="mx-1 h-6 w-px bg-slate-200 dark:bg-slate-700" />
 
-          <label className="flex items-center gap-2 text-xs font-medium text-slate-600 dark:text-slate-300">
+          <div className="flex items-center gap-2 text-xs font-medium text-slate-600 dark:text-slate-300">
             Скорость
-            <input
-              type="range"
-              min={40}
-              max={1200}
-              step={20}
-              value={speed}
-              onChange={(e) => setSpeed(Number(e.target.value))}
-              className="w-28 accent-[var(--color-primary,#2563eb)]"
-            />
-            <span className="w-[64px] font-mono text-slate-500 dark:text-slate-400">{speed} мм/с</span>
-          </label>
+            <div className="flex items-center gap-0.5 rounded-lg border border-slate-200 bg-slate-50 p-0.5 dark:border-slate-700 dark:bg-slate-800">
+              {SPEED_STEPS.map((m) => (
+                <button
+                  key={m}
+                  onClick={() => setSpeedMul(m)}
+                  title={`${Math.round(m * BASE_MM_S)} мм/с`}
+                  className={`rounded-md px-2 py-1 text-xs font-semibold tabular-nums transition-colors ${
+                    speedMul === m
+                      ? 'bg-primary text-primary-fg'
+                      : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'
+                  }`}
+                >
+                  ×{m}
+                </button>
+              ))}
+            </div>
+          </div>
 
           <span ref={progLabelRef} className="min-w-[64px] text-right font-mono text-xs text-slate-500 dark:text-slate-400">
             0 / 0
