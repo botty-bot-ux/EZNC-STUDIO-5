@@ -32,21 +32,20 @@ interface GroovePiece {
   matrix: THREE.Matrix4;
 }
 
-// Данные одного сегмента таймлайна для движения фрезы.
-interface MotionSeg {
+// Один шаг таймлайна фрезы — короткий отрезок пути (прямой или сегмент дуги).
+// Плотная разбивка нужна, чтобы дуги изгибались, а паз открывался постепенно.
+interface Step {
   a: THREE.Vector3; // старт (в сцене)
   b: THREE.Vector3; // конец (в сцене)
-  lenXY: number; // горизонтальная длина сегмента, мм — для постоянной скорости реза
-  objectId?: string; // фигура/слой, к которому относится сегмент (для подсветки)
+  lenXY: number; // горизонтальная длина шага, мм (для постоянной скорости)
+  cut: boolean; // true — снимает материал (рисуем паз); false — холостой ход/врезка
+  objectId?: string; // слой для подсветки
 }
 
 interface Built {
-  grooves: GroovePiece[];
-  // Порядок grooves совпадает с порядком сегментов; segIndexOfGroove[k] = индекс
-  // сегмента-источника в motion[], чтобы по текущему индексу понять сколько пазов
-  // уже «прорезано».
-  segIndexOfGroove: number[];
-  motion: MotionSeg[];
+  steps: Step[];
+  grooves: GroovePiece[]; // матрицы пазов — по одному на cut-шаг
+  grooveStepIndex: number[]; // индекс шага для каждого паза (строго возрастает)
   board: { cx: number; cy: number; cz: number; w: number; h: number; d: number };
   span: number;
 }
@@ -102,8 +101,8 @@ function buildScene(segs: ToolpathSegment[], toolDiameter: number, machine: Mach
   };
 
   const grooves: GroovePiece[] = [];
-  const segIndexOfGroove: number[] = [];
-  const motion: MotionSeg[] = [];
+  const grooveStepIndex: number[] = [];
+  const steps: Step[] = [];
 
   const up = new THREE.Vector3(0, 1, 0);
   const q = new THREE.Quaternion();
@@ -111,52 +110,108 @@ function buildScene(segs: ToolpathSegment[], toolDiameter: number, machine: Mach
   const scl = new THREE.Vector3();
   const m = new THREE.Matrix4();
 
-  segs.forEach((s, idx) => {
-    const [ax, ay, az] = toScene(s.startX, s.startY, s.startZ);
-    const [bx, by, bz] = toScene(s.endX, s.endY, s.endZ);
-    const lenXY = Math.hypot(s.endX - s.startX, s.endY - s.startY);
-    motion.push({ a: new THREE.Vector3(ax, ay, az), b: new THREE.Vector3(bx, by, bz), lenXY, objectId: s.objectId });
+  // Шаг выборки пути: чтобы соседние боксы пазов перекрывались и сливались в
+  // непрерывный канал (особенно на дугах). Не мельче 2 мм и не крупнее 25 мм.
+  const sampleStep = Math.max(2, Math.min(toolDiameter * 0.6, 25));
+  const lip = 0.2; // минимальный выступ над поверхностью против z-fighting
 
-    if (!isGroove(s)) return;
-
-    const dx = bx - ax;
-    const dz = bz - az;
-    const len = Math.hypot(dx, dz);
-    // Глубина паза не больше толщины листа: сквозной рез заполняет всю толщу,
-    // но не торчит за нижнюю грань заготовки.
-    const depth = Math.min(Math.max(Math.abs(s.endZ), 0.2), thickness);
-    // Небольшой «зазор» над поверхностью: плита непрозрачна, поэтому паз должен
-    // выступать на 0.5 мм, иначе его перекрывает верхняя грань заготовки (z-fighting).
-    const lip = 0.5;
-
-    let angleY = 0;
-    let length = len;
-    if (len < 0.01) {
-      // Сверловка / точка: квадратное сечение ≈ пятно фрезы.
-      length = toolDiameter;
-    } else {
-      angleY = Math.atan2(dx, dz);
+  // Разбиваем сегмент на мировые точки вдоль РЕАЛЬНОЙ траектории (дуга — по дуге).
+  const samplePoints = (s: ToolpathSegment): { x: number; y: number; z: number }[] => {
+    const pts: { x: number; y: number; z: number }[] = [];
+    const isArc = s.type === 'arc_cw' || s.type === 'arc_ccw';
+    if (!isArc) {
+      const len = Math.hypot(s.endX - s.startX, s.endY - s.startY);
+      const n = Math.max(1, Math.ceil(len / sampleStep));
+      for (let i = 0; i <= n; i++) {
+        const t = i / n;
+        pts.push({
+          x: s.startX + (s.endX - s.startX) * t,
+          y: s.startY + (s.endY - s.startY) * t,
+          z: s.startZ + (s.endZ - s.startZ) * t,
+        });
+      }
+      return pts;
     }
+    const cx = s.centerX ?? (s.startX + s.endX) / 2;
+    const cy = s.centerY ?? (s.startY + s.endY) / 2;
+    const r = Math.hypot(s.startX - cx, s.startY - cy);
+    const a0 = Math.atan2(s.startY - cy, s.startX - cx);
+    const a1 = Math.atan2(s.endY - cy, s.endX - cx);
+    const cw = s.type === 'arc_cw';
+    let delta = a1 - a0;
+    if (cw) {
+      while (delta > 0) delta -= Math.PI * 2;
+      if (delta === 0) delta = -Math.PI * 2; // полная окружность
+    } else {
+      while (delta < 0) delta += Math.PI * 2;
+      if (delta === 0) delta = Math.PI * 2;
+    }
+    const n = Math.max(2, Math.ceil((Math.abs(delta) * r) / sampleStep));
+    for (let i = 0; i <= n; i++) {
+      const ang = a0 + delta * (i / n);
+      pts.push({
+        x: cx + r * Math.cos(ang),
+        y: cy + r * Math.sin(ang),
+        z: s.startZ + (s.endZ - s.startZ) * (i / n),
+      });
+    }
+    return pts;
+  };
 
-    q.setFromAxisAngle(up, angleY);
-    pos.set((ax + bx) / 2, (lip - depth) / 2, (az + bz) / 2);
-    scl.set(toolDiameter, depth + lip, length);
-    m.compose(pos, q, scl);
-    grooves.push({ matrix: m.clone() });
-    segIndexOfGroove.push(idx);
-  });
+  for (const s of segs) {
+    const cut = isGroove(s);
+    const pts = samplePoints(s);
+    for (let i = 0; i < pts.length - 1; i++) {
+      const p0 = pts[i];
+      const p1 = pts[i + 1];
+      const [ax, ay, az] = toScene(p0.x, p0.y, p0.z);
+      const [bx, by, bz] = toScene(p1.x, p1.y, p1.z);
+      const stepIndex = steps.length;
+      steps.push({
+        a: new THREE.Vector3(ax, ay, az),
+        b: new THREE.Vector3(bx, by, bz),
+        lenXY: Math.hypot(p1.x - p0.x, p1.y - p0.y),
+        cut,
+        objectId: s.objectId,
+      });
+
+      if (!cut) continue;
+
+      const dx = bx - ax;
+      const dz = bz - az;
+      const len = Math.hypot(dx, dz);
+      // Глубина паза не больше толщины листа: сквозной рез заполняет всю толщу,
+      // но не торчит за нижнюю грань заготовки.
+      const depth = Math.min(Math.max(Math.abs(p1.z), 0.2), thickness);
+
+      let angleY = 0;
+      let length = len;
+      if (len < 0.01) {
+        length = toolDiameter; // сверловка / врезка — пятно фрезы
+      } else {
+        angleY = Math.atan2(dx, dz);
+      }
+
+      q.setFromAxisAngle(up, angleY);
+      pos.set((ax + bx) / 2, (lip - depth) / 2, (az + bz) / 2);
+      scl.set(toolDiameter, depth + lip, length);
+      m.compose(pos, q, scl);
+      grooves.push({ matrix: m.clone() });
+      grooveStepIndex.push(stepIndex);
+    }
+  }
 
   const span = Math.max(bw, bd);
-  return { grooves, segIndexOfGroove, motion, board, span };
+  return { steps, grooves, grooveStepIndex, board, span };
 }
 
-// Верхняя граница: сколько pазов уже прорезано, если текущий сегмент = currentSeg.
-function revealedCount(segIndexOfGroove: number[], currentSeg: number): number {
+// Верхняя граница: сколько пазов уже прорезано, если текущий шаг = currentStep.
+function revealedCount(grooveStepIndex: number[], currentStep: number): number {
   let lo = 0,
-    hi = segIndexOfGroove.length;
+    hi = grooveStepIndex.length;
   while (lo < hi) {
     const mid = (lo + hi) >> 1;
-    if (segIndexOfGroove[mid] <= currentSeg) lo = mid + 1;
+    if (grooveStepIndex[mid] <= currentStep) lo = mid + 1;
     else hi = mid;
   }
   return lo;
@@ -191,7 +246,7 @@ const SceneContents: React.FC<SceneContentsProps> = ({ built, toolDiameter, cloc
     built.grooves.forEach((g, i) => mesh.setMatrixAt(i, g.matrix));
     mesh.instanceMatrix.needsUpdate = true;
     mesh.count = 0;
-    clockRef.current.total = built.motion.length;
+    clockRef.current.total = built.steps.length;
     clockRef.current.prog = 0;
     clockRef.current.done = false;
     lastActiveIdRef.current = null;
@@ -200,16 +255,17 @@ const SceneContents: React.FC<SceneContentsProps> = ({ built, toolDiameter, cloc
 
   useFrame((_, delta) => {
     const clock = clockRef.current;
-    if (!built || built.motion.length === 0) return;
+    if (!built || built.steps.length === 0) return;
     const mesh = instRef.current;
-    const total = built.motion.length;
+    const total = built.steps.length;
 
     if (clock.playing && !clock.done) {
-      // Постоянная скорость фрезы по XY: длинный сегмент идёт дольше короткого.
-      // Вертикальные врезки (lenXY≈0) считаем за минимум, чтобы не вставали.
-      const cur = built.motion[Math.min(Math.floor(clock.prog), total - 1)];
+      // Постоянная скорость фрезы по XY; холостые ходы/врезки идут быстрее (×6),
+      // чтобы перелёты не ползли. Короткие шаги считаем за минимум, чтобы не вставали.
+      const cur = built.steps[Math.min(Math.floor(clock.prog), total - 1)];
       const eff = Math.max(cur.lenXY, 20);
-      clock.prog += (delta * clock.speed) / eff;
+      const mul = cur.cut ? 1 : 6;
+      clock.prog += (delta * clock.speed * mul) / eff;
       if (clock.prog >= total) {
         clock.prog = total;
         clock.done = true;
@@ -218,9 +274,9 @@ const SceneContents: React.FC<SceneContentsProps> = ({ built, toolDiameter, cloc
       }
     }
 
-    const currentSeg = Math.min(Math.floor(clock.prog), total - 1);
+    const currentStep = Math.min(Math.floor(clock.prog), total - 1);
     if (mesh) {
-      const reveal = revealedCount(built.segIndexOfGroove, clock.prog > 0 ? currentSeg : -1);
+      const reveal = revealedCount(built.grooveStepIndex, clock.prog > 0 ? currentStep : -1);
       if (mesh.count !== reveal) mesh.count = reveal;
     }
 
@@ -229,18 +285,18 @@ const SceneContents: React.FC<SceneContentsProps> = ({ built, toolDiameter, cloc
       labelRef.current.textContent = `${Math.min(Math.floor(clock.prog), total)} / ${total}`;
     }
 
-    // Активный слой = фигура текущего сегмента; пишем в стор только при смене.
-    const activeId = clock.prog > 0 ? built.motion[currentSeg].objectId ?? null : null;
+    // Активный слой = фигура текущего шага; пишем в стор только при смене.
+    const activeId = clock.prog > 0 ? built.steps[currentStep].objectId ?? null : null;
     if (activeId !== lastActiveIdRef.current) {
       lastActiveIdRef.current = activeId;
       onActiveLayer(activeId);
     }
 
-    // Фреза: интерполяция внутри текущего сегмента.
+    // Фреза: интерполяция внутри текущего шага.
     const cutter = cutterRef.current;
     if (cutter) {
-      const t = Math.max(0, Math.min(1, clock.prog - currentSeg));
-      const seg = built.motion[currentSeg];
+      const t = Math.max(0, Math.min(1, clock.prog - currentStep));
+      const seg = built.steps[currentStep];
       const tipY = THREE.MathUtils.lerp(seg.a.y, seg.b.y, t);
       const cutterH = 60;
       cutter.position.set(
@@ -291,9 +347,9 @@ const SceneContents: React.FC<SceneContentsProps> = ({ built, toolDiameter, cloc
 
 const GhostPath: React.FC<{ built: Built }> = React.memo(({ built }) => {
   const positions = React.useMemo(() => {
-    const pts = new Float32Array(built.motion.length * 6);
+    const pts = new Float32Array(built.steps.length * 6);
     let i = 0;
-    for (const seg of built.motion) {
+    for (const seg of built.steps) {
       pts[i++] = seg.a.x;
       pts[i++] = seg.a.y;
       pts[i++] = seg.a.z;
@@ -406,7 +462,7 @@ const Scene3D: React.FC = () => {
         <div className="flex items-center gap-3 rounded-2xl border border-slate-200/80 bg-white/95 px-4 py-2.5 shadow-md dark:border-slate-700 dark:bg-slate-900/95">
           <button
             onClick={togglePlay}
-            disabled={!built || built.motion.length === 0}
+            disabled={!built || built.steps.length === 0}
             title={playing ? 'Пауза' : 'Проиграть съём фрезой'}
             className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-primary-fg disabled:opacity-40"
           >
@@ -423,7 +479,7 @@ const Scene3D: React.FC = () => {
           </button>
           <button
             onClick={reset}
-            disabled={!built || built.motion.length === 0}
+            disabled={!built || built.steps.length === 0}
             title="Сбросить в начало"
             className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 disabled:opacity-40 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
           >
@@ -455,7 +511,7 @@ const Scene3D: React.FC = () => {
         </div>
       </div>
 
-      {(!built || built.motion.length === 0) && (
+      {(!built || built.steps.length === 0) && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
           <div className="rounded-2xl border border-slate-200 bg-white/90 px-6 py-4 text-sm text-slate-500 shadow dark:border-slate-700 dark:bg-slate-900/90 dark:text-slate-400">
             Нет траектории. Нарисуйте контур/линии во вкладке 2D — паз появится здесь.
