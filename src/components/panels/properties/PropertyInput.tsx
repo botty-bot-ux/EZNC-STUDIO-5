@@ -57,10 +57,18 @@ export const PropertyInput: React.FC<PropertyInputProps> = ({
     if (n !== null) onChange(n); // живое обновление холста/G-кода без округления
   };
 
+  // Единая база для commit/shift: без черновика — входящее value; с черновиком —
+  // разобранное число, а при невалидном вводе один и тот же fallbackValue в обеих
+  // ветках (иначе итог зависел бы от порядка действий пользователя).
+  const resolveBase = (): number => {
+    if (draft === null) return value;
+    const n = parseDecimalOrNull(draft);
+    return n !== null ? n : fallbackValue;
+  };
+
   const commit = () => {
     if (draft !== null) {
-      const n = parseDecimalOrNull(draft);
-      let next = n !== null ? n : fallbackValue;
+      let next = resolveBase();
       if (dec != null) next = Number(next.toFixed(dec));
       onChange(next);
     }
@@ -72,11 +80,10 @@ export const PropertyInput: React.FC<PropertyInputProps> = ({
   const hasStepper = typeof stepNum === 'number' && Number.isFinite(stepNum) && stepNum > 0;
 
   // Общая функция сдвига на `deltaSteps` шагов (клик = ±1; drag = инкремент шагов с прошлого события).
-  // Считаем от актуального черновика, если он есть, иначе от props.value.
+  // База — из resolveBase(): тот же источник, что и у commit (единый fallback при невалидном черновике).
   const shift = (deltaSteps: number) => {
     if (!hasStepper) return;
-    const base = draft !== null ? parseDecimalOrNull(draft) ?? value : value;
-    let next = base + deltaSteps * (stepNum as number);
+    let next = resolveBase() + deltaSteps * (stepNum as number);
     if (dec != null) next = Number(next.toFixed(dec));
     setDraft(null);
     onChange(next);
