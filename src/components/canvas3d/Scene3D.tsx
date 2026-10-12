@@ -2,7 +2,6 @@ import React from 'react';
 import * as THREE from 'three';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
-import { useShallow } from 'zustand/react/shallow';
 import { useProjectStore } from '../../store/useProjectStore';
 import { ToolpathSegment } from '../../types';
 
@@ -50,7 +49,7 @@ interface Built {
   span: number;
 }
 
-function buildScene(segs: ToolpathSegment[], toolDiameter: number, fallback: { x0: number; y0: number; x1: number; y1: number }): Built | null {
+function buildScene(segs: ToolpathSegment[], toolDiameter: number): Built | null {
   if (segs.length === 0) return null;
 
   let minX = Infinity,
@@ -67,11 +66,13 @@ function buildScene(segs: ToolpathSegment[], toolDiameter: number, fallback: { x
   }
   if (!Number.isFinite(minX)) return null;
 
+  // Заготовка = габарит обрабатываемого содержимого + отступ (не зона хода станка:
+  // bounds — это.travel, а не лист). Иначе деталь тонула бы в огромной плите.
   const margin = 40 + toolDiameter;
-  const bw = Math.max(maxX - minX, fallback.x1 - fallback.x0) + margin * 2;
-  const bd = Math.max(maxY - minY, fallback.y1 - fallback.y0) + margin * 2;
-  const cxWorld = (minX + maxX) / 2 || (fallback.x0 + fallback.x1) / 2;
-  const czWorld = (minY + maxY) / 2 || (fallback.y0 + fallback.y1) / 2;
+  const bw = maxX - minX + margin * 2;
+  const bd = maxY - minY + margin * 2;
+  const cxWorld = (minX + maxX) / 2;
+  const czWorld = (minY + maxY) / 2;
   // Толщина заготовки: минимум 16 мм (ДСП), но не тоньше самого глубокого вреза.
   const thickness = Math.max(16, Math.abs(minZ) + 4);
 
@@ -270,22 +271,12 @@ GhostPath.displayName = 'GhostPath';
 // ─────────────────────────────── обёртка + UI ───────────────────────────────
 
 const Scene3D: React.FC = () => {
-  const { segments, toolDiameter, board } = useProjectStore(
-    useShallow((s) => {
-      const m = s.machine;
-      const sheet = m.stockSheet;
-      const fallback = sheet?.enabled
-        ? { x0: 0, y0: 0, x1: sheet.widthX, y1: sheet.widthY }
-        : { x0: m.bounds.xMin, y0: m.bounds.yMin, x1: m.bounds.xMax, y1: m.bounds.yMax };
-      return {
-        segments: s.toolpathSegments,
-        toolDiameter: m.toolDiameter ?? 3,
-        board: fallback,
-      };
-    })
-  );
+  // Только стабильные значения из стора (ссылка/примитив) — иначе селектор вернёт
+  // новый объект каждый вызов и useSyncExternalStore уйдёт в бесконечный ре-рендер.
+  const segments = useProjectStore((s) => s.toolpathSegments);
+  const toolDiameter = useProjectStore((s) => s.machine.toolDiameter ?? 3);
 
-  const built = React.useMemo(() => buildScene(segments, toolDiameter, board), [segments, toolDiameter, board]);
+  const built = React.useMemo(() => buildScene(segments, toolDiameter), [segments, toolDiameter]);
 
   // Единый источник «часов» симуляции — мутабельный ref, вне undoable-стора.
   const clockRef = React.useRef<Clock>({ prog: 0, playing: false, speed: 60, done: false, total: 0 });
@@ -337,6 +328,9 @@ const Scene3D: React.FC = () => {
         const cur = Math.min(Math.floor(c.prog), c.total);
         el.textContent = `${cur} / ${c.total}`;
       }
+      // useFrame гасит clockRef.playing при завершении, а React-состояние «playing»
+      // остаётся — синхронизируем иконку (setPlaying с тем же значением = no-op).
+      if (c.done) setPlaying(false);
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
