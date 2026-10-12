@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import { useProjectStore } from '../../store/useProjectStore';
-import { ToolpathSegment } from '../../types';
+import { MachineSettings, ToolpathSegment } from '../../types';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Симуляция съёма фрезой в 3D.
@@ -51,7 +51,7 @@ interface Built {
   span: number;
 }
 
-function buildScene(segs: ToolpathSegment[], toolDiameter: number): Built | null {
+function buildScene(segs: ToolpathSegment[], toolDiameter: number, machine: MachineSettings): Built | null {
   if (segs.length === 0) return null;
 
   let minX = Infinity,
@@ -68,15 +68,29 @@ function buildScene(segs: ToolpathSegment[], toolDiameter: number): Built | null
   }
   if (!Number.isFinite(minX)) return null;
 
-  // Заготовка = габарит обрабатываемого содержимого + отступ (не зона хода станка:
-  // bounds — это.travel, а не лист). Иначе деталь тонула бы в огромной плите.
-  const margin = 40 + toolDiameter;
-  const bw = maxX - minX + margin * 2;
-  const bd = maxY - minY + margin * 2;
-  const cxWorld = (minX + maxX) / 2;
-  const czWorld = (minY + maxY) / 2;
-  // Толщина заготовки: минимум 16 мм (ДСП), но не тоньше самого глубокого вреза.
-  const thickness = Math.max(16, Math.abs(minZ) + 4);
+  // Толщина листа = «Глубина реза Z» (machine.cutDepth), но не тоньше самого
+  // глубокого вреза (иначе паз торчал бы за дно) и не меньше заготовки-минимума.
+  const cutDepth = machine.cutDepth ?? 0;
+  const thickness = Math.max(cutDepth, Math.abs(minZ), 8);
+
+  // Габарит листа ДСП = «Заготовка листа» (stockSheet). В мировых координатах лист
+  // занимает X∈[−widthX,0], Y∈[−widthY,0] (так его рисует 2D), поэтому центр —
+  // (−widthX/2, −widthY/2). Если лист выключен — подгоняем плиту под содержимое.
+  const sheet = machine.stockSheet;
+  const useSheet = !!sheet && sheet.enabled && sheet.preset !== 'none' && sheet.widthX > 0 && sheet.widthY > 0;
+  let bw: number, bd: number, cxWorld: number, czWorld: number;
+  if (useSheet && sheet) {
+    bw = sheet.widthX;
+    bd = sheet.widthY;
+    cxWorld = -sheet.widthX / 2;
+    czWorld = -sheet.widthY / 2;
+  } else {
+    const margin = 40 + toolDiameter;
+    bw = maxX - minX + margin * 2;
+    bd = maxY - minY + margin * 2;
+    cxWorld = (minX + maxX) / 2;
+    czWorld = (minY + maxY) / 2;
+  }
 
   const board = {
     cx: cxWorld,
@@ -108,7 +122,9 @@ function buildScene(segs: ToolpathSegment[], toolDiameter: number): Built | null
     const dx = bx - ax;
     const dz = bz - az;
     const len = Math.hypot(dx, dz);
-    const depth = Math.max(Math.abs(s.endZ), 0.2);
+    // Глубина паза не больше толщины листа: сквозной рез заполняет всю толщу,
+    // но не торчит за нижнюю грань заготовки.
+    const depth = Math.min(Math.max(Math.abs(s.endZ), 0.2), thickness);
     // Небольшой «зазор» над поверхностью: плита непрозрачна, поэтому паз должен
     // выступать на 0.5 мм, иначе его перекрывает верхняя грань заготовки (z-fighting).
     const lip = 0.5;
@@ -292,10 +308,11 @@ const Scene3D: React.FC = () => {
   // Только стабильные значения из стора (ссылка/примитив/функция) — иначе селектор
   // вернёт новый объект каждый вызов и useSyncExternalStore уйдёт в ре-рендер-цикл.
   const segments = useProjectStore((s) => s.toolpathSegments);
-  const toolDiameter = useProjectStore((s) => s.machine.toolDiameter ?? 3);
+  const machine = useProjectStore((s) => s.machine);
   const setSimActiveLayerId = useProjectStore((s) => s.setSimActiveLayerId);
 
-  const built = React.useMemo(() => buildScene(segments, toolDiameter), [segments, toolDiameter]);
+  const toolDiameter = machine.toolDiameter ?? 3;
+  const built = React.useMemo(() => buildScene(segments, toolDiameter, machine), [segments, toolDiameter, machine]);
 
   // Единый источник «часов» симуляции — мутабельный ref, вне undoable-стора.
   const clockRef = React.useRef<Clock>({ prog: 0, playing: false, speed: 150, done: false, total: 0 });
