@@ -10,13 +10,14 @@
  * VERSION в именах кэшей: новый деплой с другим VERSION вытесняет старые кэши
  * на этапе activate.
  */
-const VERSION = 'v2';
+const VERSION = 'v5';
 const SHELL_CACHE = `eznc-shell-${VERSION}`;
 const ASSET_CACHE = `eznc-assets-${VERSION}`;
 
 // Каталог, в котором лежит sw.js (…/ или …/EZNC-STUDIO-5/).
 const BASE = new URL('./', self.location).href;
 const BASE_PATHNAME = new URL(BASE).pathname;
+const ASSETS_PREFIX = `${BASE_PATHNAME}assets/`;
 const INDEX_URLS = [BASE, `${BASE}index.html`];
 
 self.addEventListener('install', (event) => {
@@ -69,8 +70,9 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Статика внутри нашего пути: кэш первой, добор из сети.
-  if (url.pathname.startsWith(BASE_PATHNAME)) {
+  // Только хешированные бандлы сборки (/assets/): кэш первой, добор из сети.
+  // Dev-модули (/src/, /@vite/, /node_modules/) никогда не кэшируются.
+  if (url.pathname.startsWith(ASSETS_PREFIX)) {
     event.respondWith(
       caches.match(req).then(
         (cached) =>
