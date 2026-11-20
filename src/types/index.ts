@@ -19,6 +19,7 @@ export interface BaseShape {
   type: ShapeType;
   color?: string;
   depth: number; // Positive number representing cutting depth in mm (e.g. 5 means Z = -5)
+  useOwnDepth?: boolean; // Если true — использовать obj.depth вместо глобальной machine.cutDepth (напр., пазы 4 мм на листе 17.5 мм)
   operationType: OperationType;
   visible?: boolean; // Visibility flag for canvas and G-code generation
   frozen?: boolean; // Заморозка — фигуру нельзя случайно сдвинуть/отредактировать на холсте
@@ -156,6 +157,8 @@ export interface MachineSettings {
     xMax: number;
     yMin: number;
     yMax: number;
+    zMin?: number;
+    zMax?: number;
   };
   stockSheet?: StockSheetSettings;
   workOffset: {
@@ -209,7 +212,71 @@ export interface WarningItem {
   objectId?: string;
 }
 
-export type ActiveTool = 'select' | 'point' | 'line' | 'polyline' | 'rectangle' | 'circle' | 'arc' | 'measure';
+export type ActiveTool =
+  | 'select'
+  | 'point'
+  | 'line'
+  | 'polyline'
+  | 'rectangle'
+  | 'circle'
+  | 'arc'
+  | 'measure'
+  | 'trim'
+  | 'fillet';
+
+// Живое превью модального окна «Повернуть на угол»: фигуры повёрнуты вокруг anchor
+// на angleDeg° только для отрисовки на холсте до подтверждения.
+export interface LiveRotateState {
+  ids: string[];
+  anchor: Point2D;
+  angleDeg: number;
+}
+
+// Предпросмотр инструмента «Ножницы»: отсекаемый участок под курсором и точки разреза.
+export interface TrimPreviewState {
+  objectId: string;
+  cutPoints: Point2D[];
+  removeSegment?: {
+    kind: 'line';
+    start: Point2D;
+    end: Point2D;
+  } | {
+    kind: 'arc';
+    center: Point2D;
+    radius: number;
+    startAngle: number;
+    endAngle: number;
+    clockwise: boolean;
+  };
+}
+
+// Предпросмотр инструмента «Скругление» между двумя отрезками или для прямоугольника.
+export interface FilletPreviewState {
+  arc: {
+    centerX: number;
+    centerY: number;
+    radius: number;
+    startX: number;
+    startY: number;
+    endX: number;
+    endY: number;
+    clockwise: boolean;
+  };
+  tangent1: Point2D;
+  tangent2: Point2D;
+}
+
+// Режим выравнивания фигуры/группы относительно листа ДСП в экранных координатах холста.
+export type StockAlignMode =
+  | 'topLeft'
+  | 'topCenter'
+  | 'topRight'
+  | 'centerLeft'
+  | 'center'
+  | 'centerRight'
+  | 'bottomLeft'
+  | 'bottomCenter'
+  | 'bottomRight';
 
 // Способ построения дуги (под-режим инструмента «Дуга»):
 //  '3pt'    — три точки (старт → точка НА дуге → конец), дуга через все три;
@@ -247,6 +314,37 @@ export interface ToolpathSegment {
   feed?: number;
   operationId?: string;
   objectId?: string;
+  /** 1-based номер строки в тексте G-кода (заполняется при разборе текста редактора). */
+  lineNumber?: number;
+}
+
+/**
+ * Транзиентное состояние превью прокрутки G-кода: связывает видимые/активные строки
+ * в редакторе с соответствующими сегментами траектории на 2D-холсте.
+ */
+export interface GcodeScrollPreview {
+  startLine: number;
+  endLine: number;
+  focusLine: number;
+  segments: ToolpathSegment[];
+  focusSegmentId: string | null;
+  activeObjectId?: string;
+}
+
+export type AlignMode =
+  | 'screenLeft'
+  | 'screenCenterH'
+  | 'screenRight'
+  | 'screenTop'
+  | 'screenCenterV'
+  | 'screenBottom';
+
+export interface CanvasFocusRequest {
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
+  seq: number;
 }
 
 export interface ProjectData {
@@ -254,6 +352,6 @@ export interface ProjectData {
   name: string;
   machine: MachineSettings;
   objects: CADObject[];
-  operations: OperationItem[];
+  operations?: OperationItem[];
   postprocessorTemplates: PostprocessorTemplates;
 }

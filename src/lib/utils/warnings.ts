@@ -1,6 +1,11 @@
 import { CADObject, MachineSettings, OperationItem, WarningItem } from '../../types';
 
-import { isPointWithinBounds, transformProgramToMachine } from '../geometry/transform';
+import {
+  computeArcBounds,
+  isPointWithinBounds,
+  transformProgramToMachine,
+} from '../geometry/transform';
+import { normalizeMachineBounds } from '../geometry/bounds';
 
 export function analyzeProjectWarnings(
   objects: CADObject[],
@@ -9,6 +14,8 @@ export function analyzeProjectWarnings(
 ): WarningItem[] {
   const warnings: WarningItem[] = [];
 
+  const mb = normalizeMachineBounds(machine.bounds);
+
   // 1. Machine settings checks
   if (machine.safeZ <= 0) {
     warnings.push({
@@ -16,6 +23,13 @@ export function analyzeProjectWarnings(
       level: 'error',
       title: 'Небезопасная высота Z',
       message: 'Безопасная высота Z равна 0 или отрицательна. Задайте положительное значение (например, 10 мм).',
+    });
+  } else if (machine.safeZ > mb.maxZ) {
+    warnings.push({
+      id: 'warn_safe_z_max',
+      level: 'error',
+      title: 'Превышен предел оси Z (верх)',
+      message: `Безопасная высота Z (${machine.safeZ} мм) превышает максимальный ход оси Z станка (${mb.maxZ} мм).`,
     });
   }
 
@@ -67,8 +81,9 @@ export function analyzeProjectWarnings(
       pointsToCheck.push({ x: obj.centerX - r, y: obj.centerY - r });
       pointsToCheck.push({ x: obj.centerX + r, y: obj.centerY + r });
     } else if (obj.type === 'arc') {
-      pointsToCheck.push({ x: obj.startX, y: obj.startY });
-      pointsToCheck.push({ x: obj.endX, y: obj.endY });
+      const b = computeArcBounds(obj);
+      pointsToCheck.push({ x: b.minX, y: b.minY });
+      pointsToCheck.push({ x: b.maxX, y: b.maxY });
     }
 
     let isOutOfBounds = false;
@@ -85,6 +100,24 @@ export function analyzeProjectWarnings(
         level: 'error',
         title: `Выход за пределы: ${obj.name}`,
         message: `Объект "${obj.name}" (или его часть) выходит за границы рабочей зоны станка [${machine.bounds.xMin}..${machine.bounds.xMax}, ${machine.bounds.yMin}..${machine.bounds.yMax}].`,
+        objectId: obj.id,
+      });
+    }
+
+    const effectiveDepth =
+      obj.type === 'point'
+        ? obj.depth
+        : obj.useOwnDepth
+        ? (obj.depth ?? machine.cutDepth ?? 5)
+        : (machine.cutDepth ?? obj.depth ?? 5);
+    const checkedDepth = Math.max(obj.depth ?? 0, effectiveDepth);
+
+    if (obj.visible !== false && checkedDepth > 0 && -checkedDepth < mb.minZ) {
+      warnings.push({
+        id: `warn_bound_z_${obj.id}`,
+        level: 'error',
+        title: `Превышен предел Z: ${obj.name}`,
+        message: `Глубина обработки объекта "${obj.name}" (Z = -${checkedDepth} мм) ниже минимального предела оси Z станка (${mb.minZ} мм).`,
         objectId: obj.id,
       });
     }

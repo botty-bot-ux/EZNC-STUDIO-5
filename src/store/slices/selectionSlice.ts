@@ -14,13 +14,14 @@ export function createSelectionSlice(
   | 'setSelectedObjectIds'
   | 'toggleObjectSelection'
   | 'selectAllObjects'
-  | 'setSelectedOperationId'
   | 'setLiveEdit'
   | 'setLiveMeasure'
   | 'setLiveMove'
   | 'setLiveScale'
+  | 'setLiveRotate'
   | 'setParallelPreview'
   | 'setShapeDialog'
+  | 'setPendingVectorImport'
 > {
   const { set, get } = ctx;
 
@@ -85,16 +86,13 @@ export function createSelectionSlice(
       }));
     },
 
-    setSelectedOperationId: (id: string | null) =>
-      set({
-        selectedOperationId: id,
-      }),
-
     setLiveEdit: (v) => set({ liveEdit: v }),
     setLiveMeasure: (v) => set({ liveMeasure: v }),
     setLiveMove: (v) => set({ liveMove: v }),
     setLiveScale: (v) => set({ liveScale: v }),
+    setLiveRotate: (v) => set({ liveRotate: v }),
     setParallelPreview: (v) => set({ parallelPreview: v }),
     setShapeDialog: (d) => set({ shapeDialog: d }),
+    setPendingVectorImport: (v) => set({ pendingVectorImport: v }),
   };
 }

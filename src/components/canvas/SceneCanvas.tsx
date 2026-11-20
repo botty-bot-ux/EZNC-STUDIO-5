@@ -1,10 +1,13 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { CircleDot, FileUp, LineDotRightHorizontal, Square } from 'lucide-react';
 import { useSelectedObjectId } from '../../store/useProjectStore';
-import { CADObject, Point2D } from '../../types';
-import { CanvasControls } from './CanvasControls';
+import { isRailMachine } from '../../store/initialState';
+import { CADObject, FilletPreviewState, Point2D, TrimPreviewState } from '../../types';
+import { CanvasControls, CursorSubscribeFn } from './CanvasControls';
 import { CanvasHud } from './CanvasHud';
 import { ArcModeSelector } from './ArcModeSelector';
 import { LineModeSelector } from './LineModeSelector';
+import { FilletModeSelector } from './FilletModeSelector';
 import { ShapeContextMenu } from './ShapeContextMenu';
 import {
   DragMode,
@@ -13,32 +16,35 @@ import {
   findObjectBodyHit,
   findObjectsInBox,
 } from './canvasHitTest';
-import { getUnderlayCanvasRect, UNDERLAY_HANDLE_PX } from './canvasDrawers';
 import {
   clampRayToPosFaces,
-  clampToPosFaces,
+  computeDisplayObjects,
   computeNodeEditItems,
   pointFromPolar,
-  shiftCADObject,
-  translateObjectFull,
 } from './sceneCanvasGeometry';
 import { CanvasPointer, LiveDrag, SceneCanvasProps } from './sceneCanvas.types';
 import { drawScene } from './sceneCanvasRender';
 import { useCanvasStore } from './useCanvasStore';
+import { useCanvasViewport } from './useCanvasViewport';
+import { useCanvasUnderlay } from './useCanvasUnderlay';
+import { useCanvasKeyboard } from './useCanvasKeyboard';
+import { useCanvasGestures } from './useCanvasGestures';
+import { evaluateToolHover, handleDrawingToolDown } from './canvasToolHandlers';
 import {
   HoveredHandle,
   SnapPointInfo,
   canvasToWorld,
   worldToCanvas,
-  buildArc,
 } from './canvasUtils';
 import { paletteForTheme } from './canvasPalette';
-import { constrainAngle, scaleCADObject } from '../../lib/geometry/transform';
+import { constrainAngle, translateCADObject } from '../../lib/geometry/transform';
+import { analyzeTrajectoryBounds } from '../../lib/geometry/bounds';
 import { useIsMobile } from '../../hooks/useIsMobile';
 
 export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const isMobile = useIsMobile();
 
   const {
     objects,
@@ -57,6 +63,8 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
     setViewMode,
     activeTool,
     setActiveTool,
+    filletRadius,
+    setFilletRadius,
     arcMode,
     setArcMode,
     lineMode,
@@ -65,482 +73,186 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
     snapToGrid,
     setSnapToGrid,
     gridStep,
+    setGridStep,
     setLiveEdit,
     setLiveMeasure,
     liveMove,
     liveScale,
+    liveRotate,
     parallelPreview,
+    trimObjectAtPoint,
+    filletLines,
+    filletRectangle,
     underlay,
     updateUnderlay,
     mobileSheet,
     theme,
+    gcodeScrollPreview,
+    canvasFocusRequest,
+    canvasFitSeq,
+    setShapeDialog,
   } = useCanvasStore();
-  // «Основная» фигура — производная от selectedObjectIds (последний id).
+
   const selectedObjectId = useSelectedObjectId();
-
-  // Правый клик по фигуре → контекстное меню (позиция на экране или null).
-  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null);
-
-  // Canvas Pan & Zoom
-  const [pan, setPan] = useState<Point2D>({ x: 350, y: 350 });
-  const [zoom, setZoom] = useState<number>(1.2);
-
-  // Палитра холста следует за темой приложения (светлая/тёмная).
   const palette = useMemo(() => paletteForTheme(theme), [theme]);
 
-  // Перерисовка/ресайз канваса при изменении размера окна (телефон: адресная строка, поворот)
-  const [viewportVer, setViewportVer] = useState(0);
-  useEffect(() => {
-    const onResize = () => setViewportVer((v) => v + 1);
-    window.addEventListener('resize', onResize);
-    window.addEventListener('orientationchange', onResize);
-    return () => {
-      window.removeEventListener('resize', onResize);
-      window.removeEventListener('orientationchange', onResize);
-    };
-  }, []);
+  // ── Камера и подложка ──────────────────────────────────────────────
+  const { pan, setPan, zoom, setZoom, viewportVer, fitView, zoomAtCenter } = useCanvasViewport({
+    containerRef,
+    canvasRef,
+    machine,
+    canvasFocusRequest,
+    canvasFitSeq,
+  });
 
-  // Magnetic Snapping
+  const {
+    underlayImgRef,
+    underlayImgVer,
+    tryStartDrag: tryStartUnderlayDrag,
+    handleMove: handleUnderlayMove,
+    handleUp: handleUnderlayUp,
+    cancelDrag: cancelUnderlayDrag,
+  } = useCanvasUnderlay(underlay, updateUnderlay);
+
+  // ── Реактивное состояние UI / дискретных этапов инструментов ───────
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null);
   const [objectSnapEnabled, setObjectSnapEnabled] = useState<boolean>(true);
-  const [activeSnapInfo, setActiveSnapInfo] = useState<SnapPointInfo | null>(null);
-
-  // Dragging & Hover state
   const [dragMode, setDragMode] = useState<DragMode>('none');
-  const [dragStartCanvasPt, setDragStartCanvasPt] = useState<Point2D>({ x: 0, y: 0 });
-  const [dragStartWorldPt, setDragStartWorldPt] = useState<Point2D>({ x: 0, y: 0 });
-  const [dragObjInitial, setDragObjInitial] = useState<CADObject | null>(null);
-  const [dragIds, setDragIds] = useState<string[]>([]);
-  const [liveDrag, setLiveDrag] = useState<LiveDrag>({ mode: 'none' });
-  const [hoveredHandle, setHoveredHandle] = useState<HoveredHandle | null>(null);
 
-  // Selection Box Marquee
-  const [selectionBoxStart, setSelectionBoxStart] = useState<Point2D | null>(null);
-  const [selectionBoxCurrent, setSelectionBoxCurrent] = useState<Point2D | null>(null);
-
-  // Active Drawing Tool state
   const [drawStartPt, setDrawStartPt] = useState<Point2D | null>(null);
   const [drawArcStartPt, setDrawArcStartPt] = useState<Point2D | null>(null);
   const [drawArcEndPt, setDrawArcEndPt] = useState<Point2D | null>(null);
-  // Накопленные узлы при построении полилинии/контура (под-режимы «Линия»).
   const [polyPts, setPolyPts] = useState<Point2D[]>([]);
-  const [currentMouseProgPt, setCurrentMouseProgPt] = useState<Point2D | null>(null);
-
-  // Active Measurement Tool state
   const [measureStartPt, setMeasureStartPt] = useState<Point2D | null>(null);
   const [measureEndPt, setMeasureEndPt] = useState<Point2D | null>(null);
-
-  // Подложка (фоновая референсная картинка, только на сессию): кэш загруженного
-  // изображения + версия для ре-рендера после загрузки + временное состояние драга.
-  const underlayImgRef = useRef<HTMLImageElement | null>(null);
-  const [underlayImgVer, setUnderlayImgVer] = useState(0);
-  const underlayDragRef = useRef<
-    | { mode: 'move'; startWorld: Point2D; origX: number; origY: number }
-    | {
-        mode: 'resize';
-        startWorld: Point2D;
-        origX: number;
-        origY: number;
-        origW: number;
-        origH: number;
-      }
-    | null
-  >(null);
-
-  useEffect(() => {
-    if (!underlay.src) {
-      underlayImgRef.current = null;
-      setUnderlayImgVer((v) => v + 1);
-      return;
-    }
-    const img = new Image();
-    img.onload = () => {
-      underlayImgRef.current = img;
-      setUnderlayImgVer((v) => v + 1);
-    };
-    img.onerror = () => {
-      underlayImgRef.current = null;
-      setUnderlayImgVer((v) => v + 1);
-    };
-    img.src = underlay.src;
-  }, [underlay.src]);
-
-  // Dynamic distance input (DYN) shared by the line tool and the arc's start→end
-  // chord: type a distance, press Enter to place the point at that length.
+  const [filletFirstPick, setFilletFirstPick] = useState<{ id: string; clickPt: Point2D } | null>(null);
+  const [toolStatusHint, setToolStatusHint] = useState<string | null>(null);
   const [lineLengthInput, setLineLengthInput] = useState<string>('');
-  const [lineDirAngle, setLineDirAngle] = useState<number>(0);
+  const [dynAnchorPx, setDynAnchorPx] = useState<Point2D | null>(null);
 
-  // Latest drawing state/functions for the window keydown handler (avoids stale closures)
-  const drawStateRef = useRef({
-    activeTool,
-    lineMode,
-    drawStartPt,
-    drawArcStartPt,
-    drawArcEndPt,
-    polyPts,
-    lineLengthInput,
-    lineDirAngle,
-  });
-  drawStateRef.current = {
-    activeTool,
-    lineMode,
-    drawStartPt,
-    drawArcStartPt,
-    drawArcEndPt,
-    polyPts,
-    lineLengthInput,
-    lineDirAngle,
-  };
-  const finishLineRef = useRef<(end: Point2D) => void>(() => {});
-  finishLineRef.current = (end: Point2D) => {
-    if (!drawStartPt) return;
-    const clamped = clampRayToPosFaces(drawStartPt, end);
-    if (Math.hypot(clamped.x - drawStartPt.x, clamped.y - drawStartPt.y) < 0.1) {
-      // Уперся в грань ровно в свою же точку — не создаём вырожденный отрезок.
-      setDrawStartPt(null);
-      setLineLengthInput('');
-      return;
+  const toolStatusHintRef = useRef<string | null>(null);
+  const setHintIfChanged = useCallback((next: string | null) => {
+    if (toolStatusHintRef.current !== next) {
+      toolStatusHintRef.current = next;
+      setToolStatusHint(next);
     }
-    addObject({
-      name: `Отрезок ${objects.length + 1}`,
-      type: 'line',
-      startX: drawStartPt.x,
-      startY: drawStartPt.y,
-      endX: clamped.x,
-      endY: clamped.y,
-      depth: 5,
-      operationType: 'cut',
-    });
-    setDrawStartPt(null);
-    setLineLengthInput('');
-  };
-
-  // Завершение полилинии/контура: из накопленных узлов создаём фигуру-ломаную.
-  const commitPolyline = () => {
-    if (polyPts.length < 2) {
-      setPolyPts([]);
-      return;
-    }
-    const closed = lineMode === 'polygon';
-    addObject({
-      name: `${closed ? 'Контур' : 'Полилиния'} ${objects.length + 1}`,
-      type: 'polyline',
-      points: polyPts,
-      closed,
-      depth: 5,
-      operationType: 'cut',
-    });
-    setPolyPts([]);
-    setLineLengthInput('');
-  };
-  // Свежий доступ к commitPolyline из window-обработчика keydown (без stale-замыкания).
-  const commitPolylineRef = useRef<() => void>(() => {});
-  commitPolylineRef.current = commitPolyline;
-
-  // DYN: place the pending line end / arc chord end at the typed length along the
-  // current rubber-band direction. Used by Enter (desktop) and the on-screen OK (mobile).
-  const commitDynLength = () => {
-    const ds = drawStateRef.current;
-    const anchor =
-      ds.activeTool === 'line'
-        ? ds.drawStartPt
-        : ds.activeTool === 'arc' && !ds.drawArcEndPt
-        ? ds.drawArcStartPt
-        : null;
-    if (!anchor) return;
-    const L = parseFloat(ds.lineLengthInput);
-    if (!(L > 0)) return;
-    const end = pointFromPolar(anchor, ds.lineDirAngle, L);
-    if (ds.activeTool === 'arc') {
-      setDrawArcEndPt(clampRayToPosFaces(anchor, end));
-      setLineLengthInput('');
-    } else {
-      finishLineRef.current(end);
-    }
-  };
-
-  useEffect(() => {
-    if (activeTool !== 'measure') {
-      setMeasureStartPt(null);
-      setMeasureEndPt(null);
-    }
-    if (activeTool !== 'line') {
-      setPolyPts([]);
-    }
-  }, [activeTool]);
-
-  // Пока идёт жест на холсте (перетаскивание/пан/выделение рамкой или рисование с
-  // поставленной первой точкой) — просим плавающие панели не перехватывать мышь.
-  useEffect(() => {
-    const drawing =
-      (activeTool === 'line' &&
-        (lineMode === 'line' ? !!drawStartPt : polyPts.length > 0)) ||
-      (activeTool === 'arc' && !!drawArcStartPt) ||
-      (activeTool === 'rectangle' && !!drawStartPt) ||
-      (activeTool === 'circle' && !!drawStartPt) ||
-      (activeTool === 'measure' && !!measureStartPt && !measureEndPt);
-    const dragging = dragMode !== 'none';
-    setCanvasGrabbing(dragging || drawing);
-  }, [
-    dragMode,
-    activeTool,
-    lineMode,
-    drawStartPt,
-    drawArcStartPt,
-    polyPts,
-    measureStartPt,
-    measureEndPt,
-    setCanvasGrabbing,
-  ]);
-
-  // Mirror the transient vertex-edit drag into the store so the Свойства panel shows the
-  // live coordinates while a handle is dragged (store objects stay untouched until mouseup).
-  // Панель показывает только «якорь» — ту фигуру, чей гриф реально схвачен мышью.
-  useEffect(() => {
-    if (liveDrag.mode === 'edit' && liveDrag.items.length > 0) {
-      const anchor =
-        liveDrag.items.find((i) => i.id === selectedObjectId) ?? liveDrag.items[0];
-      setLiveEdit({ id: anchor.id, patch: anchor.patch });
-    } else {
-      setLiveEdit(null);
-    }
-  }, [liveDrag, selectedObjectId, setLiveEdit]);
-
-  // Mirror the ruler into the store so the Свойства panel shows a live readout instead of
-  // a floating window.
-  useEffect(() => {
-    if (activeTool === 'measure' && measureStartPt) {
-      const end = measureEndPt ?? currentMouseProgPt;
-      setLiveMeasure(end ? { start: measureStartPt, end } : null);
-    } else {
-      setLiveMeasure(null);
-    }
-  }, [activeTool, measureStartPt, measureEndPt, currentMouseProgPt, setLiveMeasure]);
-
-  // Geometry actually drawn on the canvas: store objects with the uncommitted drag
-  // overlaid. This keeps the store untouched during pointer-move (no per-frame G-code
-  // regeneration) while still showing live feedback.
-  const displayObjects = useMemo<CADObject[]>(() => {
-    if (liveDrag.mode === 'translate') {
-      const idset = new Set(liveDrag.ids);
-      return objects.map((o) =>
-        idset.has(o.id) ? translateObjectFull(o, liveDrag.dx, liveDrag.dy) : o
-      );
-    }
-    if (liveDrag.mode === 'edit') {
-      const map = new Map(liveDrag.items.map((i) => [i.id, i.patch]));
-      if (map.size === 0) return objects;
-      return objects.map((o) => {
-        const p = map.get(o.id);
-        return p ? ({ ...o, ...p } as CADObject) : o;
-      });
-    }
-    // Живое превью из модуля «Переместить» (до подтверждения): сдвигаем выбранную группу.
-    if (liveMove && liveMove.ids.length > 0 && (liveMove.dx !== 0 || liveMove.dy !== 0)) {
-      const idset = new Set(liveMove.ids);
-      return objects.map((o) =>
-        idset.has(o.id) ? translateObjectFull(o, liveMove.dx, liveMove.dy) : o
-      );
-    }
-    // Живое превью из модуля «Масштабировать» (до подтверждения): растягиваем группу
-    // относительно якоря.
-    if (liveScale && liveScale.ids.length > 0 && (liveScale.sx !== 1 || liveScale.sy !== 1)) {
-      const idset = new Set(liveScale.ids);
-      return objects.map((o) =>
-        idset.has(o.id) ? scaleCADObject(o, liveScale.anchor, liveScale.sx, liveScale.sy) : o
-      );
-    }
-    return objects;
-  }, [objects, liveDrag, liveMove, liveScale]);
-
-  // Auto-fit canvas view
-  const fitView = () => {
-    if (!containerRef.current) return;
-    const width = containerRef.current.clientWidth;
-    const height = containerRef.current.clientHeight;
-
-    const minX = Math.min(machine.bounds.xMin, machine.bounds.xMax);
-    const maxX = Math.max(machine.bounds.xMin, machine.bounds.xMax);
-    const minY = Math.min(machine.bounds.yMin, machine.bounds.yMax);
-    const maxY = Math.max(machine.bounds.yMin, machine.bounds.yMax);
-
-    const boundW = Math.abs(maxY - minY) || 1000;
-    const boundH = Math.abs(maxX - minX) || 1000;
-
-    const padding = 130;
-    const zoomX = (width - padding) / boundW;
-    const zoomY = (height - padding) / boundH;
-    const newZoom = Math.min(Math.max(Math.min(zoomX, zoomY), 0.2), 3.0);
-
-    const worldCenterX = (minX + maxX) / 2;
-    const worldCenterY = (minY + maxY) / 2;
-
-    const panX = width / 2 - worldCenterY * newZoom;
-    const panY = height / 2 - worldCenterX * newZoom;
-
-    setZoom(newZoom);
-    setPan({ x: panX, y: panY });
-  };
-
-  useEffect(() => {
-    fitView();
   }, []);
 
-  // Keyboard Shortcuts
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const isInput =
-        e.target instanceof HTMLInputElement ||
-        e.target instanceof HTMLTextAreaElement ||
-        ((e.target as HTMLElement)?.isContentEditable ?? false);
+  // ── Высокочастотное состояние холста на refs + rAF (без ререндеров на каждый mousemove) ──
+  const activeSnapInfoRef = useRef<SnapPointInfo | null>(null);
+  const hoveredHandleRef = useRef<HoveredHandle | null>(null);
+  const trimPreviewRef = useRef<TrimPreviewState | null>(null);
+  const filletPreviewRef = useRef<FilletPreviewState | null>(null);
+  const selectionBoxStartRef = useRef<Point2D | null>(null);
+  const selectionBoxCurrentRef = useRef<Point2D | null>(null);
+  const liveDragRef = useRef<LiveDrag>({ mode: 'none' });
+  const dragStartCanvasPtRef = useRef<Point2D>({ x: 0, y: 0 });
+  const dragStartWorldPtRef = useRef<Point2D>({ x: 0, y: 0 });
+  const dragObjInitialRef = useRef<CADObject | null>(null);
+  const dragIdsRef = useRef<string[]>([]);
+  const lineDirAngleRef = useRef<number>(0);
+  const currentMouseProgPtRef = useRef<Point2D | null>(null);
 
-      if (isInput) {
-        if (e.key === 'Escape') {
-          (e.target as HTMLElement).blur();
-          cancelDrawing();
-          setActiveTool('select');
-        }
-        return;
-      }
-
-      const key = e.key.toLowerCase();
-      const code = e.code;
-
-      // ---- Групповое копирование / вставка выделенных фигур (Ctrl+C / Ctrl+V) ----
-      if ((e.ctrlKey || e.metaKey) && code === 'KeyC') {
-        if (selectedObjectIds.length > 0) {
-          e.preventDefault();
-          copySelectedObjects();
-        }
-        return;
-      }
-      if ((e.ctrlKey || e.metaKey) && code === 'KeyV') {
-        e.preventDefault();
-        pasteClipboard();
-        return;
-      }
-
-      // ---- Dynamic distance input while a line / arc chord's first point is placed ----
-      const ds = drawStateRef.current;
-      const dynAnchor =
-        ds.activeTool === 'line'
-          ? ds.drawStartPt
-          : ds.activeTool === 'arc' && !ds.drawArcEndPt
-          ? ds.drawArcStartPt
-          : null;
-      if (dynAnchor) {
-        const isDigit = e.key >= '0' && e.key <= '9';
-        const isDecimal = e.key === '.' || e.key === ',';
-        if (isDigit || (isDecimal && !ds.lineLengthInput.includes('.'))) {
-          e.preventDefault();
-          setLineLengthInput((prev) => (prev + (isDecimal ? '.' : e.key)).slice(0, 12));
-          return;
-        }
-        if (e.key === 'Backspace' && ds.lineLengthInput.length > 0) {
-          e.preventDefault();
-          setLineLengthInput((prev) => prev.slice(0, -1));
-          return;
-        }
-        if (e.key === 'Enter') {
-          if (parseFloat(ds.lineLengthInput) > 0) {
-            e.preventDefault();
-            commitDynLength();
-            return;
-          }
-        }
-        if (e.key === 'Escape' && ds.lineLengthInput.length > 0) {
-          e.preventDefault();
-          setLineLengthInput('');
-          return;
-        }
-      }
-
-      // ---- Полилиния / контур: Enter — завершить, Escape — сбросить узлы ----
-      if (ds.activeTool === 'line' && ds.lineMode !== 'line') {
-        if (e.key === 'Enter' && ds.polyPts.length >= 2) {
-          e.preventDefault();
-          commitPolylineRef.current();
-          return;
-        }
-        if (e.key === 'Escape' && ds.polyPts.length > 0) {
-          e.preventDefault();
-          setPolyPts([]);
-          return;
-        }
-      }
-
-      if (e.key === 'Escape') {
-        cancelDrawing();
-        setActiveTool('select');
-        setSelectedObjectId(null);
-        setSelectedObjectIds([]);
-      } else if (e.key === 'Delete' || e.key === 'Backspace') {
-        if (selectedObjectIds.length > 0) {
-          deleteSelectedObjects();
-        }
-      } else if ((code === 'KeyS' || key === 's' || key === 'ы') && !e.ctrlKey && !e.metaKey) {
-        setActiveTool('select');
-      } else if ((code === 'KeyH' || key === 'h' || key === 'р') && !e.ctrlKey && !e.metaKey) {
-        setActiveTool('point');
-      } else if ((code === 'KeyL' || key === 'l' || key === 'д') && !e.ctrlKey && !e.metaKey) {
-        setActiveTool('line');
-      } else if ((code === 'KeyR' || key === 'r' || key === 'к') && !e.ctrlKey && !e.metaKey) {
-        setActiveTool('rectangle');
-      } else if ((code === 'KeyC' || key === 'c' || key === 'с') && !e.ctrlKey && !e.metaKey) {
-        setActiveTool('circle');
-      } else if ((code === 'KeyA' || key === 'a' || key === 'ф') && !e.ctrlKey && !e.metaKey) {
-        setActiveTool('arc');
-      } else if ((code === 'KeyM' || key === 'm' || key === 'ь') && !e.ctrlKey && !e.metaKey) {
-        setActiveTool('measure');
-      } else if ((code === 'KeyF' || key === 'f' || key === 'а') && !e.ctrlKey && !e.metaKey) {
-        fitView();
-      }
+  // Императивная подписка для строки координат курсора в CanvasControls
+  const cursorListenersRef = useRef<Set<(pt: Point2D | null) => void>>(new Set());
+  const cursorSubscribe = useCallback<CursorSubscribeFn>((listener) => {
+    cursorListenersRef.current.add(listener);
+    listener(currentMouseProgPtRef.current);
+    return () => {
+      cursorListenersRef.current.delete(listener);
     };
+  }, []);
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedObjectIds, activeTool, setActiveTool, setSelectedObjectId, setSelectedObjectIds, deleteSelectedObjects, copySelectedObjects, pasteClipboard]);
+  const isDynAnchorActive =
+    activeTool === 'line'
+      ? !!drawStartPt
+      : activeTool === 'arc'
+      ? !!drawArcStartPt && !drawArcEndPt
+      : false;
 
-  const cancelDrawing = () => {
-    setDrawStartPt(null);
-    setDrawArcStartPt(null);
-    setDrawArcEndPt(null);
-    setPolyPts([]);
-    setLineLengthInput('');
-    setMeasureStartPt(null);
-    setMeasureEndPt(null);
-    setSelectionBoxStart(null);
-    setSelectionBoxCurrent(null);
-    setDragMode('none');
-    setLiveDrag({ mode: 'none' });
-    setDragIds([]);
-    setDragObjInitial(null);
-    setActiveSnapInfo(null);
-    setLiveEdit(null);
-    setLiveMeasure(null);
-  };
+  const notifyCursor = useCallback(
+    (pt: Point2D | null) => {
+      currentMouseProgPtRef.current = pt;
+      cursorListenersRef.current.forEach((fn) => fn(pt));
+      onCursorMove?.(pt);
+      if (isDynAnchorActive) {
+        setDynAnchorPx(pt ? worldToCanvas(pt.x, pt.y, pan, zoom) : null);
+      }
+      if (activeTool === 'measure' && measureStartPt && !measureEndPt) {
+        setLiveMeasure(pt ? { start: measureStartPt, end: pt } : null);
+      }
+    },
+    [onCursorMove, isDynAnchorActive, pan, zoom, activeTool, measureStartPt, measureEndPt, setLiveMeasure]
+  );
 
-  // Main canvas render loop
   useEffect(() => {
+    if (!isDynAnchorActive) {
+      setDynAnchorPx(null);
+    } else if (currentMouseProgPtRef.current) {
+      setDynAnchorPx(
+        worldToCanvas(currentMouseProgPtRef.current.x, currentMouseProgPtRef.current.y, pan, zoom)
+      );
+    }
+  }, [isDynAnchorActive, pan, zoom]);
+
+  // ── Базовые объекты для превью модалок и габаритов стола ───────────
+  const modalPreviewObjects = useMemo<CADObject[]>(
+    () =>
+      computeDisplayObjects({
+        objects,
+        liveDrag: { mode: 'none' },
+        liveMove,
+        liveScale,
+        liveRotate,
+      }),
+    [objects, liveMove, liveScale, liveRotate]
+  );
+
+  const isModalLivePreview =
+    Boolean(liveMove && liveMove.ids.length > 0 && (liveMove.dx !== 0 || liveMove.dy !== 0)) ||
+    Boolean(liveScale && liveScale.ids.length > 0 && (liveScale.sx !== 1 || liveScale.sy !== 1)) ||
+    Boolean(liveRotate && liveRotate.ids.length > 0 && Math.abs(liveRotate.angleDeg) > 1e-6);
+
+  const boundsSummary = useMemo(
+    () =>
+      analyzeTrajectoryBounds(
+        isModalLivePreview ? [] : toolpathSegments,
+        machine,
+        modalPreviewObjects
+      ),
+    [isModalLivePreview, toolpathSegments, machine, modalPreviewObjects]
+  );
+
+  // ── Движок отрисовки на rAF ────────────────────────────────────────
+  const rafIdRef = useRef<number | null>(null);
+  const paintNowRef = useRef<() => void>(() => {});
+
+  paintNowRef.current = () => {
     const container = containerRef.current;
     const canvas = canvasRef.current;
     if (!container || !canvas) return;
 
     const width = container.clientWidth;
     const height = container.clientHeight;
-    // Ретина/HiDPI: backing store ×devicePixelRatio, CSS-размер фиксирован, а базовый
-    // трансформ масштабирует рисование — всё дальше идёт в CSS-пикселях как раньше.
     const dpr = window.devicePixelRatio || 1;
-    canvas.width = Math.round(width * dpr);
-    canvas.height = Math.round(height * dpr);
-    canvas.style.width = `${width}px`;
-    canvas.style.height = `${height}px`;
+    const targetW = Math.round(width * dpr);
+    const targetH = Math.round(height * dpr);
+    if (canvas.width !== targetW || canvas.height !== targetH) {
+      canvas.width = targetW;
+      canvas.height = targetH;
+      canvas.style.width = `${width}px`;
+      canvas.style.height = `${height}px`;
+    }
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-    // Clear
-    ctx.clearRect(0, 0, width, height);
+    const liveDrag = liveDragRef.current;
+    const displayObjects =
+      liveDrag.mode === 'none'
+        ? modalPreviewObjects
+        : computeDisplayObjects({ objects, liveDrag, liveMove, liveScale, liveRotate });
 
     drawScene({
       ctx,
@@ -557,29 +269,49 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
       toolpathSegments,
       displayObjects,
       selectedObjectIds,
-      hoveredHandle,
+      hoveredHandle: hoveredHandleRef.current,
       dragMode,
       parallelPreview,
-      selectionBoxStart,
-      selectionBoxCurrent,
+      selectionBoxStart: selectionBoxStartRef.current,
+      selectionBoxCurrent: selectionBoxCurrentRef.current,
       activeTool,
       drawStartPt,
       drawArcStartPt,
       drawArcEndPt,
-      currentMouseProgPt,
+      currentMouseProgPt: currentMouseProgPtRef.current,
       arcMode,
       lineMode,
       polyPts,
       measureStartPt,
       measureEndPt,
-      activeSnapInfo,
+      activeSnapInfo: activeSnapInfoRef.current,
+      gcodeScrollPreview,
+      boundsSummary,
+      trimPreview: trimPreviewRef.current,
+      filletPreview: filletPreviewRef.current,
     });
+  };
+
+  const scheduleDraw = useCallback(() => {
+    if (rafIdRef.current !== null) return;
+    rafIdRef.current = window.requestAnimationFrame(() => {
+      rafIdRef.current = null;
+      paintNowRef.current();
+    });
+  }, []);
+
+  useEffect(() => {
+    if (rafIdRef.current !== null) {
+      window.cancelAnimationFrame(rafIdRef.current);
+      rafIdRef.current = null;
+    }
+    paintNowRef.current();
   }, [
     pan,
     zoom,
     viewportVer,
     gridStep,
-    displayObjects,
+    modalPreviewObjects,
     selectedObjectId,
     selectedObjectIds,
     parallelPreview,
@@ -592,35 +324,223 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
     drawStartPt,
     drawArcStartPt,
     drawArcEndPt,
-    currentMouseProgPt,
     measureStartPt,
     measureEndPt,
-    hoveredHandle,
-    activeSnapInfo,
     dragMode,
-    selectionBoxStart,
-    selectionBoxCurrent,
     machine,
     palette,
     underlay,
     underlayImgVer,
+    gcodeScrollPreview,
+    boundsSummary,
   ]);
 
-  // Handle Press Down (mouse or single touch)
+  useEffect(() => {
+    return () => {
+      if (rafIdRef.current !== null) {
+        window.cancelAnimationFrame(rafIdRef.current);
+      }
+    };
+  }, []);
+
+  // ── Завершение линии / полилинии / DYN-ввода ───────────────────────
+  const drawStateRef = useRef({
+    activeTool,
+    lineMode,
+    drawStartPt,
+    drawArcStartPt,
+    drawArcEndPt,
+    polyPts,
+    lineLengthInput,
+  });
+  drawStateRef.current = {
+    activeTool,
+    lineMode,
+    drawStartPt,
+    drawArcStartPt,
+    drawArcEndPt,
+    polyPts,
+    lineLengthInput,
+  };
+
+  const finishLine = useCallback(
+    (end: Point2D) => {
+      if (!drawStartPt) return;
+      const clamped = clampRayToPosFaces(drawStartPt, end);
+      if (Math.hypot(clamped.x - drawStartPt.x, clamped.y - drawStartPt.y) < 0.1) {
+        setDrawStartPt(null);
+        setLineLengthInput('');
+        return;
+      }
+      addObject({
+        name: `Отрезок ${objects.length + 1}`,
+        type: 'line',
+        startX: drawStartPt.x,
+        startY: drawStartPt.y,
+        endX: clamped.x,
+        endY: clamped.y,
+        depth: 5,
+        operationType: 'cut',
+      });
+      setDrawStartPt(null);
+      setLineLengthInput('');
+    },
+    [drawStartPt, addObject, objects.length]
+  );
+
+  const commitPolyline = useCallback(() => {
+    if (polyPts.length < 2) {
+      setPolyPts([]);
+      return;
+    }
+    const closed = lineMode === 'polygon';
+    addObject({
+      name: `${closed ? 'Контур' : 'Полилиния'} ${objects.length + 1}`,
+      type: 'polyline',
+      points: polyPts,
+      closed,
+      depth: 5,
+      operationType: 'cut',
+    });
+    setPolyPts([]);
+    setLineLengthInput('');
+  }, [polyPts, lineMode, addObject, objects.length]);
+
+  const finishLineRef = useRef(finishLine);
+  finishLineRef.current = finishLine;
+  const commitPolylineRef = useRef(commitPolyline);
+  commitPolylineRef.current = commitPolyline;
+
+  const commitDynLength = useCallback(() => {
+    const ds = drawStateRef.current;
+    const anchor =
+      ds.activeTool === 'line'
+        ? ds.drawStartPt
+        : ds.activeTool === 'arc' && !ds.drawArcEndPt
+        ? ds.drawArcStartPt
+        : null;
+    if (!anchor) return;
+    const L = parseFloat(ds.lineLengthInput);
+    if (!(L > 0)) return;
+    const end = pointFromPolar(anchor, lineDirAngleRef.current, L);
+    if (ds.activeTool === 'arc') {
+      setDrawArcEndPt(clampRayToPosFaces(anchor, end));
+      setLineLengthInput('');
+    } else {
+      finishLineRef.current(end);
+    }
+  }, []);
+
+  const commitDynLengthRef = useRef(commitDynLength);
+  commitDynLengthRef.current = commitDynLength;
+
+  const cancelDrawing = useCallback(() => {
+    setDrawStartPt(null);
+    setDrawArcStartPt(null);
+    setDrawArcEndPt(null);
+    setPolyPts([]);
+    setLineLengthInput('');
+    setMeasureStartPt(null);
+    setMeasureEndPt(null);
+    setFilletFirstPick(null);
+    setHintIfChanged(null);
+    setDragMode('none');
+    trimPreviewRef.current = null;
+    filletPreviewRef.current = null;
+    selectionBoxStartRef.current = null;
+    selectionBoxCurrentRef.current = null;
+    liveDragRef.current = { mode: 'none' };
+    dragIdsRef.current = [];
+    dragObjInitialRef.current = null;
+    activeSnapInfoRef.current = null;
+    hoveredHandleRef.current = null;
+    setLiveEdit(null);
+    setLiveMeasure(null);
+    scheduleDraw();
+  }, [setHintIfChanged, setLiveEdit, setLiveMeasure, scheduleDraw]);
+
+  const cancelDrawingRef = useRef(cancelDrawing);
+  cancelDrawingRef.current = cancelDrawing;
+
+  // Сброс незавершённых состояний при смене инструмента
+  useEffect(() => {
+    if (activeTool !== 'measure') {
+      setMeasureStartPt(null);
+      setMeasureEndPt(null);
+    }
+    if (activeTool !== 'line') setPolyPts([]);
+    if (activeTool !== 'trim') trimPreviewRef.current = null;
+    if (activeTool !== 'fillet') {
+      setFilletFirstPick(null);
+      filletPreviewRef.current = null;
+    }
+    setHintIfChanged(null);
+    if (activeTool !== 'select') hoveredHandleRef.current = null;
+    scheduleDraw();
+  }, [activeTool, setHintIfChanged, scheduleDraw]);
+
+  // Флаг активного жеста для отключения pointer-events у плавающих панелей
+  useEffect(() => {
+    const drawing =
+      (activeTool === 'line' && (lineMode === 'line' ? !!drawStartPt : polyPts.length > 0)) ||
+      (activeTool === 'arc' && !!drawArcStartPt) ||
+      (activeTool === 'rectangle' && !!drawStartPt) ||
+      (activeTool === 'circle' && !!drawStartPt) ||
+      (activeTool === 'measure' && !!measureStartPt && !measureEndPt);
+    setCanvasGrabbing(dragMode !== 'none' || drawing);
+  }, [
+    dragMode,
+    activeTool,
+    lineMode,
+    drawStartPt,
+    drawArcStartPt,
+    polyPts,
+    measureStartPt,
+    measureEndPt,
+    setCanvasGrabbing,
+  ]);
+
+  // Синхронизация линейки в стор при фиксации конечной точки или сбросе
+  useEffect(() => {
+    if (activeTool === 'measure' && measureStartPt) {
+      const end = measureEndPt ?? currentMouseProgPtRef.current;
+      setLiveMeasure(end ? { start: measureStartPt, end } : null);
+    } else {
+      setLiveMeasure(null);
+    }
+  }, [activeTool, measureStartPt, measureEndPt, setLiveMeasure]);
+
+  // Горячие клавиши холста
+  useCanvasKeyboard({
+    drawStateRef,
+    selectedObjectIds,
+    setActiveTool,
+    setSelectedObjectId,
+    setSelectedObjectIds,
+    deleteSelectedObjects,
+    copySelectedObjects,
+    pasteClipboard,
+    setLineLengthInput,
+    setPolyPts,
+    commitDynLengthRef,
+    commitPolylineRef,
+    cancelDrawingRef,
+    fitView,
+  });
+
+  // ── Обработчики указателя (мышь / 1 палец) ─────────────────────────
   const pointerDown = (e: CanvasPointer) => {
     if (!canvasRef.current) return;
     const rect = canvasRef.current.getBoundingClientRect();
     const mousePx = { x: e.clientX - rect.left, y: e.clientY - rect.top };
     const rawWorldPt = canvasToWorld(mousePx.x, mousePx.y, pan, zoom);
 
-    // Middle click / Space or Pan
     if (e.button === 1) {
       setDragMode('pan');
-      setDragStartCanvasPt(mousePx);
+      dragStartCanvasPtRef.current = mousePx;
       return;
     }
 
-    // Smart magnetic snap
     const { point: snapPt, snapInfo } = findMagneticSnapPoint(
       rawWorldPt,
       mousePx,
@@ -634,199 +554,143 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
       undefined,
       machine
     );
-    setActiveSnapInfo(snapInfo);
+    activeSnapInfoRef.current = snapInfo;
 
-    // Active tool drawing dispatch
-    if (activeTool === 'point') {
-      addObject({
-        name: `Отверстие ${objects.length + 1}`,
-        type: 'point',
-        x: snapPt.x,
-        y: snapPt.y,
-        diameter: 11,
-        depth: 33,
-        drillMode: '11mm',
-        operationType: 'drill',
-      });
+    const handledDrawing = handleDrawingToolDown({
+      activeTool,
+      snapPt,
+      shiftKey: e.shiftKey,
+      zoom,
+      objectsCount: objects.length,
+      lineMode,
+      arcMode,
+      drawStartPt,
+      drawArcStartPt,
+      drawArcEndPt,
+      polyPts,
+      measureStartPt,
+      measureEndPt,
+      lineLengthInput,
+      lineDirAngle: lineDirAngleRef.current,
+      addObject,
+      setDrawStartPt,
+      setDrawArcStartPt,
+      setDrawArcEndPt,
+      setPolyPts,
+      setMeasureStartPt,
+      setMeasureEndPt,
+      setLineLengthInput,
+      setLineDirAngle: (ang) => {
+        lineDirAngleRef.current = ang;
+      },
+      finishLine,
+      commitPolyline,
+    });
+    if (handledDrawing) {
+      scheduleDraw();
       return;
     }
 
-    if (activeTool === 'line') {
-      // Под-режимы «Полилиния» / «Контур»: каждый клик добавляет узел ломаной.
-      if (lineMode !== 'line') {
-        const pt = clampToPosFaces(snapPt);
-        if (polyPts.length === 0) {
-          setPolyPts([pt]);
-        } else {
-          const first = polyPts[0];
-          const last = polyPts[polyPts.length - 1];
-          const tol = 14 / zoom;
-          const nearFirst = Math.hypot(pt.x - first.x, pt.y - first.y) <= tol;
-          const nearLast = Math.hypot(pt.x - last.x, pt.y - last.y) <= tol;
-          if (lineMode === 'polygon' && polyPts.length >= 2 && nearFirst) {
-            commitPolylineRef.current(); // замкнуть контур на первый узел
-          } else if (nearLast && polyPts.length >= 2) {
-            commitPolylineRef.current(); // двойной клик = завершить
-          } else {
-            setPolyPts([...polyPts, pt]);
-          }
-        }
+    if (activeTool === 'trim') {
+      activeSnapInfoRef.current = null;
+      const hitId = findObjectBodyHit(objects, rawWorldPt, zoom);
+      if (!hitId) {
+        setHintIfChanged('Кликните по пересечённому отрезку, дуге или окружности');
+        scheduleDraw();
         return;
       }
-      if (!drawStartPt) {
-        setDrawStartPt(clampToPosFaces(snapPt));
-        setLineLengthInput('');
-        setLineDirAngle(0);
+      const trimmed = trimObjectAtPoint(hitId, rawWorldPt);
+      if (trimmed) {
+        trimPreviewRef.current = null;
+        hoveredHandleRef.current = null;
+        setHintIfChanged(null);
       } else {
-        // Priority: typed length > Shift-ortho/45° > free magnetic point.
-        const L = parseFloat(lineLengthInput);
-        let end: Point2D;
-        if (L > 0) {
-          end = pointFromPolar(drawStartPt, lineDirAngle, L);
-        } else if (e.shiftKey) {
-          end = constrainAngle(drawStartPt, snapPt, 45);
-        } else {
-          end = snapPt;
-        }
-        finishLineRef.current(end);
+        setHintIfChanged('Нет пересечений для обрезки этой фигуры');
       }
+      scheduleDraw();
       return;
     }
 
-    if (activeTool === 'rectangle') {
-      if (!drawStartPt) {
-        setDrawStartPt(snapPt);
-      } else {
-        const x = Math.min(drawStartPt.x, snapPt.x);
-        const y = Math.min(drawStartPt.y, snapPt.y);
-        const w = Math.abs(snapPt.x - drawStartPt.x);
-        const h = Math.abs(snapPt.y - drawStartPt.y);
+    if (activeTool === 'fillet') {
+      activeSnapInfoRef.current = null;
+      const hitId = findObjectBodyHit(objects, rawWorldPt, zoom);
+      const hitObj = hitId ? objects.find((o) => o.id === hitId) : null;
 
-        if (w > 0.1 && h > 0.1) {
-          addObject({
-            name: `Прямоугольник ${objects.length + 1}`,
-            type: 'rectangle',
-            x,
-            y,
-            width: w,
-            height: h,
-            depth: 5,
-            operationType: 'cut',
-          });
+      if (!hitObj) {
+        if (filletFirstPick) {
+          setFilletFirstPick(null);
+          filletPreviewRef.current = null;
         }
-        setDrawStartPt(null);
+        setHintIfChanged(null);
+        scheduleDraw();
+        return;
       }
+      if (!filletFirstPick && hitObj.type === 'rectangle') {
+        const res = filletRectangle(hitObj.id, filletRadius);
+        setHintIfChanged(res.ok ? null : res.reason ?? 'Не удалось скруглить прямоугольник');
+        return;
+      }
+      if (hitObj.type !== 'line') {
+        setHintIfChanged('Выберите отрезок или прямоугольник для скругления');
+        return;
+      }
+      if (hitObj.frozen) {
+        setHintIfChanged('Отрезок зафиксирован от изменений');
+        return;
+      }
+      if (!filletFirstPick) {
+        setFilletFirstPick({ id: hitObj.id, clickPt: rawWorldPt });
+        filletPreviewRef.current = null;
+        setHintIfChanged(null);
+        scheduleDraw();
+        return;
+      }
+      if (filletFirstPick.id === hitObj.id) {
+        setFilletFirstPick(null);
+        filletPreviewRef.current = null;
+        setHintIfChanged(null);
+        scheduleDraw();
+        return;
+      }
+      const res = filletLines(
+        filletFirstPick.id,
+        hitObj.id,
+        filletRadius,
+        filletFirstPick.clickPt,
+        rawWorldPt
+      );
+      if (res.ok) {
+        setFilletFirstPick(null);
+        filletPreviewRef.current = null;
+        setHintIfChanged(null);
+      } else {
+        setHintIfChanged(res.reason ?? 'Не удалось построить скругление');
+      }
+      scheduleDraw();
       return;
     }
 
-    if (activeTool === 'circle') {
-      if (!drawStartPt) {
-        setDrawStartPt(snapPt);
-      } else {
-        const r = Math.hypot(snapPt.x - drawStartPt.x, snapPt.y - drawStartPt.y);
-        if (r > 0.5) {
-          addObject({
-            name: `Окружность R${r.toFixed(1)} (${objects.length + 1})`,
-            type: 'circle',
-            centerX: drawStartPt.x,
-            centerY: drawStartPt.y,
-            radius: r,
-            depth: 5,
-            operationType: 'cut',
-          });
-        }
-        setDrawStartPt(null);
-      }
-      return;
-    }
-
-    if (activeTool === 'arc') {
-      if (!drawArcStartPt) {
-        setDrawArcStartPt(clampToPosFaces(snapPt));
-        setLineLengthInput('');
-        setLineDirAngle(0);
-      } else if (!drawArcEndPt) {
-        // Вторая точка: для 'center' — это ЦЕНТР (просто магнитная точка),
-        // для '3pt'/'bulge' — конец хорды с приоритетом: введённая длина > Shift 90°/45°.
-        let end: Point2D;
-        const L = parseFloat(lineLengthInput);
-        if (arcMode === 'center') {
-          end = snapPt;
-        } else if (L > 0) {
-          end = pointFromPolar(drawArcStartPt, lineDirAngle, L);
-        } else if (e.shiftKey) {
-          end = constrainAngle(drawArcStartPt, snapPt, 45);
-        } else {
-          end = snapPt;
-        }
-        setDrawArcEndPt(clampRayToPosFaces(drawArcStartPt, end));
-        setLineLengthInput('');
-      } else {
-        // Третья точка = «живая» мышь. Интерпретация зависит от режима (см. buildArc).
-        const arcData = buildArc(arcMode, drawArcStartPt, drawArcEndPt, snapPt);
-        if (arcData) {
-          addObject({
-            name: `Дуга R${arcData.radius.toFixed(1)} (${objects.length + 1})`,
-            type: 'arc',
-            startX: arcData.startX,
-            startY: arcData.startY,
-            endX: arcData.endX,
-            endY: arcData.endY,
-            centerX: arcData.centerX,
-            centerY: arcData.centerY,
-            radius: arcData.radius,
-            clockwise: arcData.clockwise,
-            depth: 5,
-            operationType: 'cut',
-          });
-        }
-        setDrawArcStartPt(null);
-        setDrawArcEndPt(null);
-      }
-      return;
-    }
-
-    if (activeTool === 'measure') {
-      if (!measureStartPt || (measureStartPt && measureEndPt)) {
-        setMeasureStartPt(snapPt);
-        setMeasureEndPt(null);
-      } else {
-        setMeasureEndPt(snapPt);
-      }
-      return;
-    }
-
-    // SELECT TOOL: Handle dragging or Object body dragging or Selection Box
+    // Инструмент «Выбор»: гриф → тело фигуры → подложка → рамочное выделение
     if (activeTool === 'select') {
-      // 1. Check Handle Hit
       const handleHit = findHandleHit(objects, selectedObjectIds, mousePx, pan, zoom);
       if (handleHit) {
         const targetObj = objects.find((o) => o.id === handleHit.objectId);
         if (targetObj) {
-          // Если фигура с этим грифом уже в выделении — оставляем группу нетронутой
-          // (переставив якорь в конец, чтобы панель показывала именно её координаты).
-          // Иначе — схлопываем выделение до этой фигуры, как и при клике по телу.
-          let group: string[];
-          if (selectedObjectIds.includes(targetObj.id)) {
-            group = [...selectedObjectIds.filter((id) => id !== targetObj.id), targetObj.id];
-            setSelectedObjectIds(group);
-          } else {
-            group = [targetObj.id];
-            setSelectedObjectIds(group);
-          }
-          // Замороженные не участвуют в групповом перемещении узла.
+          const group = selectedObjectIds.includes(targetObj.id)
+            ? [...selectedObjectIds.filter((id) => id !== targetObj.id), targetObj.id]
+            : [targetObj.id];
+          setSelectedObjectIds(group);
           const frozen = new Set(objects.filter((o) => o.frozen).map((o) => o.id));
           setDragMode(handleHit.type);
-          setDragStartCanvasPt(mousePx);
-          setDragStartWorldPt(snapPt);
-          setDragObjInitial({ ...targetObj });
-          setDragIds(group.filter((id) => !frozen.has(id)));
-          setLiveDrag({ mode: 'none' });
+          dragStartCanvasPtRef.current = mousePx;
+          dragStartWorldPtRef.current = snapPt;
+          dragObjInitialRef.current = { ...targetObj };
+          dragIdsRef.current = group.filter((id) => !frozen.has(id));
+          liveDragRef.current = { mode: 'none' };
           return;
         }
       }
 
-      // 2. Check Object Body Hit
       const hitObjId = findObjectBodyHit(objects, rawWorldPt, zoom);
       if (hitObjId) {
         let currentSelectedIds = selectedObjectIds;
@@ -835,123 +699,65 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
           currentSelectedIds = selectedObjectIds.includes(hitObjId)
             ? selectedObjectIds.filter((id) => id !== hitObjId)
             : [...selectedObjectIds, hitObjId];
-        } else {
-          if (!selectedObjectIds.includes(hitObjId)) {
-            setSelectedObjectIds([hitObjId]);
-            currentSelectedIds = [hitObjId];
-          }
+        } else if (!selectedObjectIds.includes(hitObjId)) {
+          setSelectedObjectIds([hitObjId]);
+          currentSelectedIds = [hitObjId];
         }
 
-        // Body drag = pure translation of the selected set. Frozen figures stay
-        // selectable (to be unfrozen from Свойства) but never move: exclude them here.
         const frozenIds = new Set(objects.filter((o) => o.frozen).map((o) => o.id));
         setDragMode('object');
-        setDragStartCanvasPt(mousePx);
-        setDragStartWorldPt(rawWorldPt);
-        setDragObjInitial(null);
-        setDragIds(currentSelectedIds.filter((id) => !frozenIds.has(id)));
-        setLiveDrag({ mode: 'none' });
-      } else if (underlay.src && underlay.visible && !underlay.frozen) {
-        // 3. Подложка (фоновая картинка): сначала угол-ручка изменения размера, потом тело
-        const uRect = getUnderlayCanvasRect(underlay, pan, zoom);
-        const hs = UNDERLAY_HANDLE_PX;
-        const hx = uRect.x + uRect.w;
-        const hy = uRect.y + uRect.h;
-        if (
-          mousePx.x >= hx - hs &&
-          mousePx.x <= hx + hs &&
-          mousePx.y >= hy - hs &&
-          mousePx.y <= hy + hs
-        ) {
-          underlayDragRef.current = {
-            mode: 'resize',
-            startWorld: rawWorldPt,
-            origX: underlay.x,
-            origY: underlay.y,
-            origW: underlay.w,
-            origH: underlay.h,
-          };
-          return;
-        }
-        if (
-          mousePx.x >= uRect.x &&
-          mousePx.x <= uRect.x + uRect.w &&
-          mousePx.y >= uRect.y &&
-          mousePx.y <= uRect.y + uRect.h
-        ) {
-          underlayDragRef.current = {
-            mode: 'move',
-            startWorld: rawWorldPt,
-            origX: underlay.x,
-            origY: underlay.y,
-          };
-          return;
-        }
-        // Промах мимо картинки — обычное рамочное выделение
-        if (!e.shiftKey) {
-          setSelectedObjectIds([]);
-        }
-        setDragMode('selection_box');
-        setSelectionBoxStart(mousePx);
-        setSelectionBoxCurrent(mousePx);
-        setDragStartCanvasPt(mousePx);
-      } else {
-        // Clicked empty area
-        if (!e.shiftKey) {
-          setSelectedObjectIds([]);
-        }
-        setDragMode('selection_box');
-        setSelectionBoxStart(mousePx);
-        setSelectionBoxCurrent(mousePx);
-        setDragStartCanvasPt(mousePx);
+        dragStartCanvasPtRef.current = mousePx;
+        dragStartWorldPtRef.current = rawWorldPt;
+        dragObjInitialRef.current = null;
+        dragIdsRef.current = currentSelectedIds.filter((id) => !frozenIds.has(id));
+        liveDragRef.current = { mode: 'none' };
+        return;
       }
+
+      if (tryStartUnderlayDrag(mousePx, rawWorldPt, pan, zoom)) {
+        return;
+      }
+
+      if (!e.shiftKey) setSelectedObjectIds([]);
+      setDragMode('selection_box');
+      selectionBoxStartRef.current = mousePx;
+      selectionBoxCurrentRef.current = mousePx;
+      dragStartCanvasPtRef.current = mousePx;
+      scheduleDraw();
     }
   };
 
-  // Handle Move (mouse drag or single-finger drag)
   const pointerMove = (e: CanvasPointer) => {
     if (!canvasRef.current) return;
     const rect = canvasRef.current.getBoundingClientRect();
     const mousePx = { x: e.clientX - rect.left, y: e.clientY - rect.top };
     const rawWorldPt = canvasToWorld(mousePx.x, mousePx.y, pan, zoom);
 
-    // 0. Подложка: перетаскивание / изменение размера фонового чертежа
-    const uDrag = underlayDragRef.current;
-    if (uDrag) {
-      if (uDrag.mode === 'move') {
-        const dx = rawWorldPt.x - uDrag.startWorld.x;
-        const dy = rawWorldPt.y - uDrag.startWorld.y;
-        updateUnderlay({ x: uDrag.origX + dx, y: uDrag.origY + dy });
-      } else {
-        const w = Math.max(1, rawWorldPt.x - uDrag.origX);
-        const h = Math.max(1, rawWorldPt.y - uDrag.origY);
-        updateUnderlay({ w, h });
-      }
-      setCurrentMouseProgPt(rawWorldPt);
-      onCursorMove?.(rawWorldPt);
+    // 0. Подложка
+    if (handleUnderlayMove(rawWorldPt)) {
+      notifyCursor(rawWorldPt);
       return;
     }
 
-    // 1. Pan Mode
+    // 1. Панорамирование
     if (dragMode === 'pan') {
-      const dx = mousePx.x - dragStartCanvasPt.x;
-      const dy = mousePx.y - dragStartCanvasPt.y;
+      const dx = mousePx.x - dragStartCanvasPtRef.current.x;
+      const dy = mousePx.y - dragStartCanvasPtRef.current.y;
       setPan((prev) => ({ x: prev.x + dx, y: prev.y + dy }));
-      setDragStartCanvasPt(mousePx);
-      setCurrentMouseProgPt(rawWorldPt);
-      onCursorMove?.(rawWorldPt);
+      dragStartCanvasPtRef.current = mousePx;
+      notifyCursor(rawWorldPt);
       return;
     }
 
-    // 1b. Selection Box Mode
+    // 1b. Рамка выделения
     if (dragMode === 'selection_box') {
-      setSelectionBoxCurrent(mousePx);
-      setCurrentMouseProgPt(rawWorldPt);
-      onCursorMove?.(rawWorldPt);
+      selectionBoxCurrentRef.current = mousePx;
+      notifyCursor(rawWorldPt);
+      scheduleDraw();
       return;
     }
 
-    // 2. Magnetic Snap Update
+    // 2. Магнитная привязка
     const { point: snapPt, snapInfo } = findMagneticSnapPoint(
       rawWorldPt,
       mousePx,
@@ -965,10 +771,8 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
       dragMode,
       machine
     );
-    setActiveSnapInfo(snapInfo);
+    activeSnapInfoRef.current = snapInfo;
 
-    // Rubber-band for the line and the arc's start→end chord: track direction,
-    // honour Shift 45°-polars, and reflect a typed distance live in the preview.
     let previewPt = snapPt;
     const dynAnchor =
       activeTool === 'line'
@@ -983,120 +787,115 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
         ang = Math.atan2(constrained.y - dynAnchor.y, constrained.x - dynAnchor.x);
         previewPt = constrained;
       }
-      setLineDirAngle(ang);
+      lineDirAngleRef.current = ang;
       const L = parseFloat(lineLengthInput);
-      if (L > 0) {
-        previewPt = pointFromPolar(dynAnchor, ang, L);
-      }
-      // Резинка не выходит за грани +X/+Y: конец «упирается» в ближайшую грань.
+      if (L > 0) previewPt = pointFromPolar(dynAnchor, ang, L);
       previewPt = clampRayToPosFaces(dynAnchor, previewPt);
     }
-    setCurrentMouseProgPt(previewPt);
-    onCursorMove?.(previewPt);
+    notifyCursor(previewPt);
 
-    // 3. Handle Dragging — update the live overlay only (no store writes per frame)
+    // 3. Активное перетаскивание объекта или узла (только ref + rAF — без мутаций стора)
     if (dragMode !== 'none') {
+      const dragIds = dragIdsRef.current;
       if (dragMode === 'object' && dragIds.length > 0) {
-        // Shift = вести перемещение строго по 90° (без 45°) относительно точки захвата.
         const anchorPt = e.shiftKey
-          ? constrainAngle(dragStartWorldPt, snapPt, 90)
+          ? constrainAngle(dragStartWorldPtRef.current, snapPt, 90)
           : snapPt;
-        const dx = anchorPt.x - dragStartWorldPt.x;
-        const dy = anchorPt.y - dragStartWorldPt.y;
-        setLiveDrag({ mode: 'translate', dx, dy, ids: dragIds });
-      } else if (dragIds.length > 0 && dragObjInitial) {
+        const dx = anchorPt.x - dragStartWorldPtRef.current.x;
+        const dy = anchorPt.y - dragStartWorldPtRef.current.y;
+        liveDragRef.current = { mode: 'translate', dx, dy, ids: dragIds };
+      } else if (dragIds.length > 0 && dragObjInitialRef.current) {
         const items = computeNodeEditItems({
           objects,
           dragIds,
-          base: dragObjInitial,
+          base: dragObjInitialRef.current,
           dragMode,
           snapPt,
           shift: e.shiftKey,
           ctrl: e.ctrlKey,
           zoom,
         });
-        if (items) setLiveDrag({ mode: 'edit', items });
+        if (items) {
+          liveDragRef.current = { mode: 'edit', items };
+          if (items.length > 0) {
+            const anchor = items.find((i) => i.id === selectedObjectId) ?? items[0];
+            setLiveEdit({ id: anchor.id, patch: anchor.patch });
+          }
+        }
       }
+      scheduleDraw();
       return;
     }
 
-    // 4. Hover detection when not dragging
-    if (activeTool === 'select') {
-      const handleHit = findHandleHit(objects, selectedObjectIds, mousePx, pan, zoom);
-      if (handleHit) {
-        setHoveredHandle({ objectId: handleHit.objectId, type: handleHit.type });
-      } else {
-        const bodyHitId = findObjectBodyHit(objects, rawWorldPt, zoom);
-        if (bodyHitId) {
-          setHoveredHandle({ objectId: bodyHitId, type: 'body' });
-        } else {
-          setHoveredHandle(null);
-        }
-      }
+    // 4. Подсветка наведения (trim / fillet / select)
+    const hover = evaluateToolHover({
+      activeTool,
+      objects,
+      selectedObjectIds,
+      mousePx,
+      rawWorldPt,
+      pan,
+      zoom,
+      filletFirstPick,
+      filletRadius,
+    });
+    if (hover) {
+      if (hover.clearSnap) activeSnapInfoRef.current = null;
+      hoveredHandleRef.current = hover.hoveredHandle;
+      trimPreviewRef.current = hover.trimPreview;
+      filletPreviewRef.current = hover.filletPreview;
+      if (hover.statusHint !== undefined) setHintIfChanged(hover.statusHint);
     }
+    scheduleDraw();
   };
 
   const pointerUp = (e: CanvasPointer) => {
-    // Подложка: геометрия уже пишется в стор на каждый move — просто завершаем жест.
-    if (underlayDragRef.current) {
-      underlayDragRef.current = null;
-      return;
-    }
+    if (handleUnderlayUp()) return;
+
+    const liveDrag = liveDragRef.current;
     if (dragMode === 'selection_box') {
-      if (selectionBoxStart && selectionBoxCurrent) {
-        const distPx = Math.hypot(
-          selectionBoxCurrent.x - selectionBoxStart.x,
-          selectionBoxCurrent.y - selectionBoxStart.y
-        );
+      const boxStart = selectionBoxStartRef.current;
+      const boxCurr = selectionBoxCurrentRef.current;
+      if (boxStart && boxCurr) {
+        const distPx = Math.hypot(boxCurr.x - boxStart.x, boxCurr.y - boxStart.y);
         if (distPx > 3) {
-          const w1 = canvasToWorld(selectionBoxStart.x, selectionBoxStart.y, pan, zoom);
-          const w2 = canvasToWorld(selectionBoxCurrent.x, selectionBoxCurrent.y, pan, zoom);
-          const box = {
+          const w1 = canvasToWorld(boxStart.x, boxStart.y, pan, zoom);
+          const w2 = canvasToWorld(boxCurr.x, boxCurr.y, pan, zoom);
+          const matchedIds = findObjectsInBox(objects, {
             minX: Math.min(w1.x, w2.x),
             maxX: Math.max(w1.x, w2.x),
             minY: Math.min(w1.y, w2.y),
             maxY: Math.max(w1.y, w2.y),
-          };
-
-          const matchedIds = findObjectsInBox(objects, box);
-          if (e.shiftKey) {
-            const combined = Array.from(new Set([...selectedObjectIds, ...matchedIds]));
-            setSelectedObjectIds(combined);
-          } else {
-            setSelectedObjectIds(matchedIds);
-          }
+          });
+          setSelectedObjectIds(
+            e.shiftKey ? Array.from(new Set([...selectedObjectIds, ...matchedIds])) : matchedIds
+          );
         }
       }
-      setSelectionBoxStart(null);
-      setSelectionBoxCurrent(null);
+      selectionBoxStartRef.current = null;
+      selectionBoxCurrentRef.current = null;
     } else if (liveDrag.mode === 'translate') {
-      // Commit the whole group translation in ONE store mutation (one history push + one
-      // G-code regen), instead of one per selected object per mousemove. `objects` still
-      // holds the pre-drag originals, so applying the full delta here is correct.
       const idset = new Set(liveDrag.ids);
       const updates = objects
         .filter((o) => idset.has(o.id))
-        .map((o) => ({ id: o.id, patch: shiftCADObject(o, liveDrag.dx, liveDrag.dy) }));
+        .map((o) => ({ id: o.id, patch: translateCADObject(o, liveDrag.dx, liveDrag.dy) }));
       if (updates.length > 0) updateObjectsBulk(updates, true);
     } else if (liveDrag.mode === 'edit') {
-      // Коммитим групповое редактирование узлов одной историей: либо один совпадающий
-      // узел (соло-фигура), либо сразу пачка узлов у всех выделенных фигур.
       if (liveDrag.items.length > 0) updateObjectsBulk(liveDrag.items, true);
+      setLiveEdit(null);
     }
-    // pan / plain click (liveDrag.mode === 'none'): no store write, no history entry.
 
     setDragMode('none');
-    setDragObjInitial(null);
-    setDragIds([]);
-    setLiveDrag({ mode: 'none' });
+    dragObjInitialRef.current = null;
+    dragIdsRef.current = [];
+    liveDragRef.current = { mode: 'none' };
+    scheduleDraw();
   };
 
-  // Свежий pointerUp для window-страховки (замыкание всегда с актуальным liveDrag/objects).
-  const pointerUpRef = useRef<(e: CanvasPointer) => void>(() => {});
+  const pointerUpRef = useRef(pointerUp);
   pointerUpRef.current = pointerUp;
 
-  // Страховка: если мышь отпустили вне холста (например, над шапкой), завершаем жест,
-  // чтобы перетаскивание не «залипло». Отпускание прямо на холсте обрабатывает onMouseUp.
+  // Страховка: если мышь отпустили вне холста, завершаем жест без залипания
   useEffect(() => {
     if (dragMode === 'none') return;
     const onWinUp = (ev: MouseEvent) => {
@@ -1113,254 +912,221 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({ onCursorMove }) => {
   }, [dragMode]);
 
   const handleMouseLeave = () => {
-    setCurrentMouseProgPt(null);
-    setActiveSnapInfo(null);
-    onCursorMove?.(null);
+    activeSnapInfoRef.current = null;
+    notifyCursor(null);
+    scheduleDraw();
   };
 
-  const handleWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
-    e.preventDefault();
-    if (!canvasRef.current) return;
-
-    const rect = canvasRef.current.getBoundingClientRect();
-    const mousePx = { x: e.clientX - rect.left, y: e.clientY - rect.top };
-
-    const zoomFactor = e.deltaY < 0 ? 1.15 : 0.85;
-    const newZoom = Math.min(Math.max(zoom * zoomFactor, 0.1), 15.0);
-
-    const newPanX = mousePx.x - (mousePx.x - pan.x) * (newZoom / zoom);
-    const newPanY = mousePx.y - (mousePx.y - pan.y) * (newZoom / zoom);
-
-    setZoom(newZoom);
-    setPan({ x: newPanX, y: newPanY });
-  };
-
-  // ───────────────────────── Тач-жесты (телефон) ─────────────────────────
-  // 1 палец = курсор (тап = клик,.drag = перетаскивание), 2 пальца = щипок-зум + панорама.
-  const isMobile = useIsMobile();
-  const touchModeRef = useRef<'none' | 'single' | 'pinch'>('none');
-  const lastTouchTsRef = useRef(0);
-  const pinchRef = useRef<{
-    startDist: number;
-    startMid: Point2D; // в px относительно канваса
-    startZoom: number;
-    startPan: Point2D;
-  } | null>(null);
-
-  // Отменить незавершённое одиночное перетаскивание при переходе к щипку (без коммита).
   const cancelPointerInteraction = () => {
-    underlayDragRef.current = null;
+    cancelUnderlayDrag();
     setDragMode('none');
-    setLiveDrag({ mode: 'none' });
-    setSelectionBoxStart(null);
-    setSelectionBoxCurrent(null);
-    setDragIds([]);
-    setDragObjInitial(null);
+    liveDragRef.current = { mode: 'none' };
+    selectionBoxStartRef.current = null;
+    selectionBoxCurrentRef.current = null;
+    dragIdsRef.current = [];
+    dragObjInitialRef.current = null;
+    setLiveEdit(null);
+    scheduleDraw();
   };
 
-  const handleTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
-    lastTouchTsRef.current = Date.now();
-    if (e.touches.length >= 2) {
-      touchModeRef.current = 'pinch';
-      cancelPointerInteraction();
-      if (!canvasRef.current) return;
-      const rect = canvasRef.current.getBoundingClientRect();
-      const t0 = e.touches[0];
-      const t1 = e.touches[1];
-      pinchRef.current = {
-        startDist: Math.max(Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY), 1),
-        startMid: {
-          x: (t0.clientX + t1.clientX) / 2 - rect.left,
-          y: (t0.clientY + t1.clientY) / 2 - rect.top,
-        },
-        startZoom: zoom,
-        startPan: pan,
-      };
-      return;
-    }
-    if (e.touches.length === 1) {
-      touchModeRef.current = 'single';
-      const t = e.touches[0];
-      pointerDown({ clientX: t.clientX, clientY: t.clientY, shiftKey: false, ctrlKey: false, button: 0 });
-    }
-  };
+  const {
+    handleTouchStart,
+    handleTouchMove,
+    handleTouchEnd,
+    handleMouseDown,
+    handleMouseMove,
+    handleMouseUp,
+  } = useCanvasGestures({
+    canvasRef,
+    pan,
+    zoom,
+    setPan,
+    setZoom,
+    onPointerDown: pointerDown,
+    onPointerMove: pointerMove,
+    onPointerUp: pointerUp,
+    onCancelInteraction: cancelPointerInteraction,
+    onTouchPointerCleared: () => {
+      activeSnapInfoRef.current = null;
+      notifyCursor(null);
+      scheduleDraw();
+    },
+  });
 
-  const handleTouchMove = (e: React.TouchEvent<HTMLCanvasElement>) => {
-    lastTouchTsRef.current = Date.now();
-    if (touchModeRef.current === 'pinch') {
-      const g = pinchRef.current;
-      if (!g || e.touches.length < 2 || !canvasRef.current) return;
-      const rect = canvasRef.current.getBoundingClientRect();
-      const t0 = e.touches[0];
-      const t1 = e.touches[1];
-      const dist = Math.max(Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY), 1);
-      const mid = {
-        x: (t0.clientX + t1.clientX) / 2 - rect.left,
-        y: (t0.clientY + t1.clientY) / 2 - rect.top,
-      };
-      const newZoom = Math.min(Math.max(g.startZoom * (dist / g.startDist), 0.1), 15.0);
-      const k = newZoom / g.startZoom;
-      setZoom(newZoom);
-      setPan({
-        x: mid.x - (g.startMid.x - g.startPan.x) * k,
-        y: mid.y - (g.startMid.y - g.startPan.y) * k,
-      });
-      return;
-    }
-    if (touchModeRef.current === 'single' && e.touches.length === 1) {
-      const t = e.touches[0];
-      pointerMove({ clientX: t.clientX, clientY: t.clientY, shiftKey: false, ctrlKey: false });
-    }
-  };
-
-  const handleTouchEnd = (e: React.TouchEvent<HTMLCanvasElement>) => {
-    lastTouchTsRef.current = Date.now();
-    if (touchModeRef.current === 'pinch') {
-      if (e.touches.length === 0) {
-        touchModeRef.current = 'none';
-        pinchRef.current = null;
-      }
-      // Один палец остался после щипка — ждём полного отпускания, чтобы не «прыгало».
-      return;
-    }
-    if (touchModeRef.current === 'single' && e.touches.length === 0) {
-      touchModeRef.current = 'none';
-      const t = e.changedTouches[0];
-      if (t) {
-        pointerUp({ clientX: t.clientX, clientY: t.clientY, shiftKey: false, ctrlKey: false });
-      }
-      setCurrentMouseProgPt(null);
-      setActiveSnapInfo(null);
-    }
-  };
-
-  // Браузер после тапа генерирует «синтетические» mouse-события — глушим их,
-  // чтобы каждый жест не выполнился дважды.
-  const touchedRecently = () => Date.now() - lastTouchTsRef.current < 1500;
-  const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (touchedRecently()) return;
-    // Правая кнопка — не «клик»: её обрабатывает onContextMenu (меню фигуры).
-    if (e.button === 2) return;
-    pointerDown(e);
-  };
-  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (touchedRecently()) return;
-    pointerMove(e);
-  };
-  const handleMouseUp = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (touchedRecently()) return;
-    pointerUp(e);
-  };
-
-  // Мобильная шторка открыта — поднимаем плавающую панель координат/масштаба над ней
-  // (шторка занимает нижние 54% области холста, см. App.tsx).
   const controlsBottomStyle =
-    isMobile && mobileSheet !== 'none' ? { bottom: 'calc(54% + 10px)' } : undefined;
+    isMobile && mobileSheet !== 'none' ? { bottom: 'calc(58% + 10px)' } : undefined;
 
-  // Экранная точка конца текущего отрезка/хорды — чтобы модуль длины висел у самого отрезка.
-  const dynAnchorPx =
-    currentMouseProgPt &&
-    (activeTool === 'line'
-      ? !!drawStartPt
-      : activeTool === 'arc'
-      ? !!drawArcStartPt && !drawArcEndPt
-      : false)
-      ? worldToCanvas(currentMouseProgPt.x, currentMouseProgPt.y, pan, zoom)
-      : null;
+  const controlsEl = (
+    <CanvasControls
+      cursorSubscribe={cursorSubscribe}
+      snapToGrid={snapToGrid}
+      objectSnapEnabled={objectSnapEnabled}
+      showTrajectory={viewMode === 'preview'}
+      gridStep={gridStep}
+      zoom={zoom}
+      onToggleTrajectory={() => setViewMode(viewMode === 'preview' ? 'edit' : 'preview')}
+      onToggleGridSnap={() => setSnapToGrid(!snapToGrid)}
+      onGridStepChange={setGridStep}
+      onToggleObjectSnap={() => setObjectSnapEnabled(!objectSnapEnabled)}
+      onZoomOut={() => zoomAtCenter(zoom / 1.25)}
+      onZoomIn={() => zoomAtCenter(zoom * 1.25)}
+      onZoomReset={() => zoomAtCenter(1.0)}
+      onFitView={fitView}
+      bottomStyle={controlsBottomStyle}
+      docked={!isMobile}
+    />
+  );
 
   return (
-    <div
-      ref={containerRef}
-      className="relative w-full h-full bg-[#f1f5f9] dark:bg-[#0f172a] overflow-hidden select-none"
-      onContextMenu={(e) => {
-        e.preventDefault();
-        setCtxMenu(null);
-        // Меню фигур — прерогатива инструмента «выбор»: в середине рисования
-        // (незавершённая линия/дуга) правый клик ничего не открывает.
-        if (activeTool !== 'select' || !canvasRef.current) return;
-        const rect = canvasRef.current.getBoundingClientRect();
-        const mousePx = { x: e.clientX - rect.left, y: e.clientY - rect.top };
-        const worldPt = canvasToWorld(mousePx.x, mousePx.y, pan, zoom);
-        const hitId = findObjectBodyHit(objects, worldPt, zoom);
-        if (!hitId) return;
-        if (!selectedObjectIds.includes(hitId)) setSelectedObjectIds([hitId]);
-        setCtxMenu({ x: e.clientX, y: e.clientY });
-      }}
-    >
-      <canvas
-        ref={canvasRef}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseLeave}
-        onWheel={handleWheel}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-        onTouchCancel={handleTouchEnd}
-        className="w-full h-full cursor-crosshair block"
-        style={{ touchAction: 'none' }}
-      />
-
-      {ctxMenu && (
-        <ShapeContextMenu x={ctxMenu.x} y={ctxMenu.y} onClose={() => setCtxMenu(null)} />
-      )}
-
-      <CanvasHud
-        activeTool={activeTool}
-        arcMode={arcMode}
-        lineMode={lineMode}
-        polyPtsCount={polyPts.length}
-        drawStartPt={drawStartPt}
-        drawArcStartPt={drawArcStartPt}
-        drawArcEndPt={drawArcEndPt}
-        measureStartPt={measureStartPt}
-        measureEndPt={measureEndPt}
-        lineLengthInput={lineLengthInput}
-        dynAnchorPx={dynAnchorPx}
-        onCancelDraw={cancelDrawing}
-        onCommitPolyline={commitPolyline}
-        isMobile={isMobile}
-        onLineLengthChange={setLineLengthInput}
-        onDynCommit={commitDynLength}
-      />
-
-      {activeTool === 'arc' && (
-        <ArcModeSelector
-          value={arcMode}
-          onChange={(mode) => {
-            // Смена способа при незавершённом построении — сбрасываем накопленные точки.
-            setDrawArcStartPt(null);
-            setDrawArcEndPt(null);
-            setLineLengthInput('');
-            setArcMode(mode);
-          }}
+    <div className="flex flex-col w-full h-full bg-canvas overflow-hidden select-none">
+      <div
+        ref={containerRef}
+        className="relative flex-1 min-h-0 bg-canvas overflow-hidden"
+        onContextMenu={(e) => {
+          e.preventDefault();
+          setCtxMenu(null);
+          if (activeTool !== 'select' || !canvasRef.current) return;
+          const rect = canvasRef.current.getBoundingClientRect();
+          const mousePx = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+          const worldPt = canvasToWorld(mousePx.x, mousePx.y, pan, zoom);
+          const hitId = findObjectBodyHit(objects, worldPt, zoom);
+          if (!hitId) return;
+          if (!selectedObjectIds.includes(hitId)) setSelectedObjectIds([hitId]);
+          setCtxMenu({ x: e.clientX, y: e.clientY });
+        }}
+      >
+        <canvas
+          ref={canvasRef}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseLeave}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          onTouchCancel={handleTouchEnd}
+          className="w-full h-full cursor-crosshair block"
+          style={{ touchAction: 'none' }}
         />
-      )}
 
-      {activeTool === 'line' && (
-        <LineModeSelector
-          value={lineMode}
-          onChange={(mode) => {
-            // Смена способа — сбрасываем и одиночную линию, и незавершённую ломаную.
-            setDrawStartPt(null);
-            setPolyPts([]);
-            setLineLengthInput('');
-            setLineMode(mode);
+        {ctxMenu && (
+          <ShapeContextMenu x={ctxMenu.x} y={ctxMenu.y} onClose={() => setCtxMenu(null)} />
+        )}
+
+        {/* Стартовая подсказка на пустом чертеже — исчезает сразу после выбора инструмента или первой фигуры */}
+        {objects.length === 0 && activeTool === 'select' && dragMode === 'none' && (
+          <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center p-4">
+            <div className="pointer-events-auto bg-surface/92 backdrop-blur-md border border-line rounded-xl px-5 py-4 shadow-md max-w-sm w-full text-center space-y-3">
+              <div>
+                <div className="text-sm font-semibold text-fg">Чистый лист готов к работе</div>
+                <p className="text-xs text-muted mt-0.5 leading-snug">
+                  Начните рисовать деталь или загрузите готовый файл DXF / SVG
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center justify-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setActiveTool('line')}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-fg hover:opacity-90 text-xs font-semibold transition-opacity whitespace-nowrap cursor-pointer"
+                >
+                  <LineDotRightHorizontal className="w-3.5 h-3.5 shrink-0" />
+                  <span>Линия</span>
+                </button>
+                {isRailMachine(machine) ? (
+                  <button
+                    type="button"
+                    onClick={() => setActiveTool('point')}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-subtle hover:bg-surface-hover border border-line text-fg text-xs font-medium transition-colors whitespace-nowrap cursor-pointer"
+                  >
+                    <CircleDot className="w-3.5 h-3.5 text-muted shrink-0" />
+                    <span>Отверстие</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setActiveTool('rectangle')}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-subtle hover:bg-surface-hover border border-line text-fg text-xs font-medium transition-colors whitespace-nowrap cursor-pointer"
+                  >
+                    <Square className="w-3.5 h-3.5 text-muted shrink-0" />
+                    <span>Прямоугольник</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setShapeDialog({ kind: 'import' })}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-subtle hover:bg-surface-hover border border-line text-fg text-xs font-medium transition-colors whitespace-nowrap cursor-pointer"
+                >
+                  <FileUp className="w-3.5 h-3.5 text-muted shrink-0" />
+                  <span>Импорт DXF/SVG</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <CanvasHud
+          activeTool={activeTool}
+          arcMode={arcMode}
+          lineMode={lineMode}
+          polyPtsCount={polyPts.length}
+          drawStartPt={drawStartPt}
+          drawArcStartPt={drawArcStartPt}
+          drawArcEndPt={drawArcEndPt}
+          measureStartPt={measureStartPt}
+          measureEndPt={measureEndPt}
+          lineLengthInput={lineLengthInput}
+          dynAnchorPx={dynAnchorPx}
+          filletFirstLineActive={Boolean(filletFirstPick)}
+          filletRadius={filletRadius}
+          toolStatusHint={toolStatusHint}
+          onCancelDraw={() => {
+            if (activeTool === 'fillet' && filletFirstPick) {
+              setFilletFirstPick(null);
+              filletPreviewRef.current = null;
+              setHintIfChanged(null);
+              scheduleDraw();
+              return;
+            }
+            cancelDrawing();
+            if (activeTool === 'trim' || activeTool === 'fillet') {
+              setActiveTool('select');
+            }
           }}
+          onCommitPolyline={commitPolyline}
+          isMobile={isMobile}
+          onLineLengthChange={setLineLengthInput}
+          onDynCommit={commitDynLength}
+          modeSelector={
+            activeTool === 'arc' ? (
+              <ArcModeSelector
+                value={arcMode}
+                onChange={(mode) => {
+                  setDrawArcStartPt(null);
+                  setDrawArcEndPt(null);
+                  setLineLengthInput('');
+                  setArcMode(mode);
+                }}
+              />
+            ) : activeTool === 'line' ? (
+              <LineModeSelector
+                value={lineMode}
+                onChange={(mode) => {
+                  setDrawStartPt(null);
+                  setPolyPts([]);
+                  setLineLengthInput('');
+                  setLineMode(mode);
+                }}
+              />
+            ) : activeTool === 'fillet' ? (
+              <FilletModeSelector value={filletRadius} onChange={setFilletRadius} />
+            ) : undefined
+          }
         />
-      )}
 
-      <CanvasControls
-        cursorPos={currentMouseProgPt}
-        snapToGrid={snapToGrid}
-        objectSnapEnabled={objectSnapEnabled}
-        showTrajectory={viewMode === 'preview'}
-        onToggleTrajectory={() => setViewMode(viewMode === 'preview' ? 'edit' : 'preview')}
-        onToggleGridSnap={() => setSnapToGrid(!snapToGrid)}
-        onToggleObjectSnap={() => setObjectSnapEnabled(!objectSnapEnabled)}
-        bottomStyle={controlsBottomStyle}
-      />
+        {isMobile && controlsEl}
+      </div>
+
+      {!isMobile && controlsEl}
     </div>
   );
 };

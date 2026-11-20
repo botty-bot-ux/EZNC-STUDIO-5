@@ -1,131 +1,230 @@
 import React from 'react';
-import { ChevronRight, Code, Compass, Sliders, SlidersHorizontal } from 'lucide-react';
+import {
+  AlertCircle,
+  AlertTriangle,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  Code,
+  Compass,
+  SlidersHorizontal,
+} from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
-import { useProjectStore } from '../../store/useProjectStore';
-import { MachineSettingsPanel } from './MachineSettingsPanel';
-import { GcodeEditor } from '../editor/GcodeEditor';
-import { PropertiesPanel } from './PropertiesPanel';
 import { useIsMobile } from '../../hooks/useIsMobile';
+import { useProjectStore } from '../../store/useProjectStore';
+import { GcodeEditor } from '../editor/GcodeEditor';
+import { useResizablePanel } from '../ui/useResizablePanel';
+import { InspectorStatusBar } from './InspectorStatusBar';
+import { MachineSettingsPanel } from './MachineSettingsPanel';
+import { PropertiesPanel } from './PropertiesPanel';
 
 export const RightSidebar: React.FC = () => {
   const isMobile = useIsMobile();
-  const { activeTab, setActiveTab, warnings, rightPanelOpen, toggleRightPanel, canvasGrabbing } =
-    useProjectStore(
-      useShallow((s) => ({
-        activeTab: s.activeTab,
-        setActiveTab: s.setActiveTab,
-        warnings: s.warnings,
-        rightPanelOpen: s.rightPanelOpen,
-        toggleRightPanel: s.toggleRightPanel,
-        canvasGrabbing: s.canvasGrabbing,
-      }))
-    );
+  const {
+    activeTab,
+    setActiveTab,
+    warnings,
+    rightPanelOpen,
+    toggleRightPanel,
+    selectedObjectIds,
+    activeTool,
+    openSafetyDrawer,
+  } = useProjectStore(
+    useShallow((s) => ({
+      activeTab: s.activeTab,
+      setActiveTab: s.setActiveTab,
+      warnings: s.warnings,
+      rightPanelOpen: s.rightPanelOpen,
+      toggleRightPanel: s.toggleRightPanel,
+      selectedObjectIds: s.selectedObjectIds,
+      activeTool: s.activeTool,
+      openSafetyDrawer: s.openSafetyDrawer,
+    }))
+  );
+
+  const isGcodeMode = activeTab === 'gcode';
+  const { width, resizing, handleProps } = useResizablePanel(isGcodeMode ? 'gcode' : 'inspector');
 
   const errorCount = warnings.filter((w) => w.level === 'error').length;
+  const warningCount = warnings.filter((w) => w.level === 'warning').length;
 
-  // Во время жеста на холсте панель пропускает мышь сквозь себя и слегка гаснет.
-  const inertClass = canvasGrabbing ? 'pointer-events-none opacity-40' : '';
-
-  // Monaco держим смонтированным после первого открытия вкладки G-кода (см. контент ниже).
-  const [gcodeSeen, setGcodeSeen] = React.useState(false);
+  const [gcodeSeen, setGcodeSeen] = React.useState(isGcodeMode);
   React.useEffect(() => {
-    if (activeTab === 'gcode') setGcodeSeen(true);
-  }, [activeTab]);
+    if (isGcodeMode) setGcodeSeen(true);
+  }, [isGcodeMode]);
 
-  // На мобильных те же панели живут в нижней шторке (MobileTabBar + App).
   if (isMobile) return null;
+
+  const openInspectorMode = () => {
+    const hasContext = selectedObjectIds.length > 0 || activeTool === 'measure';
+    setActiveTab(hasContext ? 'properties' : 'machine');
+  };
 
   if (!rightPanelOpen) {
     return (
-      <button
-        onClick={toggleRightPanel}
-        title="Открыть панель свойств и станка"
-        className={`absolute right-4 top-20 z-20 w-11 h-11 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-md flex items-center justify-center cursor-pointer hover:bg-white hover:dark:bg-slate-800 transition-all text-slate-700 dark:text-slate-200 hover:text-primary ${inertClass}`}
+      <aside
+        aria-label="Свёрнутый инспектор"
+        className="w-11 bg-surface border-l border-line flex flex-col items-center justify-between py-2.5 select-none shrink-0 z-20"
       >
-        <Sliders className="w-5 h-5 text-accent" />
-      </button>
+        <div className="flex flex-col items-center gap-1.5">
+          <button
+            type="button"
+            onClick={toggleRightPanel}
+            title="Развернуть инспектор"
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-muted hover:text-fg hover:bg-surface-hover transition-colors cursor-pointer mb-1"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+
+          <button
+            type="button"
+            onClick={openInspectorMode}
+            title="Инспектор (свойства выделения или лист)"
+            className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors cursor-pointer ${
+              activeTab === 'properties'
+                ? 'bg-surface-subtle text-fg border border-line'
+                : 'text-muted hover:text-fg hover:bg-surface-hover'
+            }`}
+          >
+            <SlidersHorizontal className="w-4 h-4" />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('machine')}
+            title="Лист ДСП и настройки станка"
+            className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors cursor-pointer ${
+              activeTab === 'machine'
+                ? 'bg-surface-subtle text-fg border border-line'
+                : 'text-muted hover:text-fg hover:bg-surface-hover'
+            }`}
+          >
+            <Compass className="w-4 h-4" />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('gcode')}
+            title="Редактор G-кода"
+            className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors cursor-pointer ${
+              activeTab === 'gcode'
+                ? 'bg-surface-subtle text-fg border border-line'
+                : 'text-muted hover:text-fg hover:bg-surface-hover'
+            }`}
+          >
+            <Code className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Нижний индикатор проверки безопасности на свёрнутой панели */}
+        <button
+          type="button"
+          onClick={openSafetyDrawer}
+          title={
+            errorCount > 0
+              ? `Ошибок безопасности: ${errorCount} (открыть)`
+              : warningCount > 0
+              ? `Предупреждений: ${warningCount} (открыть)`
+              : 'Проверка безопасности пройдена'
+          }
+          className={`relative w-8 h-8 rounded-lg flex items-center justify-center transition-colors cursor-pointer ${
+            errorCount > 0
+              ? 'text-danger hover:bg-danger/10'
+              : warningCount > 0
+              ? 'text-warning hover:bg-warning/10'
+              : 'text-success hover:bg-surface-hover'
+          }`}
+        >
+          {errorCount > 0 ? (
+            <AlertCircle className="w-4 h-4" />
+          ) : warningCount > 0 ? (
+            <AlertTriangle className="w-4 h-4" />
+          ) : (
+            <CheckCircle2 className="w-4 h-4" />
+          )}
+          {(errorCount > 0 || warningCount > 0) && (
+            <span className="absolute -top-0.5 -right-0.5 font-mono text-[9px] font-bold bg-surface px-0.5 rounded">
+              {errorCount > 0 ? errorCount : warningCount}
+            </span>
+          )}
+        </button>
+      </aside>
     );
   }
 
-  // Fixed balanced panel width for all tabs
-  const panelWidthClass = 'w-96 md:w-[420px]';
-
   return (
-    <aside className={`absolute right-4 top-20 bottom-4 ${panelWidthClass} bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-md text-slate-800 dark:text-slate-100 flex flex-col select-none z-20 overflow-hidden transition-all duration-200 ${inertClass}`}>
-      {/* Top Header / Collapse Bar */}
-      <div className="px-3 py-2 bg-slate-50 dark:bg-slate-800 border-b border-slate-200/80 dark:border-slate-700/80 flex items-center justify-between shrink-0">
+    <aside
+      aria-label="Инспектор и редактор G-кода"
+      style={{ width }}
+      className="relative shrink-0 bg-surface border-l border-line text-fg flex flex-col select-none z-10 overflow-hidden"
+    >
+      {/* Левая граница для перетаскивания ширины (двойной клик — сброс) */}
+      <div
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Изменить ширину панели (двойной клик — сброс)"
+        title="Потяните для изменения ширины · двойной клик — сбросить"
+        {...handleProps}
+        className={`group absolute left-0 top-0 bottom-0 w-1.5 -ml-0.5 z-30 cursor-col-resize touch-none transition-colors ${
+          resizing ? 'bg-accent/55' : 'hover:bg-accent/35'
+        }`}
+      />
+
+      {/* Шапка: 2 режима («Инспектор» и «G-код») + кнопка сворачивания */}
+      <div className="px-2.5 py-2 bg-surface-subtle border-b border-line flex items-center justify-between gap-2 shrink-0">
+        <div className="flex items-center gap-0.5 bg-canvas p-0.5 rounded-lg border border-line flex-1 min-w-0">
+          <button
+            type="button"
+            onClick={openInspectorMode}
+            title="Контекстный инспектор: выбранная фигура или настройки листа и станка"
+            className={`flex-1 py-1 px-2.5 rounded-md flex items-center justify-center gap-1.5 text-xs font-medium transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+              !isGcodeMode
+                ? 'bg-surface text-fg font-semibold shadow-2xs'
+                : 'text-muted hover:text-fg'
+            }`}
+          >
+            <SlidersHorizontal className="w-3.5 h-3.5 shrink-0" />
+            <span>Инспектор</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('gcode')}
+            title="Редактор управляющей программы (G-код)"
+            className={`flex-1 py-1 px-2.5 rounded-md flex items-center justify-center gap-1.5 text-xs font-medium transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+              isGcodeMode
+                ? 'bg-surface text-fg font-semibold shadow-2xs'
+                : 'text-muted hover:text-fg'
+            }`}
+          >
+            <Code className="w-3.5 h-3.5 shrink-0" />
+            <span>G-код</span>
+          </button>
+        </div>
+
         <button
+          type="button"
           onClick={toggleRightPanel}
-          title="Свернуть панель"
-          className="p-1.5 rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-900 hover:dark:text-slate-100 hover:bg-slate-200/60 hover:dark:bg-slate-600/60 transition-colors"
+          title="Свернуть инспектор"
+          className="p-1.5 rounded-md text-muted hover:text-fg hover:bg-surface-hover transition-colors shrink-0 cursor-pointer"
         >
           <ChevronRight className="w-4 h-4" />
         </button>
-        <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-          {activeTab === 'gcode'
-            ? 'Редактор G-кода'
-            : activeTab === 'properties'
-            ? 'Свойства'
-            : 'Параметры станка'}
-        </span>
       </div>
 
-      {/* Tabs bar */}
-      <div className="grid grid-cols-3 bg-slate-100/80 dark:bg-slate-800/80 border-b border-slate-200/80 dark:border-slate-700/80 p-1 gap-1 text-[13px] font-semibold shrink-0">
-        <button
-          onClick={() => setActiveTab('properties')}
-          title="Свойства выбранной фигуры"
-          className={`py-2 rounded-xl flex flex-col items-center justify-center gap-1 transition-all ${
-            activeTab === 'properties'
-              ? 'bg-primary text-primary-fg'
-              : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:dark:text-slate-100 hover:bg-slate-50 hover:dark:bg-slate-800/60'
-          }`}
-        >
-          <SlidersHorizontal className="w-3.5 h-3.5" />
-          <span>Свойства</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('gcode')}
-          title="Редактор G-кода"
-          className={`py-2 rounded-xl flex flex-col items-center justify-center gap-1 transition-all ${
-            activeTab === 'gcode'
-              ? 'bg-primary text-primary-fg'
-              : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:dark:text-slate-100 hover:bg-slate-50 hover:dark:bg-slate-800/60'
-          }`}
-        >
-          <Code className="w-3.5 h-3.5" />
-          <span>G-код</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('machine')}
-          title="Настройки станка"
-          className={`relative py-2 rounded-xl flex flex-col items-center justify-center gap-1 transition-all ${
-            activeTab === 'machine'
-              ? 'bg-primary text-primary-fg'
-              : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:dark:text-slate-100 hover:bg-slate-50 hover:dark:bg-slate-800/60'
-          }`}
-        >
-          <Compass className="w-3.5 h-3.5" />
-          <span>Станок</span>
-
-          {errorCount > 0 && (
-            <span className="absolute top-1 right-2 w-2 h-2 rounded-full bg-danger animate-pulse" />
-          )}
-        </button>
-      </div>
-
-      {/* Tab content area */}
-      <div className="flex-1 overflow-hidden bg-slate-50/40 dark:bg-slate-900/40 min-h-0 flex flex-col">
+      {/* Контент активного режима */}
+      <div className="flex-1 overflow-hidden bg-surface min-h-0 flex flex-col">
         {activeTab === 'properties' && <PropertiesPanel />}
         {activeTab === 'machine' && <MachineSettingsPanel />}
         {gcodeSeen && (
-          <div className={activeTab === 'gcode' ? 'flex-1 min-h-0 flex flex-col' : 'hidden'}>
+          <div className={isGcodeMode ? 'flex-1 min-h-0 flex flex-col' : 'hidden'}>
             <GcodeEditor />
           </div>
         )}
       </div>
+
+      {/* Постоянный статус-бар безопасности и живая сводка УП */}
+      <InspectorStatusBar />
     </aside>
   );
 };

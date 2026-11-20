@@ -6,6 +6,7 @@ import {
   parseGcodeToCadObjects,
   parseGcodeToSegments,
 } from './parser';
+import { computeToolpathStats, formatDurationRu } from './stats';
 import { OBJECT_MARKER_LINE_RE, formatObjectMarker } from './constants';
 
 /**
@@ -186,11 +187,21 @@ describe('золотые циклы сверления (вывод посимв�
 });
 
 describe('парсер стороннего G-кода', () => {
-  it('сегменты: модальные G01/G02, двузначные коды, липкая подача, G91', () => {
+  it('сегменты: модальные G01/G02, двузначные коды, липкая подача, G91 и номера строк', () => {
     const segs = parseGcodeToSegments(
-      ['G00 X0 Y0 Z5', 'G01 X10 Y0 F1200', 'G01 X20', 'G02 X25 Y5 I0 J0 F600', 'G91', 'G01 X5 Y0'].join('\n')
+      [
+        ';[ID: obj_1] Отрезок (line)',
+        'G00 X0 Y0 Z5',
+        'G01 X10 Y0 F1200',
+        'G01 X20',
+        'G02 X25 Y5 I0 J0 F600',
+        'G91',
+        'G01 X5 Y0',
+      ].join('\n')
     );
     expect(segs.map((s) => s.type)).toEqual(['rapid', 'feed', 'feed', 'arc_cw', 'feed']);
+    expect(segs.map((s) => s.lineNumber)).toEqual([2, 3, 4, 5, 7]);
+    expect(segs.every((s) => s.objectId === 'obj_1')).toBe(true);
     expect(segs[2].feed).toBe(1200); // подача наследуется модально
     expect(segs[3].centerX).toBe(20); // I/J от точки старта дуги
     expect(segs[3].centerY).toBe(0);
@@ -238,3 +249,106 @@ describe('extractProjectDataFromNC', () => {
     expect(extractProjectDataFromNC('G0 X0')).toBeNull();
   });
 });
+
+describe('workOffset round-trip', () => {
+  it('вычитает workOffset при обратном разборе в программные координаты', () => {
+    const shiftedMachine: MachineSettings = {
+      ...machine,
+      workOffset: { x: 150, y: -80 },
+    };
+    const { gcode } = generateGcode([shapes[0], shapes[2]], [], shiftedMachine, templates);
+    const parsed = parseGcodeToCadObjects(gcode, [], shiftedMachine.workOffset);
+    expect(parsed).toHaveLength(2);
+    if (parsed[0].type === 'line') {
+      expect(parsed[0].startX).toBeCloseTo(0, 3);
+      expect(parsed[0].startY).toBeCloseTo(0, 3);
+      expect(parsed[0].endX).toBeCloseTo(100.5, 3);
+      expect(parsed[0].endY).toBeCloseTo(20.25, 3);
+    }
+    if (parsed[1].type === 'circle') {
+      expect(parsed[1].centerX).toBeCloseTo(500, 3);
+      expect(parsed[1].centerY).toBeCloseTo(300, 3);
+    }
+  });
+});
+
+describe('computeToolpathStats', () => {
+  it('считает длину реза, холостого хода и время обработки', () => {
+    const segs = parseGcodeToSegments(
+      ['G01 X1200 Y0 F1200', 'G00 X0 Y0'].join('\n')
+    );
+    const stats = computeToolpathStats(segs, { ...machine, spindleDwell: 2000 });
+    expect(stats.cutLengthMm).toBeCloseTo(1200, 2);
+    expect(stats.rapidLengthMm).toBeCloseTo(1200, 2);
+    // 1200 мм при F1200 = 60 с + 1200/4000*60 = 18 с + 2 с dwell = 80 с
+    expect(stats.estimatedSeconds).toBeCloseTo(80, 1);
+    expect(formatDurationRu(stats.estimatedSeconds)).toBe('1 мин 20 с');
+  });
+});
+
+describe('прямоугольник со скруглением углов (cornerRadius)', () => {
+  it('генерирует 4 линейных прохода G01 и 4 угловые дуги G03 при R=10', () => {
+    const roundedRect: CADObject = {
+      id: 'rr1',
+      name: 'Скругл. прямоугольник',
+      type: 'rectangle',
+      x: 100,
+      y: 200,
+      width: 120,
+      height: 80,
+      cornerRadius: 10,
+      depth: 10,
+      operationType: 'cut',
+    };
+    const { gcode, segments } = generateGcode([roundedRect], [], machine, templates);
+    const lines = linesForObject(gcode, 'rr1');
+    const g03Count = lines.filter((l) => l.startsWith('G03 ')).length;
+    const g01CutMoves = lines.filter((l) => l.startsWith('G01 ') && l.includes('F1200.0')).length;
+    const objArcSegs = segments.filter((s) => s.objectId === 'rr1' && s.type === 'arc_ccw').length;
+    const objFeedSegs = segments.filter((s) => s.objectId === 'rr1' && s.type === 'feed').length;
+    expect(g03Count).toBe(4);
+    expect(g01CutMoves).toBe(4);
+    expect(objArcSegs).toBe(4);
+    expect(objFeedSegs).toBe(5); // 1 врезание + 4 линейные стороны
+  });
+});
+
+describe('смешанные глубины реза (useOwnDepth vs machine.cutDepth)', () => {
+  it('фигура с useOwnDepth: true режет на свою глубину, остальные берут machine.cutDepth', () => {
+    const headMachine: MachineSettings = {
+      ...machine,
+      cutDepth: 17.5,
+    };
+    const contour: CADObject = {
+      id: 'c_outer',
+      name: 'Внешний контур',
+      type: 'line',
+      startX: -100,
+      startY: -100,
+      endX: -500,
+      endY: -100,
+      depth: 5, // стандартный дефолт UI — должен перекрываться machine.cutDepth (17.5)
+      operationType: 'cut',
+    };
+    const groove: CADObject = {
+      id: 'g_seam',
+      name: 'Декоративный шов',
+      type: 'line',
+      startX: -200,
+      startY: -200,
+      endX: -400,
+      endY: -200,
+      depth: 4,
+      useOwnDepth: true,
+      operationType: 'cut',
+    };
+    const { gcode } = generateGcode([contour, groove], [], headMachine, templates);
+    const outerLines = linesForObject(gcode, 'c_outer');
+    const grooveLines = linesForObject(gcode, 'g_seam');
+    expect(outerLines.some((l) => l.includes('Z-17.500'))).toBe(true);
+    expect(grooveLines.some((l) => l.includes('Z-4.000'))).toBe(true);
+    expect(grooveLines.some((l) => l.includes('Z-17.500'))).toBe(false);
+  });
+});
+
+

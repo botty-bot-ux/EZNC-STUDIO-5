@@ -7,9 +7,11 @@ import {
   Eye,
   EyeOff,
   LineDotRightHorizontal,
+  Lock,
   Spline,
   Square,
   Trash2,
+  Waypoints,
 } from 'lucide-react';
 import { CADObject } from '../../types';
 
@@ -18,17 +20,34 @@ interface FigureRowProps {
   index: number;
   totalCount: number;
   isSelected: boolean;
-  isActive?: boolean; // слой, который сейчас прорезается в 3D-симуляции
+  isActive?: boolean;
   onSelect: (e?: React.MouseEvent) => void;
+  onDoubleClick?: () => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
   onDelete: () => void;
   onUpdate: (partial: Partial<CADObject>) => void;
 }
 
-// Строка фигуры в левом дереве: текст на прозрачном фоне.
-// Выбранная фигура подсвечивается синим. Действия — при наведении.
-// isActive (слой в текущем прогоне симуляции) — янтарная подсветка + пульс-точка.
+function getMetricSummary(obj: CADObject): string {
+  switch (obj.type) {
+    case 'point':
+      return `Ø${obj.diameter}`;
+    case 'line': {
+      const len = Math.hypot(obj.endX - obj.startX, obj.endY - obj.startY);
+      return `${Math.round(len)} мм`;
+    }
+    case 'arc':
+      return `R${Math.round(obj.radius)}`;
+    case 'circle':
+      return `R${Math.round(obj.radius)}`;
+    case 'rectangle':
+      return `${Math.round(obj.width)}×${Math.round(obj.height)}`;
+    case 'polyline':
+      return `${obj.points.length} тчк`;
+  }
+}
+
 export const LayerItemAccordion: React.FC<FigureRowProps> = ({
   obj,
   index,
@@ -36,18 +55,22 @@ export const LayerItemAccordion: React.FC<FigureRowProps> = ({
   isSelected,
   isActive = false,
   onSelect,
+  onDoubleClick,
   onMoveUp,
   onMoveDown,
   onDelete,
   onUpdate,
 }) => {
   const isVisible = obj.visible !== false;
+  const isFrozen = obj.frozen === true;
 
   const TypeIcon: React.ComponentType<{ className?: string }> =
     obj.type === 'point'
       ? CircleDot
       : obj.type === 'line'
       ? LineDotRightHorizontal
+      : obj.type === 'polyline'
+      ? Waypoints
       : obj.type === 'rectangle'
       ? Square
       : obj.type === 'circle'
@@ -61,24 +84,33 @@ export const LayerItemAccordion: React.FC<FigureRowProps> = ({
       ? obj.name.replace(/Ø?\d+(\.\d+)?\s*мм\s*/gi, ' ').replace(/\s+/g, ' ').trim()
       : obj.name;
 
+  const metric = getMetricSummary(obj);
+
   return (
     <div
       onClick={onSelect}
-      className={`group relative flex items-center gap-1.5 px-1.5 py-1 rounded-md cursor-pointer select-none transition-colors ${
+      onDoubleClick={onDoubleClick}
+      title="Двойной клик — приблизить фигуру на 2D-холсте"
+      className={`group relative flex items-center gap-1.5 px-2 py-1.5 rounded-lg cursor-pointer select-none transition-colors ${
         isActive
-          ? 'bg-amber-400/15 ring-1 ring-inset ring-amber-400/60'
+          ? 'bg-warning/15 ring-1 ring-inset ring-warning/50'
           : isSelected
-          ? 'bg-primary/10'
-          : 'hover:bg-slate-500/5 hover:dark:bg-slate-500/5'
+          ? 'bg-accent/12 text-fg'
+          : 'hover:bg-surface-hover'
       }`}
     >
-      {isActive && (
-        <span className="absolute -left-0.5 top-1/2 -translate-y-1/2 h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
-      )}
+      {/* Порядковый номер операции в маршруте */}
+      <span className="font-mono text-[11px] text-muted w-4 shrink-0 text-right">
+        {String(index + 1).padStart(2, '0')}
+      </span>
 
       <TypeIcon
         className={`w-3.5 h-3.5 shrink-0 ${
-          isActive ? 'text-amber-600 dark:text-amber-400' : isSelected ? 'text-primary' : 'text-slate-400 dark:text-slate-500'
+          isActive
+            ? 'text-warning'
+            : isSelected
+            ? 'text-accent'
+            : 'text-muted'
         } ${isVisible ? '' : 'opacity-40'}`}
       />
 
@@ -86,26 +118,37 @@ export const LayerItemAccordion: React.FC<FigureRowProps> = ({
         title={obj.name}
         className={`flex-1 min-w-0 truncate text-xs ${
           isSelected
-            ? 'text-primary font-semibold'
+            ? 'text-fg font-semibold'
             : isVisible
-            ? 'text-slate-700 dark:text-slate-200'
-            : 'text-slate-400 dark:text-slate-500 line-through'
+            ? 'text-fg-secondary'
+            : 'text-muted line-through'
         }`}
       >
         {displayName || obj.name}
       </span>
 
-      {/* Hover actions (на телефоне — всегда видны, hover отсутствует) */}
+      {isFrozen && (
+        <span title="Зафиксировано" className="shrink-0 flex items-center">
+          <Lock className="w-3 h-3 text-muted" />
+        </span>
+      )}
+
+      {/* Краткая метрика (скрывается при наведении на десктопе, уступая место кнопкам) */}
+      <span className="hidden md:inline group-hover:hidden font-mono text-[11px] text-muted shrink-0">
+        {isActive ? 'РЕЗ' : metric}
+      </span>
+
+      {/* Быстрые действия со строкой */}
       <div
-        className="flex items-center gap-0.5 shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 focus-within:opacity-100 transition-opacity"
+        className="flex md:hidden md:group-hover:flex focus-within:flex items-center gap-0.5 shrink-0"
         onClick={(e) => e.stopPropagation()}
       >
         <button
           type="button"
           onClick={onMoveUp}
           disabled={index === 0}
-          title="Выше"
-          className="p-0.5 rounded text-slate-400 dark:text-slate-500 hover:text-primary disabled:opacity-0"
+          title="Поднять выше в порядке резки"
+          className="p-0.5 rounded text-muted hover:text-fg disabled:opacity-20 cursor-pointer"
         >
           <ChevronUp className="w-3.5 h-3.5" />
         </button>
@@ -113,24 +156,24 @@ export const LayerItemAccordion: React.FC<FigureRowProps> = ({
           type="button"
           onClick={onMoveDown}
           disabled={index === totalCount - 1}
-          title="Ниже"
-          className="p-0.5 rounded text-slate-400 dark:text-slate-500 hover:text-primary disabled:opacity-0"
+          title="Опустить ниже в порядке резки"
+          className="p-0.5 rounded text-muted hover:text-fg disabled:opacity-20 cursor-pointer"
         >
           <ChevronDown className="w-3.5 h-3.5" />
         </button>
         <button
           type="button"
           onClick={() => onUpdate({ visible: !isVisible })}
-          title={isVisible ? 'Скрыть' : 'Показать'}
-          className="p-0.5 rounded text-slate-400 dark:text-slate-500 hover:text-primary"
+          title={isVisible ? 'Скрыть из программы' : 'Включить в программу'}
+          className="p-0.5 rounded text-muted hover:text-fg cursor-pointer"
         >
           {isVisible ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
         </button>
         <button
           type="button"
           onClick={onDelete}
-          title="Удалить"
-          className="p-0.5 rounded text-slate-400 dark:text-slate-500 hover:text-danger"
+          title="Удалить объект"
+          className="p-0.5 rounded text-muted hover:text-danger cursor-pointer"
         >
           <Trash2 className="w-3.5 h-3.5" />
         </button>

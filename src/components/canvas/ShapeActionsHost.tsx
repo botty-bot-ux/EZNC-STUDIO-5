@@ -1,15 +1,18 @@
 import React, { useEffect } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { useProjectStore } from '../../store/useProjectStore';
+import { getLastSelectedId, useProjectStore } from '../../store/useProjectStore';
 import { ArcObject, LineObject } from '../../types';
 import {
-  computeObjectBounds,
+  computeObjectsBounds,
   computeParallelArcs,
   computeParallelSegments,
 } from '../../lib/geometry/transform';
+import { ArrayDialog } from '../modals/ArrayDialog';
 import { MoveDialog } from '../modals/MoveDialog';
 import { ParallelDialog } from '../modals/ParallelDialog';
+import { RotateDialog } from '../modals/RotateDialog';
 import { ScaleDialog } from '../modals/ScaleDialog';
+import { VectorImportModal } from '../modals/VectorImportModal';
 
 /**
  * Хост модалок действий с фигурами на уровне App. Открывается по store.shapeDialog
@@ -21,25 +24,30 @@ export const ShapeActionsHost: React.FC = () => {
     shapeDialog,
     objects,
     selectedObjectIds,
-    addObject,
+    addObjectsBulk,
     moveSelectedObjectsBy,
     scaleSelectedObjectsBy,
+    rotateSelectedObjectsByAngle,
+    arraySelectedObjects,
     setShapeDialog,
   } = useProjectStore(
     useShallow((s) => ({
       shapeDialog: s.shapeDialog,
       objects: s.objects,
       selectedObjectIds: s.selectedObjectIds,
-      addObject: s.addObject,
+      addObjectsBulk: s.addObjectsBulk,
       moveSelectedObjectsBy: s.moveSelectedObjectsBy,
       scaleSelectedObjectsBy: s.scaleSelectedObjectsBy,
+      rotateSelectedObjectsByAngle: s.rotateSelectedObjectsByAngle,
+      arraySelectedObjects: s.arraySelectedObjects,
       setShapeDialog: s.setShapeDialog,
     }))
   );
 
   const selObjs = objects.filter((o) => selectedObjectIds.includes(o.id));
-  // «Основная» фигура = последний id выделения (как в панели Свойств).
-  const primary = selObjs[selObjs.length - 1];
+  // «Основная» фигура = последний id выделения (единый источник истины с панелью Свойств).
+  const primaryId = getLastSelectedId(selectedObjectIds);
+  const primary = primaryId ? selObjs.find((o) => o.id === primaryId) : undefined;
 
   // Смена выделения «во время полёта» могла сделать запрос невыполнимым — снимаем его.
   useEffect(() => {
@@ -69,23 +77,12 @@ export const ShapeActionsHost: React.FC = () => {
 
   if (shapeDialog.kind === 'scale') {
     const movable = selObjs.filter((o) => !o.frozen);
+    const bounds = computeObjectsBounds(movable);
     // Якорь — центр общей рамки выделения: фигура растягивается симметрично
     // относительно середины, группа не «уезжает» в сторону.
-    let anchor = { x: 0, y: 0 };
-    if (movable.length > 0) {
-      let minX = Infinity;
-      let minY = Infinity;
-      let maxX = -Infinity;
-      let maxY = -Infinity;
-      for (const o of movable) {
-        const b = computeObjectBounds(o);
-        minX = Math.min(minX, b.minX);
-        minY = Math.min(minY, b.minY);
-        maxX = Math.max(maxX, b.maxX);
-        maxY = Math.max(maxY, b.maxY);
-      }
-      anchor = { x: (minX + maxX) / 2, y: (minY + maxY) / 2 };
-    }
+    const anchor = bounds
+      ? { x: (bounds.minX + bounds.maxX) / 2, y: (bounds.minY + bounds.maxY) / 2 }
+      : { x: 0, y: 0 };
     return (
       <ScaleDialog
         isOpen
@@ -93,6 +90,39 @@ export const ShapeActionsHost: React.FC = () => {
         anchor={anchor}
         onClose={close}
         onApply={scaleSelectedObjectsBy}
+      />
+    );
+  }
+
+  if (shapeDialog.kind === 'rotate') {
+    const movable = selObjs.filter((o) => !o.frozen);
+    const bounds = computeObjectsBounds(movable);
+    const selectionCenter = bounds
+      ? { x: (bounds.minX + bounds.maxX) / 2, y: (bounds.minY + bounds.maxY) / 2 }
+      : { x: 0, y: 0 };
+    return (
+      <RotateDialog
+        isOpen
+        ids={movable.map((o) => o.id)}
+        selectionCenter={selectionCenter}
+        hasRectangle={movable.some((o) => o.type === 'rectangle')}
+        onClose={close}
+        onApply={rotateSelectedObjectsByAngle}
+      />
+    );
+  }
+
+  if (shapeDialog.kind === 'import') {
+    return <VectorImportModal isOpen onClose={close} />;
+  }
+
+  if (shapeDialog.kind === 'array') {
+    return (
+      <ArrayDialog
+        isOpen
+        selectedCount={selObjs.length}
+        onClose={close}
+        onApply={arraySelectedObjects}
       />
     );
   }
@@ -122,24 +152,23 @@ export const ShapeActionsHost: React.FC = () => {
         }}
         onCreate={(distance, count) => {
           const baseIndex = objects.length;
-          computeParallelArcs(arcSource, distance, count).forEach((arc, i) => {
-            addObject({
-              type: 'arc',
-              name: `Дуга R${arc.radius.toFixed(1)} (${baseIndex + i + 1})`,
-              depth: a.depth,
-              operationType: a.operationType,
-              color: a.color,
-              visible: true,
-              centerX: arc.centerX,
-              centerY: arc.centerY,
-              radius: arc.radius,
-              startX: arc.startX,
-              startY: arc.startY,
-              endX: arc.endX,
-              endY: arc.endY,
-              clockwise: arc.clockwise,
-            });
-          });
+          const batch = computeParallelArcs(arcSource, distance, count).map((arc, i) => ({
+            type: 'arc' as const,
+            name: `Дуга R${arc.radius.toFixed(1)} (${baseIndex + i + 1})`,
+            depth: a.depth,
+            operationType: a.operationType,
+            color: a.color,
+            visible: true,
+            centerX: arc.centerX,
+            centerY: arc.centerY,
+            radius: arc.radius,
+            startX: arc.startX,
+            startY: arc.startY,
+            endX: arc.endX,
+            endY: arc.endY,
+            clockwise: arc.clockwise,
+          }));
+          addObjectsBulk(batch);
         }}
       />
     );
@@ -161,20 +190,19 @@ export const ShapeActionsHost: React.FC = () => {
         }}
         onCreate={(distance, count) => {
           const baseIndex = objects.length;
-          computeParallelSegments(lineSource, distance, count).forEach((seg, i) => {
-            addObject({
-              type: 'line',
-              name: `Отрезок ${baseIndex + i + 1}`,
-              depth: l.depth,
-              operationType: l.operationType,
-              color: l.color,
-              visible: true,
-              startX: seg.startX,
-              startY: seg.startY,
-              endX: seg.endX,
-              endY: seg.endY,
-            });
-          });
+          const batch = computeParallelSegments(lineSource, distance, count).map((seg, i) => ({
+            type: 'line' as const,
+            name: `Отрезок ${baseIndex + i + 1}`,
+            depth: l.depth,
+            operationType: l.operationType,
+            color: l.color,
+            visible: true,
+            startX: seg.startX,
+            startY: seg.startY,
+            endX: seg.endX,
+            endY: seg.endY,
+          }));
+          addObjectsBulk(batch);
         }}
       />
     );

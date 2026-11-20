@@ -9,20 +9,10 @@ interface StepperFieldProps {
   placeholder?: string;
   autoFocus?: boolean;
   onChange: (v: string) => void;
-  /**
-   * Реакция на стрелки: `deltaSteps` — целое число шагов (положительное вверх,
-   * отрицательное вниз). Клик = ±1; зажать-и-тянуть = сколько шагов прошли по вертикали
-   * (6 px = 1 шаг, направление не зависит от того, на какой стрелке начали).
-   */
   onScrub: (deltaSteps: number) => void;
   onEnter: () => void;
 }
 
-/**
- * Числовое поле с вертикальными стрелками ▲/▼ для ввода мышкой.
- * Стрелки поддерживают и обычный клик (±1 шаг), и «зажать и тянуть» — тогда
- * значение меняется плавно, пока не отпустишь кнопку мыши.
- */
 export const StepperField: React.FC<StepperFieldProps> = ({
   label,
   value,
@@ -38,8 +28,8 @@ export const StepperField: React.FC<StepperFieldProps> = ({
 
   return (
     <label className="block">
-      <span className="text-[13px] font-medium text-slate-500 dark:text-slate-400">{label}</span>
-      <div className="mt-1 flex items-stretch gap-1">
+      <span className="text-xs font-medium text-muted block mb-1">{label}</span>
+      <div className="flex items-stretch gap-1">
         <input
           type="text"
           inputMode={inputMode}
@@ -53,7 +43,7 @@ export const StepperField: React.FC<StepperFieldProps> = ({
             }
           }}
           placeholder={placeholder}
-          className="w-full min-w-0 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 font-mono text-sm text-center focus:border-primary focus:bg-white focus:dark:bg-slate-900 focus:outline-none transition-all"
+          className="w-full min-w-0 bg-surface-subtle border border-line rounded-lg px-2.5 py-1.5 font-mono text-sm font-semibold text-fg text-center focus:border-accent focus:bg-surface focus:outline-none transition-colors"
         />
         <ScrubChevrons
           up={up}

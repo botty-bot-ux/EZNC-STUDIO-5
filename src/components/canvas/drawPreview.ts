@@ -15,7 +15,14 @@ export function drawDrawingPreview(
   polyPts: Point2D[],
   toolDiameter?: number
 ) {
-  if (activeTool === 'select' || !currentMouseProgPt) return;
+  if (
+    activeTool === 'select' ||
+    activeTool === 'trim' ||
+    activeTool === 'fillet' ||
+    !currentMouseProgPt
+  ) {
+    return;
+  }
 
   const wToC = (x: number, y: number) => worldToCanvas(x, y, pan, zoom);
 

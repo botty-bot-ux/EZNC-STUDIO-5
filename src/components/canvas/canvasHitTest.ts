@@ -1,4 +1,5 @@
 import { CADObject, MachineSettings, Point2D } from '../../types';
+import { computeArcBounds } from '../../lib/geometry/transform';
 import { SnapPointInfo, applyGridSnap, worldToCanvas } from './canvasUtils';
 
 export type DragMode =
@@ -146,6 +147,16 @@ export function findObjectBodyHit(
         angleInArcSweep(obj, rawWorldPt)
       ) {
         return obj.id;
+      }
+    } else if (obj.type === 'polyline' && obj.points && obj.points.length >= 2) {
+      const pts = obj.points;
+      const segCount = obj.closed ? pts.length : pts.length - 1;
+      for (let i = 0; i < segCount; i++) {
+        const a = pts[i];
+        const b = pts[(i + 1) % pts.length];
+        if (distanceToSegment(rawWorldPt, a, b) <= hitTolerance) {
+          return obj.id;
+        }
       }
     }
   }
@@ -357,12 +368,7 @@ export function getObjectBoundingBox(obj: CADObject): { minX: number; maxX: numb
     };
   }
   if (obj.type === 'arc') {
-    return {
-      minX: Math.min(obj.startX, obj.endX, obj.centerX - obj.radius),
-      maxX: Math.max(obj.startX, obj.endX, obj.centerX + obj.radius),
-      minY: Math.min(obj.startY, obj.endY, obj.centerY - obj.radius),
-      maxY: Math.max(obj.startY, obj.endY, obj.centerY + obj.radius),
-    };
+    return computeArcBounds(obj);
   }
   if (obj.type === 'polyline' && obj.points && obj.points.length > 0) {
     let minX = obj.points[0].x;

@@ -1,6 +1,12 @@
-import { CADObject, Point2D } from '../../types';
+import { CADObject, LiveRotateState, LiveScaleState, Point2D } from '../../types';
 import { DragMode, HandleType } from './canvasHitTest';
-import { constrainAngle } from '../../lib/geometry/transform';
+import { LiveDrag } from './sceneCanvas.types';
+import {
+  constrainAngle,
+  rotateCADObject,
+  scaleCADObject,
+  translateCADObject,
+} from '../../lib/geometry/transform';
 
 /** Point at distance `len` from `origin` along angle `ang` (radians). */
 export function pointFromPolar(origin: Point2D, ang: number, len: number): Point2D {
@@ -26,44 +32,52 @@ export function clampRayToPosFaces(anchor: Point2D, end: Point2D): Point2D {
   return { x: anchor.x + dx * t, y: anchor.y + dy * t };
 }
 
-export function shiftCADObject(obj: CADObject, dx: number, dy: number): Partial<CADObject> {
-  if (obj.type === 'point') {
-    return { x: obj.x + dx, y: obj.y + dy };
-  }
-  if (obj.type === 'line') {
-    return {
-      startX: obj.startX + dx,
-      startY: obj.startY + dy,
-      endX: obj.endX + dx,
-      endY: obj.endY + dy,
-    };
-  }
-  if (obj.type === 'rectangle') {
-    return { x: obj.x + dx, y: obj.y + dy };
-  }
-  if (obj.type === 'circle') {
-    return { centerX: obj.centerX + dx, centerY: obj.centerY + dy };
-  }
-  if (obj.type === 'arc') {
-    return {
-      startX: obj.startX + dx,
-      startY: obj.startY + dy,
-      endX: obj.endX + dx,
-      endY: obj.endY + dy,
-      centerX: obj.centerX + dx,
-      centerY: obj.centerY + dy,
-    };
-  }
-  if (obj.type === 'polyline' && obj.points) {
-    return {
-      points: obj.points.map((p) => ({ x: p.x + dx, y: p.y + dy })),
-    };
-  }
-  return {};
-}
+/**
+ * Накладывает незакоммиченное перетаскивание или живое превью модалки
+ * (Переместить / Масштабировать / Повернуть) поверх массива фигур стора.
+ */
+export function computeDisplayObjects(params: {
+  objects: CADObject[];
+  liveDrag: LiveDrag;
+  liveMove: { ids: string[]; dx: number; dy: number } | null;
+  liveScale: LiveScaleState | null;
+  liveRotate: LiveRotateState | null;
+}): CADObject[] {
+  const { objects, liveDrag, liveMove, liveScale, liveRotate } = params;
 
-export function translateObjectFull(obj: CADObject, dx: number, dy: number): CADObject {
-  return { ...obj, ...shiftCADObject(obj, dx, dy) } as CADObject;
+  if (liveDrag.mode === 'translate') {
+    const idset = new Set(liveDrag.ids);
+    return objects.map((o) =>
+      idset.has(o.id) ? translateCADObject(o, liveDrag.dx, liveDrag.dy) : o
+    );
+  }
+  if (liveDrag.mode === 'edit') {
+    const map = new Map(liveDrag.items.map((i) => [i.id, i.patch]));
+    if (map.size === 0) return objects;
+    return objects.map((o) => {
+      const p = map.get(o.id);
+      return p ? ({ ...o, ...p } as CADObject) : o;
+    });
+  }
+  if (liveMove && liveMove.ids.length > 0 && (liveMove.dx !== 0 || liveMove.dy !== 0)) {
+    const idset = new Set(liveMove.ids);
+    return objects.map((o) =>
+      idset.has(o.id) ? translateCADObject(o, liveMove.dx, liveMove.dy) : o
+    );
+  }
+  if (liveScale && liveScale.ids.length > 0 && (liveScale.sx !== 1 || liveScale.sy !== 1)) {
+    const idset = new Set(liveScale.ids);
+    return objects.map((o) =>
+      idset.has(o.id) ? scaleCADObject(o, liveScale.anchor, liveScale.sx, liveScale.sy) : o
+    );
+  }
+  if (liveRotate && liveRotate.ids.length > 0 && Math.abs(liveRotate.angleDeg) > 1e-6) {
+    const idset = new Set(liveRotate.ids);
+    return objects.map((o) =>
+      idset.has(o.id) ? rotateCADObject(o, liveRotate.angleDeg, liveRotate.anchor) : o
+    );
+  }
+  return objects;
 }
 
 /**
@@ -165,9 +179,6 @@ export function computeNodeEditItems(params: {
         if (chosen.type === 'line_start') patch = { startX: nx, startY: ny };
         else if (chosen.type === 'line_end') patch = { endX: nx, endY: ny };
         else if (chosen.type === 'arc_start' && o.type === 'arc') {
-          // Тянем за НАЧАЛО дуги: центр фиксирован, радиус = расстояние до курсора.
-          // Второй конец НЕ оставляем на месте — он уезжает вдоль своего направления,
-          // чтобы всегда лежать на окружности (в конце дуги), а не отдельно от неё.
           const cx = o.centerX;
           const cy = o.centerY;
           const newR = Math.hypot(nx - cx, ny - cy);
@@ -182,7 +193,6 @@ export function computeNodeEditItems(params: {
             endY: cy + (uy / ul) * newR,
           };
         } else if (chosen.type === 'arc_end' && o.type === 'arc') {
-          // То же для КОНЦА дуги: начало уезжает вдоль своего радиуса на новую окружность.
           const cx = o.centerX;
           const cy = o.centerY;
           const newR = Math.hypot(nx - cx, ny - cy);

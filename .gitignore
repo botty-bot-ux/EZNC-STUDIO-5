@@ -10,5 +10,17 @@ coverage/
 # Local scratch / trash
 .trash/
 
+# Локальные бэкапы (содержат копию mcp.json с токенами — в репозиторий нельзя)
+.backup/
+*.bak
+
+# Демо-артефакты прогонов MCP (фото, .nc, скриншоты, отчёты) — держим локально
+demo/
+
+# Локальные инструменты и артефакты IDE, не часть приложения
+.aistudio/
+.qoder-input-images/
+skills/
+
 # Sample .nc kept locally for manual import testing (not part of the app)
 /Проект_ЧПУ_Деталь_1.nc

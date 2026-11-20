@@ -1,4 +1,5 @@
 import React from 'react';
+import { activeToolLabel } from './canvasHudHelpers';
 import { ActiveTool, ArcMode, LineMode, Point2D } from '../../types';
 
 interface CanvasHudProps {
@@ -12,18 +13,18 @@ interface CanvasHudProps {
   measureStartPt?: Point2D | null;
   measureEndPt?: Point2D | null;
   lineLengthInput?: string;
-  /** Экранные пиксели конца текущего отрезка/хорды — куда прилепить модуль длины. */
   dynAnchorPx?: Point2D | null;
   onCancelDraw: () => void;
   onCommitPolyline?: () => void;
-  // Мобильный DYN-ввод: экранная клавиатура вместо физических клавиш.
   isMobile?: boolean;
   onLineLengthChange?: (v: string) => void;
   onDynCommit?: () => void;
+  modeSelector?: React.ReactNode;
+  filletFirstLineActive?: boolean;
+  filletRadius?: number;
+  toolStatusHint?: string | null;
 }
 
-// Плавающие окна координат/замера перенесены в правую панель «Свойства».
-// Здесь остаются только подсказка по активному инструменту и DYN-счётчик длины при наборе.
 export const CanvasHud: React.FC<CanvasHudProps> = ({
   activeTool,
   arcMode = 'bulge',
@@ -41,30 +42,31 @@ export const CanvasHud: React.FC<CanvasHudProps> = ({
   isMobile,
   onLineLengthChange,
   onDynCommit,
+  modeSelector,
+  filletFirstLineActive = false,
+  filletRadius = 10,
+  toolStatusHint = null,
 }) => {
-  // HUD banner for active tool instruction
   const getToolInstruction = () => {
     if (activeTool === 'line') {
       if (lineMode === 'polyline' || lineMode === 'polygon') {
         const closing = lineMode === 'polygon';
         if (polyPtsCount === 0) {
-          return closing
-            ? 'Контур: кликните первую точку'
-            : 'Полилиния: кликните первую точку';
+          return closing ? 'Укажите первый узел контура' : 'Укажите первый узел полилинии';
         }
         if (polyPtsCount === 1) {
-          return 'Кликайте следующие узлы · Enter — завершить · ESC — отмена';
+          return 'Добавляйте узлы кликом · Enter — завершить';
         }
         return closing
-          ? `Узлов: ${polyPtsCount} · клик по первой точке или Enter — замкнуть · ESC — отмена`
-          : `Узлов: ${polyPtsCount} · Enter или двойной клик — завершить · ESC — отмена`;
+          ? `Узлов: ${polyPtsCount} · клик по старту или Enter — замкнуть`
+          : `Узлов: ${polyPtsCount} · Enter или 2×клик — завершить`;
       }
       if (lineLengthInput) {
-        return 'Enter — создать отрезок заданной длины · Backspace — правка · ESC — сброс';
+        return 'Enter — построить отрезок заданной длины · Backspace — правка';
       }
       return drawStartPt
-        ? 'Введите длину с клавиатуры или укажите конечную точку (Shift = 90°/45°) · ESC — отмена'
-        : 'Укажите начальную точку линии (Точка 1)';
+        ? 'Введите длину с клавиатуры или укажите вторую точку (Shift = 90°/45°)'
+        : 'Укажите начальную точку отрезка';
     }
     if (activeTool === 'rectangle') {
       return drawStartPt
@@ -75,59 +77,64 @@ export const CanvasHud: React.FC<CanvasHudProps> = ({
       return drawStartPt ? 'Укажите точку на окружности (радиус)' : 'Укажите центр окружности';
     }
     if (activeTool === 'arc') {
-      if (!drawArcStartPt) return 'Дуга: укажите начальную точку (Точка 1)';
+      if (!drawArcStartPt) return 'Укажите начальную точку дуги';
       if (!drawArcEndPt) {
         if (arcMode === 'center') {
           return lineLengthInput
-            ? 'Enter — задать радиус · Backspace — правка · ESC — сброс'
-            : 'Дуга · Центр: кликните ЦЕНТР окружности (радиус = расстояние от старта)';
+            ? 'Enter — задать радиус · Backspace — правка'
+            : 'Укажите центр окружности (радиус = расстояние от старта)';
         }
         if (lineLengthInput) {
-          return 'Enter — зафиксировать длину хорды · Backspace — правка · ESC — сброс';
+          return 'Enter — зафиксировать длину хорды · Backspace — правка';
         }
         if (arcMode === '3pt') {
-          return 'Дуга · 3 точки: кликните точку НА самой дуге (2-я точка)';
+          return 'Укажите вторую точку, лежащую на самой дуге';
         }
-        return 'Дуга · Хорда+высота: укажите конец хорды (Shift = 90°/45°) · ESC — отмена';
+        return 'Укажите конец хорды (Shift = 90°/45°)';
       }
       if (arcMode === 'center') {
-        return 'Ведите мышью вокруг центра — конец скользит по окружности · ESC — отмена';
+        return 'Ведите курсор вокруг центра для выбора конечного угла';
       }
       if (arcMode === '3pt') {
-        return 'Кликните конечную точку — дуга пройдёт через все три · ESC — отмена';
+        return 'Укажите конечную точку — дуга пройдёт через все три';
       }
-      return 'Тяните вершину горба: ближе к хорде — пололее, дальше — круглее · ESC — отмена';
+      return 'Задайте прогиб дуги: ближе к хорде — пологая, дальше — круглая';
     }
     if (activeTool === 'point') {
-      return 'Укажите центр отверстия на рабочей плоскости';
+      return 'Укажите центр отверстия на рабочем поле';
     }
     if (activeTool === 'measure') {
       if (!measureStartPt) {
-        return 'Штангенциркуль: Укажите первую точку для измерения (Точка 1)';
+        return 'Штангенциркуль: укажите первую точку замера';
       }
       if (!measureEndPt) {
-        return 'Штангенциркуль: Укажите вторую точку для измерения — результат в панели «Свойства»';
+        return 'Укажите вторую точку — точные dX/dY отображаются в инспекторе';
       }
-      return 'Измерение зафиксировано. Нажмите в другом месте для нового замера или ESC для сброса';
+      return 'Замер зафиксирован · клик в другом месте для нового замера';
+    }
+    if (activeTool === 'trim') {
+      return 'Наведите на отсекаемый участок и кликните · Обрезка линий, дуг и окружностей';
+    }
+    if (activeTool === 'fillet') {
+      if (filletFirstLineActive) {
+        return `Укажите второй непараллельный отрезок для дуги R${filletRadius} мм`;
+      }
+      return `Выберите первый отрезок или кликните по прямоугольнику (R${filletRadius} мм)`;
     }
     return null;
   };
 
   const instruction = getToolInstruction();
+  const toolBadge = activeToolLabel(activeTool);
 
-  // Подпись DYN-модуля: для дуги в режиме «центр» расстояние старт→центр = радиус,
-  // иначе — длина хорды; для линии — длина.
   const dynLabel =
     activeTool === 'arc' ? (arcMode === 'center' ? 'Радиус' : 'Хорда') : 'Длина';
 
-  // DYN distance readout is shown while typing for the line, and for the arc's
-  // start→end chord (before the endpoint is placed).
   const dynReadoutActive =
     !!lineLengthInput &&
     ((activeTool === 'line' && !!drawStartPt) ||
       (activeTool === 'arc' && !!drawArcStartPt && !drawArcEndPt));
 
-  // Мобильный режим: поле ввода длины активно, пока стоит первая точка линии/хорды дуги.
   const mobileDynActive =
     !!isMobile &&
     (activeTool === 'line'
@@ -136,82 +143,110 @@ export const CanvasHud: React.FC<CanvasHudProps> = ({
       ? !!drawArcStartPt && !drawArcEndPt
       : false);
 
+  const dynBox = (
+    <div className="pointer-events-auto flex items-center gap-1.5 bg-primary text-primary-fg border border-line px-2.5 py-1.5 rounded-xl shadow-lg">
+      <span className="text-xs opacity-75 font-medium ml-0.5">{dynLabel}</span>
+      <input
+        inputMode="decimal"
+        value={lineLengthInput ?? ''}
+        onChange={(e) =>
+          onLineLengthChange?.(
+            (e.target.value.replace(/[^0-9.,]/g, '').replace(',', '.') || '').slice(0, 10)
+          )
+        }
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            (e.target as HTMLInputElement).blur();
+            onDynCommit?.();
+          }
+        }}
+        placeholder="0"
+        className="w-20 bg-surface text-fg border border-line rounded-lg px-2 py-1 text-right font-mono text-base font-semibold focus:outline-none focus:border-accent"
+      />
+      <span className="text-xs opacity-75 shrink-0">мм</span>
+      <button
+        type="button"
+        onClick={() => onDynCommit?.()}
+        className="bg-accent text-accent-fg text-xs font-semibold px-3 py-1.5 rounded-lg shrink-0 cursor-pointer"
+      >
+        Ок
+      </button>
+    </div>
+  );
+
+  const instructionBox = instruction ? (
+    <div className="pointer-events-auto bg-surface/95 backdrop-blur-md border border-line text-fg px-3 py-1.5 rounded-lg shadow-sm flex items-center gap-2 text-xs font-medium max-w-full">
+      {toolBadge && (
+        <span className="font-semibold text-accent shrink-0">{toolBadge}</span>
+      )}
+      {toolBadge && <span className="text-line-strong shrink-0">·</span>}
+      <span className={`truncate ${toolStatusHint ? 'text-danger font-semibold' : ''}`}>
+        {toolStatusHint || instruction}
+      </span>
+      {activeTool === 'line' &&
+        (lineMode === 'polyline' || lineMode === 'polygon') &&
+        polyPtsCount >= 2 && (
+          <button
+            type="button"
+            onClick={() => onCommitPolyline?.()}
+            className="bg-primary text-primary-fg hover:opacity-90 px-2.5 py-0.5 rounded-md text-xs font-semibold transition-opacity shrink-0 cursor-pointer"
+          >
+            {lineMode === 'polygon' ? 'Замкнуть' : 'Готово'}
+          </button>
+        )}
+      <button
+        type="button"
+        onClick={onCancelDraw}
+        title="Отменить инструмент (Esc)"
+        className="bg-surface-subtle hover:bg-surface-hover border border-line text-fg-secondary px-1.5 py-0.5 rounded text-[11px] font-mono transition-colors shrink-0 cursor-pointer"
+      >
+        ESC
+      </button>
+    </div>
+  ) : null;
+
+  // На мобильном сохраняем аккуратный центральный стек, на десктопе разносим по углам
+  if (isMobile) {
+    const hasTopStack = Boolean(modeSelector || instructionBox || mobileDynActive);
+    return (
+      <>
+        {hasTopStack && (
+          <div className="pointer-events-none absolute top-2.5 left-1/2 -translate-x-1/2 z-30 flex flex-col items-center gap-1.5 max-w-[94vw]">
+            {modeSelector}
+            {instructionBox}
+            {mobileDynActive && dynBox}
+          </div>
+        )}
+      </>
+    );
+  }
+
   return (
     <>
-      {/* Мобильный DYN-ввод длины с экранной клавиатуры */}
-      {mobileDynActive && (
-        <div className="absolute top-24 left-1/2 -translate-x-1/2 z-40 flex items-center gap-1.5 bg-slate-900 dark:bg-slate-100 border border-slate-600 dark:border-slate-300 px-2 py-1.5 rounded-2xl shadow-md">
-          <span className="text-xs text-slate-400 dark:text-slate-500 font-semibold ml-1">
-            {dynLabel}
-          </span>
-          <input
-            inputMode="decimal"
-            value={lineLengthInput ?? ''}
-            onChange={(e) =>
-              onLineLengthChange?.(
-                (e.target.value.replace(/[^0-9.,]/g, '').replace(',', '.') || '').slice(0, 10)
-              )
-            }
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                (e.target as HTMLInputElement).blur();
-                onDynCommit?.();
-              }
-            }}
-            placeholder="0"
-            className="w-20 bg-slate-800 border border-slate-600 rounded-lg px-2 py-1 text-right font-mono text-xl font-bold text-slate-100 dark:text-slate-900 tabular-nums focus:outline-none focus:border-slate-400"
-          />
-          <span className="text-xs text-slate-400 dark:text-slate-500 shrink-0">мм</span>
-          <button
-            onClick={() => onDynCommit?.()}
-            className="bg-white text-slate-900 active:bg-slate-200 dark:bg-slate-900 dark:text-white dark:active:bg-slate-700 text-xs font-bold px-3 py-2 rounded-lg shrink-0"
-          >
-            Готово
-          </button>
+      {/* Верхний левый угол: переключатель под-режима инструмента (Линия / Дуга) */}
+      {modeSelector && (
+        <div className="pointer-events-none absolute top-3 left-3 z-20 max-w-[42%]">
+          {modeSelector}
         </div>
       )}
 
-      {/* Модуль длины у конца отрезка/хорды (desktop) — чистый чип, следует за точкой */}
-      {dynReadoutActive && !isMobile && dynAnchorPx && (
+      {/* Верхний центр: компактная подсказка активного шага без вертикальной башни */}
+      {instructionBox && (
+        <div className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 z-20 max-w-[min(640px,80%)]">
+          {instructionBox}
+        </div>
+      )}
+
+      {/* DYN-модуль длины у курсора (desktop) */}
+      {dynReadoutActive && dynAnchorPx && (
         <div
-          className="absolute z-30 flex items-baseline gap-1 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-md px-2 py-1 shadow-sm pointer-events-none"
+          className="absolute z-30 flex items-baseline gap-1.5 bg-surface border border-line-strong rounded-lg px-2.5 py-1 shadow-md pointer-events-none"
           style={{ left: dynAnchorPx.x, top: dynAnchorPx.y, transform: 'translate(12px, -50%)' }}
         >
-          <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">
-            {dynLabel}
-          </span>
-          <span className="font-mono text-sm font-semibold text-slate-900 dark:text-slate-100 tabular-nums">
-            {lineLengthInput}
-          </span>
-          <span className="text-[10px] text-slate-400 dark:text-slate-500">мм</span>
-        </div>
-      )}
-
-      {/* Active tool instruction banner */}
-      {instruction && (
-        <div
-          className={`absolute left-1/2 -translate-x-1/2 z-20 bg-white dark:bg-slate-900 border border-line text-slate-700 dark:text-slate-200 px-4 py-2 rounded-2xl shadow-md flex items-center gap-3 text-xs font-semibold ${
-            isMobile ? 'top-24' : 'top-20'
-          }`}
-        >
-          <span>{instruction}</span>
-          {activeTool === 'line' &&
-            (lineMode === 'polyline' || lineMode === 'polygon') &&
-            polyPtsCount >= 2 && (
-              <button
-                onClick={() => onCommitPolyline?.()}
-                className="bg-primary text-primary-fg hover:opacity-90 px-2.5 py-0.5 rounded-lg text-[13px] font-bold transition-colors"
-              >
-                {lineMode === 'polygon' ? 'Замкнуть' : 'Готово'}
-              </button>
-            )}
-          <button
-            onClick={onCancelDraw}
-            className="bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 hover:dark:bg-slate-700 px-2 py-0.5 rounded-lg text-[13px] transition-colors"
-          >
-            ESC
-          </button>
+          <span className="text-[11px] text-muted font-medium">{dynLabel}</span>
+          <span className="font-mono text-sm font-semibold text-fg">{lineLengthInput}</span>
+          <span className="text-[11px] text-muted">мм</span>
         </div>
       )}
     </>

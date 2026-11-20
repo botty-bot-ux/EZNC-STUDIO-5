@@ -4,13 +4,12 @@ import {
   CircleDot,
   Download,
   FilePlus,
+  FileUp,
   FolderOpen,
-  LineDotRightHorizontal,
+  HelpCircle,
   Moon,
-  MousePointer,
   MoreHorizontal,
   Redo,
-  Ruler,
   Save,
   Spline,
   Sun,
@@ -19,12 +18,18 @@ import {
 } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useProjectStore } from '../../store/useProjectStore';
-import { ActiveTool } from '../../types';
-import { saveAs } from 'file-saver';
+import { isRailMachine, ProjectMode } from '../../store/initialState';
+import {
+  FILE_INPUT_ACCEPT,
+  importProjectFile,
+  writeTextFileToDisk,
+} from '../../lib/io/projectFiles';
 import { ExportModal } from '../modals/ExportModal';
+import { HotkeysModal } from '../modals/HotkeysModal';
 import { NewProjectModal } from '../modals/NewProjectModal';
 import { useOptimization } from '../../hooks/useOptimization';
 import { useIsMobile } from '../../hooks/useIsMobile';
+import { getToolDefs } from './toolDefs';
 
 export const Header: React.FC = () => {
   const {
@@ -40,14 +45,19 @@ export const Header: React.FC = () => {
     undoCount,
     redoCount,
     warnings,
-    setActiveTab,
+    openSafetyDrawer,
     activeTool,
     setActiveTool,
     machine,
+    applyMachinePreset,
     theme,
     toggleTheme,
     renderMode,
     setRenderMode,
+    setShapeDialog,
+    setPendingVectorImport,
+    setActiveTab,
+    showToast,
   } = useProjectStore(
     useShallow((s) => ({
       projectName: s.projectName,
@@ -62,16 +72,24 @@ export const Header: React.FC = () => {
       undoCount: s.historyUndo.length,
       redoCount: s.historyRedo.length,
       warnings: s.warnings,
-      setActiveTab: s.setActiveTab,
+      openSafetyDrawer: s.openSafetyDrawer,
       activeTool: s.activeTool,
       setActiveTool: s.setActiveTool,
       machine: s.machine,
+      applyMachinePreset: s.applyMachinePreset,
       theme: s.theme,
       toggleTheme: s.toggleTheme,
       renderMode: s.renderMode,
       setRenderMode: s.setRenderMode,
+      setShapeDialog: s.setShapeDialog,
+      setPendingVectorImport: s.setPendingVectorImport,
+      setActiveTab: s.setActiveTab,
+      showToast: s.showToast,
     }))
   );
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const hasObjects = objects.length > 0;
 
   const {
     optResult,
@@ -80,252 +98,231 @@ export const Header: React.FC = () => {
     closeExportModal,
     runOptimize,
     undoOptimize,
-  } = useOptimization();
-
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const hasObjects = objects.length > 0;
-
-  // Minimal typing for the native File System Access API (not in default DOM lib).
-  interface WritableLike {
-    write: (data: string) => Promise<void>;
-    close: () => Promise<void>;
-  }
-  interface FileHandleLike {
-    name: string;
-    createWritable: () => Promise<WritableLike>;
-  }
-  type PickerWindow = Window & {
-    showSaveFilePicker?: (opts: {
-      suggestedName: string;
-      types: { description: string; accept: Record<string, string[]> }[];
-    }) => Promise<FileHandleLike>;
-  };
-
-  // Writes text to disk via the native Save dialog (falls back to a download).
-  // Returns the saved base file name, or null if the user cancelled.
-  const writeToDisk = async (
-    content: string,
-    suggestedName: string,
-    description: string,
-    extensions: string[]
-  ): Promise<string | null> => {
-    const pickerWindow = window as PickerWindow;
-    if (typeof pickerWindow.showSaveFilePicker === 'function') {
-      try {
-        const handle = await pickerWindow.showSaveFilePicker({
-          suggestedName,
-          types: [{ description, accept: { 'text/plain': extensions } }],
-        });
-        const writable = await handle.createWritable();
-        await writable.write(content);
-        await writable.close();
-        return handle.name.replace(/\.[^/.]+$/, '');
-      } catch (err) {
-        if (err instanceof DOMException && err.name === 'AbortError') return null;
-        // Otherwise fall through to the download fallback.
-      }
-    }
-    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-    saveAs(blob, suggestedName);
-    return suggestedName.replace(/\.[^/.]+$/, '');
-  };
+  } = useOptimization(() => showToast('Нет объектов для оптимизации'));
 
   const cleanProjectName = () => projectName.trim().replace(/\s+/g, '_') || 'cnc_project';
 
-  // Save the editable project (full state) as a .json file for reopening in the editor.
   const handleSaveProject = async () => {
-    const saved = await writeToDisk(
+    const saved = await writeTextFileToDisk(
       exportProjectJSON(),
       `${cleanProjectName()}.json`,
       'Проект ЧПУ (*.json)',
       ['.json']
     );
-    if (saved) setProjectName(saved);
+    if (saved) {
+      setProjectName(saved);
+      showToast(`Проект «${saved}.json» сохранён`);
+    }
   };
 
-  // Export a clean G-code program (.nc) for the machine — no embedded project JSON.
-  // true = файл сохранён (модалка экспорта закроется), false = отменён/нечего экспортировать.
   const handleExportGcode = async (): Promise<boolean> => {
     if (!hasObjects) {
-      alert('Нет объектов для экспорта.');
+      showToast('Нет объектов для выгрузки управляющей программы', true);
       return false;
     }
-    const saved = await writeToDisk(
+    const saved = await writeTextFileToDisk(
       exportGcode(),
       `${cleanProjectName()}.nc`,
       'Управляющая программа ЧПУ (*.nc)',
       ['.nc', '.gcode', '.cnc', '.tap', '.txt']
     );
+    if (saved !== null) {
+      showToast(`Программа «${saved}.nc» выгружена`);
+    }
     return saved !== null;
   };
 
   const handleOpenFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const content = event.target?.result as string;
-      if (content) {
-        const ok = loadProjectNC(content, file.name);
-        if (!ok) {
-          alert('Ошибка при чтении файла. Проверьте содержимое файла.');
-        }
-      }
-    };
-    reader.readAsText(file);
+    importProjectFile(file, {
+      loadProjectNC,
+      openVectorImport: (pending) => {
+        setPendingVectorImport(pending);
+        setShapeDialog({ kind: 'import' });
+      },
+      onSuccess: (msg) => showToast(msg),
+      onError: (msg) => showToast(msg, true),
+    });
     e.target.value = '';
+  };
+
+  const applyPreset = (mode: ProjectMode) => {
+    applyMachinePreset(mode);
+    showToast(mode === 'rail' ? 'Применён пресет «Царга · Ø8 мм»' : 'Применён пресет «Изголовье · Ø3 мм»');
   };
 
   const errorCount = warnings.filter((w) => w.level === 'error').length;
   const warningCount = warnings.filter((w) => w.level === 'warning').length;
 
-  // Режим детали (фреза Ø8 и толще = царга) влияет на набор инструментов черчения.
-  const isRail = (machine.toolDiameter ?? 0) >= 5;
-
-  // Набор инструментов черчения: один список на мобильный и десктоп-ряды
-  // (раньше — 10 копий одинаковых кнопок с расходящимися title/классами).
-  const TOOL_DEFS: Array<{
-    id: ActiveTool;
-    Icon: React.ComponentType<{ className?: string }>;
-    title: string;
-    mobileTitle: string;
-    show: boolean;
-  }> = [
-    { id: 'select', Icon: MousePointer, title: 'Выбор и перемещение (S)', mobileTitle: 'Выбор и перемещение', show: true },
-    { id: 'line', Icon: LineDotRightHorizontal, title: 'Линия / Отрезок (L) · Shift = углы 90°/45°', mobileTitle: 'Линия / Отрезок', show: true },
-    { id: 'point', Icon: CircleDot, title: 'Отверстие / Точка (H)', mobileTitle: 'Отверстие / Точка', show: isRail },
-    { id: 'arc', Icon: Spline, title: 'Дуга окружности (A) · Shift = хорда 90°/45°', mobileTitle: 'Дуга окружности', show: !isRail },
-    { id: 'measure', Icon: Ruler, title: 'Линейка / Штангенциркуль (M)', mobileTitle: 'Линейка / Штангенциркуль', show: true },
-  ];
+  const isRail = isRailMachine(machine);
+  const modeLabel = isRail ? `Царга · Ø${machine.toolDiameter} мм` : `Изголовье · Ø${machine.toolDiameter} мм`;
+  const tools = getToolDefs(isRail);
 
   const isMobile = useIsMobile();
   const [menuOpen, setMenuOpen] = useState(false);
   const [newProjectOpen, setNewProjectOpen] = useState(false);
+  const [hotkeysOpen, setHotkeysOpen] = useState(false);
 
-  // Переключатель представления: 2D-редактор ↔ 3D-симуляция съёма фрезой.
   const viewToggle = (
-    <div className="flex items-center bg-slate-100/90 dark:bg-slate-800/90 p-1 rounded-xl border border-slate-200/90 dark:border-slate-700 shadow-inner shrink-0">
+    <div className="flex items-center bg-surface-subtle p-0.5 rounded-lg border border-line shrink-0">
       {(['2d', '3d'] as const).map((m) => {
         const active = renderMode === m;
         return (
           <button
             key={m}
+            type="button"
             onClick={() => setRenderMode(m)}
-            title={m === '2d' ? '2D-редактор' : '3D-симуляция съёма фрезой'}
-            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-              active
-                ? 'bg-primary text-primary-fg'
-                : 'text-slate-600 dark:text-slate-300 hover:bg-white hover:dark:bg-slate-800'
+            title={m === '2d' ? '2D-черчение и редактирование' : '3D-симуляция съёма материала'}
+            className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
+              active ? 'bg-primary text-primary-fg shadow-2xs' : 'text-muted hover:text-fg'
             }`}
           >
-            {m.toUpperCase()}
+            {m === '2d' ? '2D Чертёж' : '3D Симуляция'}
           </button>
         );
       })}
     </div>
   );
 
-  // ─────────────── Мобильный компактный Header: 2 ряда ───────────────
+  // ─────────────── Мобильная шапка ───────────────
   if (isMobile) {
     const menuItems = [
-      { label: 'Новый проект', Icon: FilePlus, onClick: () => setNewProjectOpen(true), color: 'text-accent' },
-      { label: 'Открыть (.json / .nc)', Icon: FolderOpen, onClick: () => fileInputRef.current?.click(), color: 'text-accent' },
-      { label: 'Сохранить проект (.json)', Icon: Save, onClick: () => handleSaveProject(), color: 'text-accent' },
-      { label: 'Экспорт на ЧПУ', Icon: Download, onClick: () => openExportModal(), color: 'text-accent' },
+      { label: 'Новый проект…', Icon: FilePlus, onClick: () => setNewProjectOpen(true) },
+      { label: 'Открыть (.json / .nc / .dxf / .svg)', Icon: FolderOpen, onClick: () => fileInputRef.current?.click() },
+      { label: 'Импорт DXF / SVG…', Icon: FileUp, onClick: () => setShapeDialog({ kind: 'import' }) },
+      { label: 'Сохранить проект (.json)', Icon: Save, onClick: () => handleSaveProject() },
+      { label: 'На станок (.nc)', Icon: Download, onClick: () => openExportModal() },
+      { label: 'Режим: Изголовье (Ø3)', Icon: Spline, onClick: () => applyPreset('head') },
+      { label: 'Режим: Царга (Ø8)', Icon: CircleDot, onClick: () => applyPreset('rail') },
+      { label: 'Горячие клавиши', Icon: HelpCircle, onClick: () => setHotkeysOpen(true) },
     ];
 
     return (
       <header
-        className="absolute inset-x-0 top-0 bg-transparent text-slate-800 dark:text-slate-100 flex flex-col gap-1 px-2 pt-1.5 pb-1 select-none z-20"
+        className="relative bg-surface border-b border-line text-fg flex flex-col gap-1.5 px-2.5 pt-1.5 pb-1.5 select-none z-30 shrink-0"
         style={{ paddingTop: 'calc(env(safe-area-inset-top) + 6px)' }}
       >
-        {/* Row 1: название, меню */}
         <div className="flex items-center gap-1.5 min-w-0">
           <input
             type="text"
             value={projectName}
             onChange={(e) => setProjectName(e.target.value)}
-            className="bg-slate-100/80 dark:bg-slate-800/80 text-slate-800 dark:text-slate-100 text-sm font-semibold px-2 py-1 rounded-xl border border-slate-200 dark:border-slate-700 focus:border-primary focus:bg-white focus:dark:bg-slate-800 focus:outline-none flex-1 min-w-0 text-center"
-            placeholder="Проект"
+            className="bg-surface-subtle text-fg text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-line focus:border-accent focus:bg-surface focus:outline-none flex-1 min-w-0"
+            placeholder="Название проекта"
           />
 
           {(errorCount > 0 || warningCount > 0) && (
             <button
-              onClick={() => setActiveTab('machine')}
-              className={`flex items-center gap-1 px-2 py-1.5 rounded-xl text-xs font-bold shrink-0 ${
-                errorCount > 0 ? 'bg-danger/10 text-danger' : 'bg-slate-100 dark:bg-slate-800 text-muted'
+              type="button"
+              onClick={openSafetyDrawer}
+              className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-mono font-semibold border shrink-0 ${
+                errorCount > 0
+                  ? 'bg-danger/10 border-danger/30 text-danger'
+                  : 'bg-warning/10 border-warning/30 text-warning'
               }`}
             >
-              <AlertTriangle className="w-4 h-4 shrink-0" />
-              {errorCount > 0 ? errorCount : warningCount}
+              <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+              <span>{errorCount > 0 ? errorCount : warningCount}</span>
             </button>
           )}
 
+          <div className="flex items-center bg-surface-subtle p-0.5 rounded-lg border border-line shrink-0">
+            {(['2d', '3d'] as const).map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setRenderMode(m)}
+                className={`px-2 py-1 rounded-md text-xs font-semibold transition-colors whitespace-nowrap shrink-0 ${
+                  renderMode === m ? 'bg-primary text-primary-fg' : 'text-muted'
+                }`}
+              >
+                {m.toUpperCase()}
+              </button>
+            ))}
+          </div>
+
           <button
+            type="button"
             onClick={toggleTheme}
             title={theme === 'dark' ? 'Светлая тема' : 'Тёмная тема'}
-            className="p-2 rounded-xl bg-slate-100/90 dark:bg-slate-800/90 border border-slate-200/90 dark:border-slate-700 text-slate-600 dark:text-slate-300 shrink-0"
+            className="p-1.5 rounded-lg bg-surface-subtle border border-line text-muted hover:text-fg shrink-0"
           >
             {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
           </button>
 
-          {viewToggle}
-
           <button
+            type="button"
             onClick={() => setMenuOpen((v) => !v)}
-            title="Меню проекта"
-            className="p-2 rounded-xl bg-slate-100/90 dark:bg-slate-800/90 border border-slate-200/90 dark:border-slate-700 text-slate-600 dark:text-slate-300 shrink-0"
+            title="Меню файла"
+            className="p-1.5 rounded-lg bg-surface-subtle border border-line text-muted hover:text-fg shrink-0"
           >
             {menuOpen ? <X className="w-4 h-4" /> : <MoreHorizontal className="w-4 h-4" />}
           </button>
         </div>
 
-        {/* Row 2: инструменты черчения + undo/redo — скрыты в 3D (там нет правки) */}
         {renderMode === '2d' && (
-        <div className="flex items-center gap-1 bg-slate-100/90 dark:bg-slate-800/90 px-1 py-0.5 rounded-xl border border-slate-200/90 dark:border-slate-700 overflow-x-auto">
-          {TOOL_DEFS.filter((t) => t.show).map(({ id, Icon, mobileTitle }) => {
-            const active = activeTool === id;
-            return (
+          <div className="flex items-center justify-between gap-1 bg-surface-subtle px-1 py-0.5 rounded-lg border border-line overflow-x-auto no-scrollbar">
+            <div className="flex items-center gap-0.5">
+              {tools.map(({ id, Icon, shortLabel, title }) => {
+                const active = activeTool === id;
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setActiveTool(id)}
+                    title={title}
+                    className={`flex items-center gap-1 px-2 py-1.5 rounded-md text-xs font-medium transition-colors shrink-0 ${
+                      active
+                        ? 'bg-primary text-primary-fg font-semibold'
+                        : 'text-fg-secondary hover:bg-surface-hover'
+                    }`}
+                  >
+                    <Icon className="w-3.5 h-3.5 shrink-0" />
+                    <span className="text-[11px]">{shortLabel}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="flex items-center gap-0.5 pl-1 border-l border-line shrink-0">
               <button
-                key={id}
-                onClick={() => setActiveTool(id)}
-                title={mobileTitle}
-                className={`p-2 rounded-lg transition-all shrink-0 ${
-                  active ? 'bg-primary text-primary-fg' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 hover:dark:bg-slate-800/60'
-                }`}
+                type="button"
+                onClick={undo}
+                disabled={undoCount === 0}
+                title="Отменить"
+                className="p-1.5 rounded-md text-fg-secondary disabled:opacity-30 hover:bg-surface-hover transition-colors"
               >
-                <Icon className={id === 'select' ? 'w-4 h-4' : `w-4 h-4 ${active ? 'text-primary-fg' : 'text-accent'}`} />
+                <Undo className="w-3.5 h-3.5" />
               </button>
-            );
-          })}
-
-          <div className="w-px h-5 bg-slate-200 dark:bg-slate-700 mx-0.5 shrink-0" />
-
-          <button onClick={undo} disabled={undoCount === 0} title="Отменить" className="p-2 rounded-lg text-slate-600 dark:text-slate-300 disabled:opacity-30 hover:bg-white hover:dark:bg-slate-800 transition-all shrink-0">
-            <Undo className="w-4 h-4" />
-          </button>
-          <button onClick={redo} disabled={redoCount === 0} title="Повторить" className="p-2 rounded-lg text-slate-600 dark:text-slate-300 disabled:opacity-30 hover:bg-white hover:dark:bg-slate-800 transition-all shrink-0">
-            <Redo className="w-4 h-4" />
-          </button>
-        </div>
+              <button
+                type="button"
+                onClick={redo}
+                disabled={redoCount === 0}
+                title="Повторить"
+                className="p-1.5 rounded-md text-fg-secondary disabled:opacity-30 hover:bg-surface-hover transition-colors"
+              >
+                <Redo className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
         )}
 
-        {/* Выпадающее меню файловых действий */}
         {menuOpen && (
           <>
             <div className="fixed inset-0 z-30" onClick={() => setMenuOpen(false)} />
-            <div className="absolute right-2 top-full mt-1 z-40 w-56 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-md p-1.5 flex flex-col gap-0.5">
-              {menuItems.map(({ label, Icon, onClick, color }) => (
+            <div className="absolute right-2.5 top-full mt-1 z-40 w-60 bg-surface rounded-xl border border-line shadow-lg p-1 flex flex-col gap-0.5">
+              {menuItems.map(({ label, Icon, onClick }) => (
                 <button
                   key={label}
+                  type="button"
                   onClick={() => {
                     setMenuOpen(false);
                     onClick();
                   }}
-                  className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 hover:dark:bg-slate-700 active:bg-slate-200 active:dark:bg-slate-600 transition-colors text-left"
+                  className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-fg hover:bg-surface-hover transition-colors text-left"
                 >
-                  <Icon className={`w-4 h-4 shrink-0 ${color}`} />
+                  <Icon className="w-4 h-4 shrink-0 text-muted" />
                   <span>{label}</span>
                 </button>
               ))}
@@ -337,7 +334,7 @@ export const Header: React.FC = () => {
           type="file"
           ref={fileInputRef}
           onChange={handleOpenFile}
-          accept=".nc,.cnc,.gcode,.json,.tap,.txt"
+          accept={FILE_INPUT_ACCEPT}
           className="hidden"
         />
 
@@ -345,9 +342,10 @@ export const Header: React.FC = () => {
           isOpen={newProjectOpen}
           onClose={() => setNewProjectOpen(false)}
           hasObjects={hasObjects}
-          onCreate={(mode) => {
+          currentMachine={machine}
+          onCreate={(mode, options) => {
             setNewProjectOpen(false);
-            newProject(mode);
+            newProject(mode, options);
           }}
         />
 
@@ -360,144 +358,172 @@ export const Header: React.FC = () => {
           onExport={handleExportGcode}
           onUndoOptimize={undoOptimize}
         />
+
+        <HotkeysModal isOpen={hotkeysOpen} onClose={() => setHotkeysOpen(false)} />
       </header>
     );
   }
 
+  // ─────────────── Десктопная верхняя панель (чистые 3 зоны) ───────────────
   return (
-    <header className="absolute inset-x-0 top-0 h-16 bg-transparent text-slate-800 dark:text-slate-100 flex items-center px-4 select-none z-20 gap-2">
-      {/* Left section: File actions & Theme */}
-      <div className="flex items-center gap-2 shrink-0">
-        <div className="flex items-center gap-1 bg-slate-100/90 dark:bg-slate-800/90 p-1 rounded-xl border border-slate-200/90 dark:border-slate-700 shadow-inner">
+    <header className="relative h-12 bg-surface border-b border-line text-fg flex items-center justify-between px-3.5 select-none z-30 gap-6 shrink-0">
+      {/* Зона 1: проект, файловые операции и быстрый переключатель пресета */}
+      <div className="flex items-center gap-2 min-w-0 shrink-0">
+        <div className="flex items-center gap-1.5 shrink-0">
+          <span className="font-mono text-xs font-bold tracking-tight text-fg whitespace-nowrap">
+            EZNC
+          </span>
+          <span className="text-line-strong">/</span>
+          <input
+            type="text"
+            value={projectName}
+            onChange={(e) => setProjectName(e.target.value)}
+            title="Название проекта (используется при сохранении .json и .nc)"
+            className="w-32 lg:w-44 bg-surface-subtle hover:bg-surface-hover focus:bg-surface text-fg text-xs font-semibold px-2.5 py-1 rounded-md border border-transparent hover:border-line focus:border-accent focus:outline-none transition-colors truncate"
+            placeholder="Без названия"
+          />
+        </div>
+
+        <div className="h-4 w-px bg-line shrink-0" />
+
+        <div className="flex items-center gap-0.5 shrink-0">
           <button
+            type="button"
             onClick={() => setNewProjectOpen(true)}
-            title="Новый проект"
-            className="p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:text-primary hover:bg-white hover:dark:bg-slate-800 transition-all hover:shadow-sm"
+            title="Новый проект (выбор пресета Изголовье / Царга)"
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium text-fg-secondary hover:text-fg hover:bg-surface-hover transition-colors whitespace-nowrap shrink-0 cursor-pointer"
           >
-            <FilePlus className="w-4 h-4 text-accent" />
+            <FilePlus className="w-3.5 h-3.5 text-muted shrink-0" />
+            <span>Новый</span>
           </button>
 
           <button
+            type="button"
             onClick={() => fileInputRef.current?.click()}
-            title="Открыть проект (.json / .nc)"
-            className="p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:text-primary hover:bg-white hover:dark:bg-slate-800 transition-all hover:shadow-sm"
+            title="Открыть проект (.json), G-код (.nc) или вектор (.dxf, .svg)"
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium text-fg-secondary hover:text-fg hover:bg-surface-hover transition-colors whitespace-nowrap shrink-0 cursor-pointer"
           >
-            <FolderOpen className="w-4 h-4 text-accent" />
+            <FolderOpen className="w-3.5 h-3.5 text-muted shrink-0" />
+            <span>Открыть</span>
           </button>
           <input
             type="file"
             ref={fileInputRef}
             onChange={handleOpenFile}
-            accept=".json,.nc,.cnc,.gcode,.tap,.txt"
+            accept={FILE_INPUT_ACCEPT}
             className="hidden"
           />
 
           <button
+            type="button"
             onClick={handleSaveProject}
-            title="Сохранить проект (.json)"
-            className="p-2 rounded-lg text-slate-700 dark:text-slate-200 hover:text-primary hover:bg-white hover:dark:bg-slate-800 transition-all hover:shadow-sm flex items-center gap-1.5 cursor-pointer"
+            title="Сохранить рабочий проект (.json), чтобы продолжить редактирование позже"
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium text-fg-secondary hover:text-fg hover:bg-surface-hover transition-colors whitespace-nowrap shrink-0 cursor-pointer"
           >
-            <Save className="w-4 h-4 text-accent" />
+            <Save className="w-3.5 h-3.5 text-muted shrink-0" />
+            <span>Проект</span>
           </button>
         </div>
 
-        {/* Тема (светлая / тёмная) */}
-        <div className="flex items-center bg-slate-100/90 dark:bg-slate-800/90 p-1 rounded-xl border border-slate-200/90 dark:border-slate-700 shadow-inner">
-          <button
-            onClick={toggleTheme}
-            title={theme === 'dark' ? 'Светлая тема' : 'Тёмная тема'}
-            className="p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:text-primary hover:bg-white hover:dark:bg-slate-800 transition-all cursor-pointer"
-          >
-            {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-          </button>
-        </div>
+        <div className="hidden xl:block h-4 w-px bg-line shrink-0" />
 
-        {viewToggle}
+        {/* Тихий индикатор активного режима — по клику открывает настройки листа и станка */}
+        <button
+          type="button"
+          onClick={() => setActiveTab('machine')}
+          title="Открыть настройки листа ДСП и станка"
+          className="hidden xl:inline-flex items-center text-[11px] font-mono tabular-nums text-muted hover:text-fg transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+        >
+          {modeLabel}
+        </button>
       </div>
 
-      {/* Middle section: Drawing Tools Toolbar — ряд инструментов скрыт в 3D */}
-      <div className="flex-1 flex items-center justify-center">
-        {renderMode === '2d' && (
-        <div className="flex items-center gap-1 bg-slate-100/90 dark:bg-slate-800/90 p-1 rounded-xl border border-slate-200/90 dark:border-slate-700 shadow-inner">
-          {TOOL_DEFS.filter((t) => t.show).map(({ id, Icon, title }) => {
-            const active = activeTool === id;
-            return (
-              <button
-                key={id}
-                onClick={() => setActiveTool(id)}
-                title={title}
-                className={`p-2 rounded-lg transition-all ${
-                  active
-                    ? 'bg-primary text-primary-fg'
-                    : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:dark:text-slate-100 hover:bg-slate-50 hover:dark:bg-slate-800/60'
-                }`}
-              >
-                <Icon className={id === 'select' ? 'w-4 h-4' : `w-4 h-4 ${active ? 'text-primary-fg' : 'text-accent'}`} />
-              </button>
-            );
-          })}
+      {/* Зона 2: переключение 2D / 3D + Отмена / Повтор */}
+      <div className="flex items-center gap-2 shrink-0">
+        {viewToggle}
 
-          <div className="w-px h-5 bg-slate-200 dark:bg-slate-700 mx-0.5 shrink-0" />
-
+        <div className="flex items-center gap-0.5 bg-surface-subtle p-0.5 rounded-lg border border-line shrink-0">
           <button
+            type="button"
             onClick={undo}
             disabled={undoCount === 0}
-            title="Отменить (Ctrl+Z)"
-            className="p-2 rounded-lg text-slate-600 dark:text-slate-300 disabled:opacity-30 hover:text-slate-900 hover:dark:text-slate-100 hover:bg-slate-50 hover:dark:bg-slate-800/60 transition-all"
+            title={`Отменить (Ctrl+Z)${undoCount > 0 ? ` · шагов: ${undoCount}` : ''}`}
+            className="p-1.5 rounded-md text-fg-secondary disabled:opacity-30 hover:text-fg hover:bg-surface-hover transition-colors shrink-0 cursor-pointer disabled:cursor-default"
           >
-            <Undo className="w-4 h-4" />
+            <Undo className="w-3.5 h-3.5" />
           </button>
 
           <button
+            type="button"
             onClick={redo}
             disabled={redoCount === 0}
-            title="Повторить (Ctrl+Y)"
-            className="p-2 rounded-lg text-slate-600 dark:text-slate-300 disabled:opacity-30 hover:text-slate-900 hover:dark:text-slate-100 hover:bg-slate-50 hover:dark:bg-slate-800/60 transition-all"
+            title={`Повторить (Ctrl+Y)${redoCount > 0 ? ` · шагов: ${redoCount}` : ''}`}
+            className="p-1.5 rounded-md text-fg-secondary disabled:opacity-30 hover:text-fg hover:bg-surface-hover transition-colors shrink-0 cursor-pointer disabled:cursor-default"
           >
-            <Redo className="w-4 h-4" />
+            <Redo className="w-3.5 h-3.5" />
           </button>
         </div>
-        )}
       </div>
 
-      {/* Right section: Export action & Warnings */}
-      <div className="flex items-center gap-2 shrink-0">
-        {/* Big export-to-CNC action */}
-        <button
-          onClick={openExportModal}
-          title="Оптимизировать маршрут и выгрузить чистый G-код на станок"
-          className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold text-primary-fg bg-primary hover:opacity-90 active:opacity-100 shadow-sm transition-all cursor-pointer"
-        >
-          <Download className="w-4 h-4" />
-          Экспорт на ЧПУ
-        </button>
-
-        {/* Warnings badge button */}
+      {/* Зона 3: предупреждения безопасности, справка, тема и главный экспорт */}
+      <div className="flex items-center gap-1.5 shrink-0">
         {(errorCount > 0 || warningCount > 0) && (
           <button
-            onClick={() => setActiveTab('machine')}
-            title={errorCount > 0 ? `${errorCount} ошибок` : `${warningCount} предупреждений`}
-            className={`flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-xs font-medium border transition-all ${
+            type="button"
+            onClick={openSafetyDrawer}
+            title={
               errorCount > 0
-                ? 'bg-danger/10 border-danger/30 text-danger hover:bg-danger/15 shadow-sm'
-                : 'bg-slate-100 dark:bg-slate-800 border-line text-muted hover:bg-slate-200 hover:dark:bg-slate-700 shadow-sm'
+                ? `Ошибок безопасности: ${errorCount} (открыть проверку)`
+                : `Предупреждений: ${warningCount} (открыть проверку)`
+            }
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono font-semibold border transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+              errorCount > 0
+                ? 'bg-danger/10 border-danger/30 text-danger hover:bg-danger/15'
+                : 'bg-warning/10 border-warning/30 text-warning hover:bg-warning/15'
             }`}
           >
-            <AlertTriangle className="w-4 h-4 shrink-0" />
-            <span className="font-bold">
-              {errorCount > 0 ? errorCount : warningCount}
-            </span>
+            <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+            <span>{errorCount > 0 ? `${errorCount} ош.` : `${warningCount} пред.`}</span>
           </button>
         )}
+
+        <button
+          type="button"
+          onClick={() => setHotkeysOpen(true)}
+          title="Горячие клавиши и приёмы работы"
+          className="p-1.5 rounded-lg bg-surface-subtle border border-line text-fg-secondary hover:text-fg hover:bg-surface-hover transition-colors cursor-pointer shrink-0"
+        >
+          <HelpCircle className="w-4 h-4" />
+        </button>
+
+        <button
+          type="button"
+          onClick={toggleTheme}
+          title={theme === 'dark' ? 'Переключить на светлую тему' : 'Переключить на тёмную тему'}
+          className="p-1.5 rounded-lg bg-surface-subtle border border-line text-fg-secondary hover:text-fg hover:bg-surface-hover transition-colors cursor-pointer shrink-0"
+        >
+          {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+        </button>
+
+        <button
+          type="button"
+          onClick={openExportModal}
+          title="Выгрузить готовую управляющую программу (.nc) для запуска на станке ЧПУ"
+          className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold text-primary-fg bg-primary hover:opacity-90 active:opacity-100 transition-opacity cursor-pointer whitespace-nowrap shrink-0"
+        >
+          <Download className="w-3.5 h-3.5 shrink-0" />
+          <span>На станок (.nc)</span>
+        </button>
       </div>
 
       <NewProjectModal
         isOpen={newProjectOpen}
         onClose={() => setNewProjectOpen(false)}
         hasObjects={hasObjects}
-        onCreate={(mode) => {
+        currentMachine={machine}
+        onCreate={(mode, options) => {
           setNewProjectOpen(false);
-          newProject(mode);
+          newProject(mode, options);
         }}
       />
 
@@ -510,6 +536,8 @@ export const Header: React.FC = () => {
         onExport={handleExportGcode}
         onUndoOptimize={undoOptimize}
       />
+
+      <HotkeysModal isOpen={hotkeysOpen} onClose={() => setHotkeysOpen(false)} />
     </header>
   );
 };

@@ -1,23 +1,17 @@
-import React, { useId, useState } from 'react';
+import React, { useId } from 'react';
 import { useScrub } from '../../ui/useScrub';
 import { ScrubChevrons } from '../../ui/ScrubChevrons';
-import { parseDecimalOrNull } from '../../../lib/utils/num';
+import { useNumericDraft } from '../../ui/useNumericDraft';
 
 interface PropertyInputProps {
   label: string;
   value: number;
   onChange: (val: number) => void;
-  /**
-   * Если задано положительным числом — справа появляются стрелки ▲/▼, каждая
-   * из которых меняет значение на ±step. По умолчанию шаг = 1 мм, то есть
-   * меняются цифры ДО запятой. Зажать стрелку и вести мышь вверх/вниз —
-   * значение меняется непрерывно (6 px = 1 шаг).
-   */
   step?: string | number;
   className?: string;
   fallbackValue?: number;
-  /** Если задано — значение округляется до этого числа знаков после запятой при уходе из поля. */
   decimals?: number;
+  layout?: 'inline' | 'stacked';
 }
 
 export const PropertyInput: React.FC<PropertyInputProps> = ({
@@ -25,83 +19,34 @@ export const PropertyInput: React.FC<PropertyInputProps> = ({
   value,
   onChange,
   step,
-  className = 'text-slate-800 dark:text-slate-100',
+  className = 'text-fg',
   fallbackValue = 0,
   decimals,
+  layout = 'inline',
 }) => {
-  // Локальный черновик: даёт набирать дробь/запятую, не «съедая» ввод. Вне редактирования
-  // показываем значение из props (при заданном decimals — округлённым до нужного числа знаков).
-  const [draft, setDraft] = useState<string | null>(null);
   const id = useId();
+  const { display, handleChange, commit, resolveBase, normalize, clearDraft } = useNumericDraft({
+    value,
+    fallbackValue,
+    decimals,
+    onCommitValue: onChange,
+  });
 
-  // toFixed принимает только целое 0..100, иначе RangeError — приводим безопасно.
-  const dec =
-    typeof decimals === 'number' && Number.isFinite(decimals)
-      ? Math.max(0, Math.min(100, Math.trunc(decimals)))
-      : null;
-
-  // Вне редактирования показываем значение из props: при decimals — округлённое и с запятой
-  // как десятичным разделителем (привычнее для русскоязычного интерфейса).
-  const display =
-    draft !== null
-      ? draft
-      : !Number.isFinite(value)
-        ? ''
-        : dec != null
-          ? value.toFixed(dec).replace('.', ',')
-          : String(value);
-
-  const handleChange = (raw: string) => {
-    setDraft(raw);
-    const n = parseDecimalOrNull(raw);
-    if (n !== null) onChange(n); // живое обновление холста/G-кода без округления
-  };
-
-  // Единая база для commit/shift: без черновика — входящее value; с черновиком —
-  // разобранное число, а при невалидном вводе один и тот же fallbackValue в обеих
-  // ветках (иначе итог зависел бы от порядка действий пользователя).
-  const resolveBase = (): number => {
-    if (draft === null) return value;
-    const n = parseDecimalOrNull(draft);
-    return n !== null ? n : fallbackValue;
-  };
-
-  const commit = () => {
-    if (draft !== null) {
-      let next = resolveBase();
-      if (dec != null) next = Number(next.toFixed(dec));
-      onChange(next);
-    }
-    setDraft(null);
-  };
-
-  // Шаг для стрелок: принимаем и число, и строку («1», «0.5»); невалидное или <=0 → стрелок нет.
   const stepNum = typeof step === 'string' ? parseFloat(step.replace(',', '.')) : step;
   const hasStepper = typeof stepNum === 'number' && Number.isFinite(stepNum) && stepNum > 0;
 
-  // Общая функция сдвига на `deltaSteps` шагов (клик = ±1; drag = инкремент шагов с прошлого события).
-  // База — из resolveBase(): тот же источник, что и у commit (единый fallback при невалидном черновике).
   const shift = (deltaSteps: number) => {
     if (!hasStepper) return;
-    let next = resolveBase() + deltaSteps * (stepNum as number);
-    if (dec != null) next = Number(next.toFixed(dec));
-    setDraft(null);
+    const next = normalize(resolveBase() + deltaSteps * (stepNum as number));
+    clearDraft();
     onChange(next);
   };
 
-  // Хуки нельзя вызывать условно — вешаем всегда, а внутри shift есть guard по hasStepper.
   const up = useScrub(shift, { clickDir: 1 });
   const down = useScrub(shift, { clickDir: -1 });
 
-  return (
-    <div className="flex items-center gap-1.5 w-full">
-      <label
-        htmlFor={id}
-        className="text-[13px] text-slate-500 dark:text-slate-400 font-medium whitespace-nowrap shrink-0 min-w-[32px]"
-        title={label}
-      >
-        {label}
-      </label>
+  const inputEl = (
+    <div className="flex items-stretch flex-1 min-w-0">
       <input
         id={id}
         type="text"
@@ -112,7 +57,9 @@ export const PropertyInput: React.FC<PropertyInputProps> = ({
         onKeyDown={(e) => {
           if (e.key === 'Enter') e.currentTarget.blur();
         }}
-        className={`w-full min-w-0 bg-slate-50 dark:bg-slate-900 border border-slate-200/90 dark:border-slate-700/90 ${hasStepper ? 'rounded-l-lg rounded-r-none border-r-0' : 'rounded-lg'} px-2 py-1 text-xs font-mono focus:bg-white focus:dark:bg-slate-800 focus:border-primary focus:outline-none transition-all ${className}`}
+        className={`w-full min-w-0 bg-surface-subtle border border-line ${
+          hasStepper ? 'rounded-l-lg rounded-r-none border-r-0' : 'rounded-lg'
+        } px-2.5 py-1.5 text-xs font-mono tabular-nums font-semibold focus:bg-surface focus:border-accent focus:outline-none transition-colors ${className}`}
       />
       {hasStepper && (
         <ScrubChevrons
@@ -120,11 +67,39 @@ export const PropertyInput: React.FC<PropertyInputProps> = ({
           down={down}
           variant="field"
           titles={{
-            up: 'Больше: клик +1 мм; зажать и тянуть вверх/вниз',
-            down: 'Меньше: клик −1 мм; зажать и тянуть вверх/вниз',
+            up: 'Увеличить: клик +1 шаг; зажать и тянуть вверх/вниз',
+            down: 'Уменьшить: клик −1 шаг; зажать и тянуть вверх/вниз',
           }}
         />
       )}
+    </div>
+  );
+
+  if (layout === 'stacked') {
+    return (
+      <div className="w-full min-w-0">
+        <label
+          htmlFor={id}
+          className="text-[11px] text-muted font-medium block mb-1 truncate"
+          title={label}
+        >
+          {label}
+        </label>
+        {inputEl}
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-1.5 w-full">
+      <label
+        htmlFor={id}
+        className="text-xs text-muted font-mono font-medium whitespace-nowrap shrink-0 min-w-[34px]"
+        title={label}
+      >
+        {label}
+      </label>
+      {inputEl}
     </div>
   );
 };

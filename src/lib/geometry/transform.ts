@@ -1,4 +1,12 @@
-import { ArcObject, CADObject, MachineSettings, ParallelArc, ParallelSegment, Point2D } from '../../types';
+import {
+  ArcObject,
+  CADObject,
+  MachineSettings,
+  ParallelArc,
+  ParallelSegment,
+  Point2D,
+  RectangleObject,
+} from '../../types';
 
 /**
  * Линии, параллельные исходному отрезку, смещённые перпендикулярно (по нормали)
@@ -365,4 +373,288 @@ export function mirrorArc(arc: ArcObject, axis: 'h' | 'v'): Partial<ArcObject> {
     clockwise: !arc.clockwise,
   };
 }
+
+/**
+ * Общая ось-выравненная рамка для массива фигур (мир, мм).
+ */
+export function computeObjectsBounds(objs: CADObject[]): ArcBounds | null {
+  if (objs.length === 0) return null;
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const o of objs) {
+    const b = computeObjectBounds(o);
+    if (b.minX < minX) minX = b.minX;
+    if (b.minY < minY) minY = b.minY;
+    if (b.maxX > maxX) maxX = b.maxX;
+    if (b.maxY > maxY) maxY = b.maxY;
+  }
+  return Number.isFinite(minX) ? { minX, minY, maxX, maxY } : null;
+}
+
+/**
+ * Зеркальное отражение фигуры относительно горизонтальной/вертикальной оси через anchor.
+ * axis='x' инвертирует мировую координату X (2*anchor.x - x);
+ * axis='y' инвертирует мировую координату Y (2*anchor.y - y).
+ * Для дуги дополнительно инвертируется направление clockwise.
+ */
+export function mirrorCADObject(
+  obj: CADObject,
+  axis: 'x' | 'y',
+  anchor: Point2D
+): CADObject {
+  const copy = structuredClone(obj);
+  const mx = (v: number) => (axis === 'x' ? 2 * anchor.x - v : v);
+  const my = (v: number) => (axis === 'y' ? 2 * anchor.y - v : v);
+
+  switch (copy.type) {
+    case 'point':
+      copy.x = mx(copy.x);
+      copy.y = my(copy.y);
+      break;
+    case 'line':
+      copy.startX = mx(copy.startX);
+      copy.startY = my(copy.startY);
+      copy.endX = mx(copy.endX);
+      copy.endY = my(copy.endY);
+      break;
+    case 'rectangle': {
+      const x1 = mx(copy.x);
+      const x2 = mx(copy.x + copy.width);
+      const y1 = my(copy.y);
+      const y2 = my(copy.y + copy.height);
+      copy.x = Math.min(x1, x2);
+      copy.y = Math.min(y1, y2);
+      copy.width = Math.abs(x2 - x1);
+      copy.height = Math.abs(y2 - y1);
+      break;
+    }
+    case 'circle':
+      copy.centerX = mx(copy.centerX);
+      copy.centerY = my(copy.centerY);
+      break;
+    case 'arc':
+      copy.startX = mx(copy.startX);
+      copy.startY = my(copy.startY);
+      copy.endX = mx(copy.endX);
+      copy.endY = my(copy.endY);
+      copy.centerX = mx(copy.centerX);
+      copy.centerY = my(copy.centerY);
+      copy.clockwise = !copy.clockwise;
+      break;
+    case 'polyline':
+      copy.points = copy.points.map((p) => ({ x: mx(p.x), y: my(p.y) }));
+      break;
+  }
+
+  return copy;
+}
+
+/**
+ * Поворот фигуры на кратный 90° угол (90 | -90 | 180) вокруг точки anchor в мировой плоскости XY.
+ */
+export function rotateCADObject90(
+  obj: CADObject,
+  angleDeg: 90 | -90 | 180,
+  anchor: Point2D
+): CADObject {
+  const copy = structuredClone(obj);
+  const rot = (px: number, py: number): Point2D => {
+    const dx = px - anchor.x;
+    const dy = py - anchor.y;
+    if (angleDeg === 90) return { x: anchor.x - dy, y: anchor.y + dx };
+    if (angleDeg === -90) return { x: anchor.x + dy, y: anchor.y - dx };
+    return { x: anchor.x - dx, y: anchor.y - dy };
+  };
+
+  switch (copy.type) {
+    case 'point': {
+      const p = rot(copy.x, copy.y);
+      copy.x = p.x;
+      copy.y = p.y;
+      break;
+    }
+    case 'line': {
+      const s = rot(copy.startX, copy.startY);
+      const e = rot(copy.endX, copy.endY);
+      copy.startX = s.x;
+      copy.startY = s.y;
+      copy.endX = e.x;
+      copy.endY = e.y;
+      break;
+    }
+    case 'rectangle': {
+      const corners = [
+        rot(copy.x, copy.y),
+        rot(copy.x + copy.width, copy.y),
+        rot(copy.x, copy.y + copy.height),
+        rot(copy.x + copy.width, copy.y + copy.height),
+      ];
+      const xs = corners.map((c) => c.x);
+      const ys = corners.map((c) => c.y);
+      const minX = Math.min(...xs);
+      const maxX = Math.max(...xs);
+      const minY = Math.min(...ys);
+      const maxY = Math.max(...ys);
+      copy.x = minX;
+      copy.y = minY;
+      copy.width = maxX - minX;
+      copy.height = maxY - minY;
+      break;
+    }
+    case 'circle': {
+      const c = rot(copy.centerX, copy.centerY);
+      copy.centerX = c.x;
+      copy.centerY = c.y;
+      break;
+    }
+    case 'arc': {
+      const s = rot(copy.startX, copy.startY);
+      const e = rot(copy.endX, copy.endY);
+      const c = rot(copy.centerX, copy.centerY);
+      copy.startX = s.x;
+      copy.startY = s.y;
+      copy.endX = e.x;
+      copy.endY = e.y;
+      copy.centerX = c.x;
+      copy.centerY = c.y;
+      break;
+    }
+    case 'polyline':
+      copy.points = copy.points.map((pt) => rot(pt.x, pt.y));
+      break;
+  }
+
+  return copy;
+}
+
+/**
+ * Вершины контура прямоугольника (с учётом скругления углов cornerRadius,
+ * аппроксимированного дуговыми сегментами). Используется при произвольном
+ * повороте прямоугольника и расчёте пересечений.
+ */
+export function roundedRectangleOutline(
+  rect: Pick<RectangleObject, 'x' | 'y' | 'width' | 'height' | 'cornerRadius'>,
+  arcSteps: number = 8
+): Point2D[] {
+  const x0 = Math.min(rect.x, rect.x + rect.width);
+  const y0 = Math.min(rect.y, rect.y + rect.height);
+  const w = Math.abs(rect.width);
+  const h = Math.abs(rect.height);
+  const r = Math.max(0, Math.min(rect.cornerRadius ?? 0, w / 2, h / 2));
+
+  if (r < 0.01) {
+    return [
+      { x: x0, y: y0 },
+      { x: x0 + w, y: y0 },
+      { x: x0 + w, y: y0 + h },
+      { x: x0, y: y0 + h },
+    ];
+  }
+
+  const pts: Point2D[] = [];
+  const corners = [
+    { cx: x0 + w - r, cy: y0 + r, a0: -Math.PI / 2, a1: 0 },
+    { cx: x0 + w - r, cy: y0 + h - r, a0: 0, a1: Math.PI / 2 },
+    { cx: x0 + r, cy: y0 + h - r, a0: Math.PI / 2, a1: Math.PI },
+    { cx: x0 + r, cy: y0 + r, a0: Math.PI, a1: (3 * Math.PI) / 2 },
+  ];
+  for (const c of corners) {
+    for (let i = 0; i <= arcSteps; i++) {
+      const a = c.a0 + ((c.a1 - c.a0) * i) / arcSteps;
+      pts.push({ x: c.cx + r * Math.cos(a), y: c.cy + r * Math.sin(a) });
+    }
+  }
+  return pts;
+}
+
+/**
+ * Поворот фигуры на произвольный угол angleDeg° вокруг точки anchor в плоскости XY.
+ * Для кратных 90° делегирует точному повороту; для произвольных углов прямоугольник
+ * преобразуется в замкнутую полилинию (с сохранением скругления), остальные примитивы
+ * сохраняют свой тип.
+ */
+export function rotateCADObject(
+  obj: CADObject,
+  angleDeg: number,
+  anchor: Point2D
+): CADObject {
+  const norm = ((angleDeg % 360) + 360) % 360;
+  if (norm < 1e-6 || Math.abs(norm - 360) < 1e-6) {
+    return structuredClone(obj);
+  }
+  if (Math.abs(norm - 90) < 1e-6) return rotateCADObject90(obj, 90, anchor);
+  if (Math.abs(norm - 180) < 1e-6) return rotateCADObject90(obj, 180, anchor);
+  if (Math.abs(norm - 270) < 1e-6) return rotateCADObject90(obj, -90, anchor);
+
+  const rad = (angleDeg * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+  const rot = (px: number, py: number): Point2D => {
+    const dx = px - anchor.x;
+    const dy = py - anchor.y;
+    return {
+      x: anchor.x + dx * cos - dy * sin,
+      y: anchor.y + dx * sin + dy * cos,
+    };
+  };
+
+  const copy = structuredClone(obj);
+  switch (copy.type) {
+    case 'point': {
+      const p = rot(copy.x, copy.y);
+      copy.x = p.x;
+      copy.y = p.y;
+      return copy;
+    }
+    case 'line': {
+      const s = rot(copy.startX, copy.startY);
+      const e = rot(copy.endX, copy.endY);
+      copy.startX = s.x;
+      copy.startY = s.y;
+      copy.endX = e.x;
+      copy.endY = e.y;
+      return copy;
+    }
+    case 'rectangle': {
+      const pts = roundedRectangleOutline(copy, 10).map((pt) => rot(pt.x, pt.y));
+      return {
+        id: copy.id,
+        name: copy.name,
+        type: 'polyline',
+        points: pts,
+        closed: true,
+        depth: copy.depth,
+        operationType: copy.operationType,
+        color: copy.color,
+        visible: copy.visible,
+        frozen: copy.frozen,
+      };
+    }
+    case 'circle': {
+      const c = rot(copy.centerX, copy.centerY);
+      copy.centerX = c.x;
+      copy.centerY = c.y;
+      return copy;
+    }
+    case 'arc': {
+      const s = rot(copy.startX, copy.startY);
+      const e = rot(copy.endX, copy.endY);
+      const c = rot(copy.centerX, copy.centerY);
+      copy.startX = s.x;
+      copy.startY = s.y;
+      copy.endX = e.x;
+      copy.endY = e.y;
+      copy.centerX = c.x;
+      copy.centerY = c.y;
+      return copy;
+    }
+    case 'polyline':
+      copy.points = copy.points.map((pt) => rot(pt.x, pt.y));
+      return copy;
+  }
+}
+
+
 

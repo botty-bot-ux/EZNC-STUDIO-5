@@ -1,72 +1,116 @@
-import React from 'react';
-import { ChevronLeft, Shapes } from 'lucide-react';
+import React, { useState } from 'react';
+import { ChevronLeft, Search, Shapes, X, Zap } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useProjectStore } from '../../store/useProjectStore';
 import { FiguresList } from './FiguresList';
 import { useIsMobile } from '../../hooks/useIsMobile';
 
-// Левая панель — простой текстовый список фигур на прозрачном фоне.
-// Выбранная фигура синим; её свойства (координаты, Ø, глубина) — на правой панели «Свойства».
-// На мобильных фигуры живут в нижней шторке «Фигуры» (см. MobileTabBar), поэтому панель скрывается.
 export const LeftToolbar: React.FC = () => {
   const isMobile = useIsMobile();
-  const { objects, leftPanelOpen, toggleLeftPanel, canvasGrabbing } = useProjectStore(
+  const [searchQuery, setSearchQuery] = useState('');
+  const {
+    objects,
+    selectedObjectIds,
+    leftPanelOpen,
+    toggleLeftPanel,
+    optimizeRoute,
+    selectAllObjects,
+  } = useProjectStore(
     useShallow((s) => ({
       objects: s.objects,
+      selectedObjectIds: s.selectedObjectIds,
       leftPanelOpen: s.leftPanelOpen,
       toggleLeftPanel: s.toggleLeftPanel,
-      canvasGrabbing: s.canvasGrabbing,
+      optimizeRoute: s.optimizeRoute,
+      selectAllObjects: s.selectAllObjects,
     }))
   );
 
-  if (isMobile) return null;
-
-  // Во время жеста на холсте панель пропускает мышь сквозь себя и слегка гаснет,
-  // чтобы не блокировать рисование/перетаскивание у левого края.
-  const inertClass = canvasGrabbing ? 'pointer-events-none opacity-40' : '';
-
-  if (!leftPanelOpen) {
-    return (
-      <div className={`absolute left-4 top-20 z-20 flex items-center select-none pointer-events-auto transition-opacity ${inertClass}`}>
-        <button
-          onClick={toggleLeftPanel}
-          title="Показать список фигур"
-          className="relative w-11 h-11 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-md flex items-center justify-center cursor-pointer hover:bg-white hover:dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:text-primary transition-colors"
-        >
-          <Shapes className="w-5 h-5 text-accent" />
-          {objects.length > 0 && (
-            <span className="absolute -top-1 -right-1 bg-primary text-primary-fg text-[12px] font-bold px-1.5 py-0.2 rounded-full min-w-[18px] text-center border-2 border-white dark:border-slate-700 shadow-sm">
-              {objects.length}
-            </span>
-          )}
-        </button>
-      </div>
-    );
-  }
+  if (isMobile || !leftPanelOpen) return null;
 
   return (
-    <aside className={`absolute left-4 top-20 bottom-4 w-[216px] flex flex-col bg-transparent text-slate-800 dark:text-slate-100 z-20 select-none overflow-hidden transition-all duration-200 ${inertClass}`}>
-      {/* Header */}
-      <div className="px-1.5 py-1 flex items-center justify-between gap-2 shrink-0">
+    <aside
+      aria-label="Список деталей и порядок резки"
+      className="w-[252px] shrink-0 flex flex-col bg-surface border-r border-line text-fg z-10 select-none overflow-hidden"
+    >
+      {/* Шапка списка деталей */}
+      <div className="px-3 py-2 bg-surface-subtle border-b border-line flex items-center justify-between gap-2 shrink-0">
         <div className="flex items-center gap-1.5 min-w-0">
-          <Shapes className="w-4 h-4 text-accent shrink-0" />
-          <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Фигуры</span>
-          <span className="text-[12px] font-bold text-slate-400 dark:text-slate-500">{objects.length}</span>
+          <Shapes className="w-3.5 h-3.5 text-muted shrink-0" />
+          <span className="text-xs font-semibold text-fg truncate">Список деталей</span>
+          <span className="font-mono tabular-nums text-xs text-muted">· {objects.length}</span>
         </div>
 
-        <button
-          onClick={toggleLeftPanel}
-          title="Свернуть панель"
-          className="p-1 rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-900 hover:dark:text-slate-100 hover:bg-slate-500/10 hover:dark:bg-slate-500/10 transition-colors shrink-0"
-        >
-          <ChevronLeft className="w-4 h-4" />
-        </button>
+        <div className="flex items-center gap-0.5 shrink-0">
+          {objects.length > 1 && (
+            <button
+              type="button"
+              onClick={() => optimizeRoute()}
+              title="Оптимизировать порядок резки (меньше холостых переходов)"
+              className="p-1 rounded-md text-muted hover:text-accent hover:bg-surface-hover transition-colors cursor-pointer"
+            >
+              <Zap className="w-3.5 h-3.5" />
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={toggleLeftPanel}
+            title="Свернуть список деталей"
+            className="p-1 rounded-md text-muted hover:text-fg hover:bg-surface-hover transition-colors cursor-pointer"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
-      {/* Figures list */}
+      {/* Быстрый поиск при большом числе объектов */}
+      {objects.length >= 6 && (
+        <div className="px-2 py-1.5 border-b border-line bg-surface shrink-0">
+          <div className="relative flex items-center">
+            <Search className="w-3.5 h-3.5 text-muted absolute left-2 pointer-events-none" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Фильтр по названию…"
+              className="w-full bg-surface-subtle border border-line rounded-md pl-7 pr-6 py-1 text-xs text-fg placeholder:text-muted focus:border-accent focus:bg-surface focus:outline-none transition-colors"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                title="Очистить фильтр"
+                className="absolute right-1.5 p-0.5 text-muted hover:text-fg cursor-pointer"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Список объектов */}
       <div className="flex-1 min-h-0">
-        <FiguresList />
+        <FiguresList filterQuery={searchQuery} />
       </div>
+
+      {/* Нижняя панель быстрых действий маршрута */}
+      {objects.length > 0 && (
+        <div className="px-3 py-1.5 bg-surface-subtle border-t border-line flex items-center justify-between text-[11px] text-muted shrink-0">
+          <span className="font-mono">
+            {selectedObjectIds.length > 0
+              ? `Выбрано: ${selectedObjectIds.length}`
+              : `Всего: ${objects.length}`}
+          </span>
+          <button
+            type="button"
+            onClick={selectAllObjects}
+            className="font-medium text-fg-secondary hover:text-fg transition-colors cursor-pointer"
+          >
+            Выделить все
+          </button>
+        </div>
+      )}
     </aside>
   );
 };

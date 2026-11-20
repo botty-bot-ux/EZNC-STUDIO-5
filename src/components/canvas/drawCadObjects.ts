@@ -68,7 +68,14 @@ export function drawCADObjects(
           const minY = Math.min(p1.y, p2.y);
           const wPx = Math.abs(p2.x - p1.x);
           const hPx = Math.abs(p2.y - p1.y);
-          ctx.strokeRect(minX, minY, wPx, hPx);
+          const cr = Math.min(Math.max(0, obj.cornerRadius ?? 0) * zoom, wPx / 2, hPx / 2);
+          if (cr > 0.5 && typeof ctx.roundRect === 'function') {
+            ctx.beginPath();
+            ctx.roundRect(minX, minY, wPx, hPx, cr);
+            ctx.stroke();
+          } else {
+            ctx.strokeRect(minX, minY, wPx, hPx);
+          }
         } else if (obj.type === 'circle') {
           const cp = wToC(obj.centerX, obj.centerY);
           const rPx = obj.radius * zoom;
@@ -156,7 +163,9 @@ export function drawCADObjects(
       if (!isSelected && !isHoveredObj) {
         ctx.fillStyle = palette.objectIdle;
         ctx.beginPath();
+        ctx.moveTo(p1.x + 3.5, p1.y);
         ctx.arc(p1.x, p1.y, 3.5, 0, Math.PI * 2);
+        ctx.moveTo(p2.x + 3.5, p2.y);
         ctx.arc(p2.x, p2.y, 3.5, 0, Math.PI * 2);
         ctx.fill();
       } else {
@@ -247,21 +256,36 @@ export function drawCADObjects(
       const minY = Math.min(p1.y, p2.y);
       const wPx = Math.abs(p2.x - p1.x);
       const hPx = Math.abs(p2.y - p1.y);
+      const cr = Math.min(Math.max(0, obj.cornerRadius ?? 0) * zoom, wPx / 2, hPx / 2);
 
-      ctx.strokeRect(minX, minY, wPx, hPx);
-
-      if (isSelected) {
-        ctx.fillStyle = 'rgba(37, 99, 235, 0.06)';
-        ctx.fillRect(minX, minY, wPx, hPx);
+      if (cr > 0.5 && typeof ctx.roundRect === 'function') {
+        ctx.beginPath();
+        ctx.roundRect(minX, minY, wPx, hPx, cr);
+        ctx.stroke();
+        if (isSelected) {
+          ctx.fillStyle = 'rgba(37, 99, 235, 0.06)';
+          ctx.fill();
+        }
+      } else {
+        ctx.strokeRect(minX, minY, wPx, hPx);
+        if (isSelected) {
+          ctx.fillStyle = 'rgba(37, 99, 235, 0.06)';
+          ctx.fillRect(minX, minY, wPx, hPx);
+        }
       }
 
-      // Vertex dots at 4 corners
+      // Vertex dots at 4 corners (moveTo перед каждой дугой, иначе fill заливает весь прямоугольник)
       ctx.fillStyle = isSelected ? '#2563eb' : palette.objectIdle;
       ctx.beginPath();
-      ctx.arc(minX, minY, 3.5, 0, Math.PI * 2);
-      ctx.arc(minX + wPx, minY, 3.5, 0, Math.PI * 2);
-      ctx.arc(minX + wPx, minY + hPx, 3.5, 0, Math.PI * 2);
-      ctx.arc(minX, minY + hPx, 3.5, 0, Math.PI * 2);
+      for (const [cx, cy] of [
+        [minX, minY],
+        [minX + wPx, minY],
+        [minX + wPx, minY + hPx],
+        [minX, minY + hPx],
+      ]) {
+        ctx.moveTo(cx + 3.5, cy);
+        ctx.arc(cx, cy, 3.5, 0, Math.PI * 2);
+      }
       ctx.fill();
     } else if (obj.type === 'circle') {
       const cp = wToC(obj.centerX, obj.centerY);
@@ -299,7 +323,9 @@ export function drawCADObjects(
       // Endpoints & center dots
       ctx.fillStyle = isSelected ? '#2563eb' : palette.objectIdle;
       ctx.beginPath();
+      ctx.moveTo(pStart.x + 3.5, pStart.y);
       ctx.arc(pStart.x, pStart.y, 3.5, 0, Math.PI * 2);
+      ctx.moveTo(pEnd.x + 3.5, pEnd.y);
       ctx.arc(pEnd.x, pEnd.y, 3.5, 0, Math.PI * 2);
       ctx.fill();
 

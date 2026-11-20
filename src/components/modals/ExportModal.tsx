@@ -1,6 +1,20 @@
-import React from 'react';
-import { Cpu, Download, Undo2, X, Zap } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+  AlertCircle,
+  AlertTriangle,
+  CheckCircle2,
+  Clock,
+  Cpu,
+  Download,
+  Undo2,
+  X,
+  Zap,
+} from 'lucide-react';
+import { useShallow } from 'zustand/react/shallow';
 import { OptimizationResult } from '../../lib/geometry/optimizer';
+import { computeToolpathStats, formatDistanceRu, formatDurationRu } from '../../lib/gcode/stats';
+import { useProjectStore } from '../../store/useProjectStore';
+import { ToggleSwitch } from '../ui/ToggleSwitch';
 
 interface ExportModalProps {
   isOpen: boolean;
@@ -8,7 +22,6 @@ interface ExportModalProps {
   result: OptimizationResult | null;
   hasObjects: boolean;
   onOptimize: () => void;
-  /** true = файл сохранён → окно закроется само; false = пользователь отменил сохранение. */
   onExport: () => Promise<boolean>;
   onUndoOptimize: () => void;
 }
@@ -24,6 +37,37 @@ export const ExportModal: React.FC<ExportModalProps> = ({
   onExport,
   onUndoOptimize,
 }) => {
+  const { toolpathSegments, machine, warnings, openSafetyDrawer } = useProjectStore(
+    useShallow((s) => ({
+      toolpathSegments: s.toolpathSegments,
+      machine: s.machine,
+      warnings: s.warnings,
+      openSafetyDrawer: s.openSafetyDrawer,
+    }))
+  );
+
+  const [autoOptimize, setAutoOptimize] = useState(true);
+
+  const stats = useMemo(
+    () => computeToolpathStats(toolpathSegments, machine),
+    [toolpathSegments, machine]
+  );
+
+  const errorCount = warnings.filter((w) => w.level === 'error').length;
+  const warningCount = warnings.filter((w) => w.level === 'warning').length;
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   const timeSavedStr = result
@@ -32,91 +76,200 @@ export const ExportModal: React.FC<ExportModalProps> = ({
       : `${result.estimatedTimeSavedSec.toFixed(1)} сек`
     : '';
 
+  const handlePrimaryExport = async () => {
+    if (!hasObjects) return;
+    if (autoOptimize && !result) {
+      onOptimize();
+    }
+    if (await onExport()) {
+      onClose();
+    }
+  };
+
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/40 dark:bg-slate-100/40 flex items-center justify-center p-4 animate-in fade-in duration-200 select-none">
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-2xl max-w-md w-full p-5 shadow-lg space-y-4 text-slate-800 dark:text-slate-100">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-200/80 dark:border-slate-700/80 pb-3">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-primary-fg">
-              <Cpu className="w-5 h-5" />
-            </div>
-            <h3 className="font-bold text-base text-slate-900 dark:text-slate-100">Экспорт на ЧПУ</h3>
+    <div
+      className="fixed inset-0 z-50 bg-black/50 backdrop-blur-[1px] flex items-center justify-center p-4 select-none"
+      onClick={onClose}
+    >
+      <div
+        role="dialog"
+        aria-label="Выгрузка программы на станок"
+        className="bg-surface border border-line rounded-xl max-w-md w-full p-5 shadow-xl space-y-4 text-fg"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Шапка */}
+        <div className="flex items-center justify-between pb-3 border-b border-line">
+          <div className="flex items-center gap-2">
+            <Cpu className="w-4 h-4 text-accent" />
+            <h3 className="font-semibold text-sm text-fg">Выгрузить на станок (.nc)</h3>
           </div>
 
           <button
+            type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 dark:text-slate-500 hover:text-slate-700 hover:dark:text-slate-200 hover:bg-slate-100 hover:dark:bg-slate-700 transition-colors"
+            title="Закрыть"
+            aria-label="Закрыть окно"
+            className="p-1 rounded-md text-muted hover:text-fg hover:bg-surface-hover transition-colors cursor-pointer"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Optimization result or a hint to optimize */}
-        {result ? (
-          <div className="rounded-xl border border-slate-200 dark:border-slate-700 p-4">
-            <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-              <span className="text-slate-500 dark:text-slate-400">Было</span>
-              <span className="text-right font-mono text-slate-500 dark:text-slate-400 line-through">
-                {toLen(result.initialDistance)}
-              </span>
+        {/* Статус проверки безопасности */}
+        {hasObjects && (
+          errorCount > 0 ? (
+            <div className="flex items-center justify-between gap-2.5 rounded-lg bg-danger/10 border border-danger/30 px-3 py-2 text-xs">
+              <div className="flex items-center gap-2 text-danger min-w-0">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span className="font-medium leading-snug">
+                  Найдено ошибок: {errorCount} — проверьте выход за пределы стола
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  openSafetyDrawer();
+                }}
+                className="px-2.5 py-1 rounded-md bg-surface border border-line text-fg text-[11px] font-semibold hover:bg-surface-hover whitespace-nowrap shrink-0 cursor-pointer"
+              >
+                Показать
+              </button>
+            </div>
+          ) : warningCount > 0 ? (
+            <div className="flex items-center justify-between gap-2.5 rounded-lg bg-warning/10 border border-warning/30 px-3 py-2 text-xs">
+              <div className="flex items-center gap-2 text-fg min-w-0">
+                <AlertTriangle className="w-4 h-4 text-warning shrink-0" />
+                <span className="leading-snug">
+                  Есть предупреждений: <strong className="font-mono tabular-nums">{warningCount}</strong>
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  openSafetyDrawer();
+                }}
+                className="px-2.5 py-1 rounded-md bg-surface border border-line text-fg text-[11px] font-semibold hover:bg-surface-hover whitespace-nowrap shrink-0 cursor-pointer"
+              >
+                Показать
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 rounded-lg bg-surface-subtle border border-line px-3 py-2 text-xs text-fg-secondary">
+              <CheckCircle2 className="w-4 h-4 text-success shrink-0" />
+              <span>Проверка пройдена · программа готова для станка</span>
+            </div>
+          )
+        )}
 
-              <span className="text-slate-500 dark:text-slate-400">Стало</span>
-              <span className="text-right font-mono font-bold text-slate-800 dark:text-slate-100">
-                {toLen(result.optimizedDistance)}
+        {/* Компактная сводка времени и пробега */}
+        {hasObjects && stats.estimatedSeconds > 0 && (
+          <div className="grid grid-cols-3 gap-2 rounded-lg bg-surface-subtle border border-line px-3 py-2.5 text-xs">
+            <div>
+              <span className="text-[11px] text-muted flex items-center gap-1">
+                <Clock className="w-3 h-3" /> Время
               </span>
-
-              <span className="text-slate-500 dark:text-slate-400">Экономия</span>
-              <span className="text-right font-mono font-semibold text-accent">
-                {toLen(result.savedDistance)} · −{result.savedPercentage.toFixed(0)}%
-              </span>
-
-              <span className="text-slate-500 dark:text-slate-400">Время</span>
-              <span className="text-right font-mono font-semibold text-slate-800 dark:text-slate-100">
-                ~{timeSavedStr}
+              <span className="font-mono tabular-nums font-semibold text-fg">
+                ~{formatDurationRu(stats.estimatedSeconds)}
               </span>
             </div>
+            <div>
+              <span className="text-[11px] text-muted block">Рабочий рез</span>
+              <span className="font-mono tabular-nums font-semibold text-fg">
+                {formatDistanceRu(stats.cutLengthMm)}
+              </span>
+            </div>
+            <div>
+              <span className="text-[11px] text-muted block">Перелёты</span>
+              <span className="font-mono tabular-nums font-semibold text-fg-secondary">
+                {formatDistanceRu(stats.rapidLengthMm)}
+              </span>
+            </div>
+          </div>
+        )}
 
-            <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-3">
-              <span className="text-[13px] text-slate-400 dark:text-slate-500">
-                {result.reorderedCount}/{result.optimizedObjects.length} переставлено · {result.flippedCount} развёрнуто
+        {/* Автооптимизация в 1 клик + детали экономии при желании */}
+        {result ? (
+          <div className="space-y-2.5 rounded-lg border border-line px-3 py-2.5">
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
+              <span className="text-muted">Холостые перелёты</span>
+              <span className="text-right font-mono tabular-nums">
+                <span className="text-muted line-through mr-1.5">{toLen(result.initialDistance)}</span>
+                <strong className="text-fg">{toLen(result.optimizedDistance)}</strong>
+              </span>
+
+              <span className="text-muted">Сокращение пробега</span>
+              <span className="text-right font-mono tabular-nums font-semibold text-success">
+                −{result.savedPercentage.toFixed(0)}% ({toLen(result.savedDistance)})
+              </span>
+
+              <span className="text-muted">Экономия времени</span>
+              <span className="text-right font-mono tabular-nums font-semibold text-fg">~{timeSavedStr}</span>
+            </div>
+
+            <div className="pt-2 border-t border-line flex items-center justify-between gap-3">
+              <span className="text-[11px] font-mono tabular-nums text-muted">
+                {result.reorderedCount}/{result.optimizedObjects.length} переставлено ·{' '}
+                {result.flippedCount} развёрнуто
               </span>
               <button
+                type="button"
                 onClick={onUndoOptimize}
-                className="inline-flex items-center gap-1 text-[13px] font-semibold text-slate-500 dark:text-slate-400 hover:text-danger transition-colors shrink-0"
+                className="inline-flex items-center gap-1 text-xs font-medium text-muted hover:text-danger transition-colors shrink-0 cursor-pointer"
               >
                 <Undo2 className="w-3.5 h-3.5" />
-                Отменить
+                Откатить
               </button>
             </div>
           </div>
         ) : (
-          <div className="rounded-xl border border-slate-200 dark:border-slate-700 p-3.5 text-xs text-slate-500 dark:text-slate-400 flex items-center gap-2">
-            <Zap className="w-4 h-4 text-accent shrink-0" />
-            <span>Маршрут не оптимизирован — выгрузка как есть.</span>
+          <div className="flex items-center justify-between gap-3 py-1">
+            <div className="min-w-0">
+              <div className="text-xs font-medium text-fg">Оптимизировать порядок резки</div>
+              <div className="text-[11px] text-muted mt-0.5 leading-snug">
+                Автоматически сократит лишние холостые перелёты при скачивании
+              </div>
+            </div>
+            <ToggleSwitch
+              checked={autoOptimize}
+              ariaLabel="Оптимизировать порядок резки перед сохранением"
+              onChange={setAutoOptimize}
+            />
           </div>
         )}
 
-        {/* Action buttons */}
-        <div className="flex items-center justify-between pt-2 border-t border-slate-200/80 dark:border-slate-700/80 gap-3">
-          <button
-            onClick={onOptimize}
-            disabled={!hasObjects}
-            className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 border border-line hover:bg-slate-200 hover:dark:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm inline-flex items-center gap-1.5"
-          >
-            <Zap className="w-4 h-4 fill-accent text-accent" />
-            Оптимизировать
-          </button>
+        {/* Кнопки */}
+        <div className="flex items-center justify-between pt-3 border-t border-line gap-2.5">
+          {!result ? (
+            <button
+              type="button"
+              onClick={onOptimize}
+              disabled={!hasObjects}
+              title="Посмотреть экономию маршрута до скачивания файла"
+              className="px-3 py-2 rounded-lg text-xs font-medium text-fg-secondary hover:text-fg bg-surface-subtle border border-line hover:bg-surface-hover disabled:opacity-40 disabled:cursor-not-allowed transition-colors inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
+            >
+              <Zap className="w-3.5 h-3.5 text-accent shrink-0" />
+              <span>Проверить экономию</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-3.5 py-2 rounded-lg text-xs font-medium text-fg-secondary hover:text-fg hover:bg-surface-hover border border-line transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+            >
+              Закрыть
+            </button>
+          )}
 
           <button
-            onClick={async () => {
-              if (await onExport()) onClose();
-            }}
+            type="button"
+            onClick={handlePrimaryExport}
             disabled={!hasObjects}
-            className="px-5 py-2.5 rounded-xl text-xs font-bold text-primary-fg bg-primary hover:opacity-90 active:opacity-100 disabled:opacity-40 disabled:cursor-not-allowed shadow-sm transition-all cursor-pointer inline-flex items-center gap-1.5"
+            className="px-4 py-2 rounded-lg text-xs font-semibold text-primary-fg bg-primary hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-opacity cursor-pointer inline-flex items-center gap-1.5 whitespace-nowrap shrink-0"
           >
-            <Download className="w-4 h-4" />
-            Экспорт .nc на станок
+            <Download className="w-3.5 h-3.5 shrink-0" />
+            <span>Скачать .nc</span>
           </button>
         </div>
       </div>

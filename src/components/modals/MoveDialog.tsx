@@ -6,23 +6,16 @@ import { StepperField } from '../ui/StepperField';
 
 interface MoveDialogProps {
   isOpen: boolean;
-  /** id перемещаемых фигур (уже без замороженных) — для живого превью на холсте. */
   ids: string[];
   onClose: () => void;
   onApply: (dx: number, dy: number) => void;
 }
 
-/**
- * Минималистичный модуль перемещения. Пока пользователь вводит X/Y, выбранная группа
- * в реальном времени сдвигается на холсте (store.liveMove — только превью). «Подтвердить»
- * применяет смещение, «Отмена»/Escape/клик мимо — откатывает (превью сбрасывается).
- */
 export const MoveDialog: React.FC<MoveDialogProps> = ({ isOpen, ids, onClose, onApply }) => {
   const setLiveMove = useProjectStore((s) => s.setLiveMove);
   const [xStr, setXStr] = useState('');
   const [yStr, setYStr] = useState('');
 
-  // Открыли — чистим поля и превью; закрыли — гарантированно снимаем превью.
   useEffect(() => {
     if (isOpen) {
       setXStr('');
@@ -48,7 +41,6 @@ export const MoveDialog: React.FC<MoveDialogProps> = ({ isOpen, ids, onClose, on
     setLiveMove({ ids, dx: parseMM(xStr), dy: parseMM(v) });
   };
 
-  // Шаг стрелками: клик = ±1 мм; «зажать и тянуть» = сколько шагов прошли по вертикали.
   const scrubX = (delta: number) => changeX(String(parseMM(xStr) + delta));
   const scrubY = (delta: number) => changeY(String(parseMM(yStr) + delta));
 
@@ -65,7 +57,7 @@ export const MoveDialog: React.FC<MoveDialogProps> = ({ isOpen, ids, onClose, on
 
   return (
     <div
-      className="fixed bottom-20 left-1/2 -translate-x-1/2 z-40 w-72 select-none"
+      className="fixed bottom-16 left-1/2 -translate-x-1/2 z-40 w-72 select-none"
       onKeyDown={(e) => {
         if (e.key === 'Escape') {
           e.stopPropagation();
@@ -76,28 +68,28 @@ export const MoveDialog: React.FC<MoveDialogProps> = ({ isOpen, ids, onClose, on
       <div
         role="dialog"
         aria-label="Переместить"
-        className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl p-5 shadow-lg text-slate-800 dark:text-slate-100"
+        className="bg-surface border border-line rounded-xl p-4 shadow-xl text-fg"
       >
-        <div className="flex items-center justify-between mb-5">
+        <div className="flex items-center justify-between mb-3.5 pb-2 border-b border-line">
           <div className="flex items-center gap-2">
             <Move className="w-4 h-4 text-accent" />
-            <h3 className="font-semibold text-sm">Переместить</h3>
+            <h3 className="font-semibold text-xs text-fg">Смещение по координатам</h3>
             {ids.length > 1 && (
-              <span className="text-[13px] text-slate-400 dark:text-slate-500">· {ids.length} фигур</span>
+              <span className="font-mono text-[11px] text-muted">· {ids.length}</span>
             )}
           </div>
           <button
             onClick={cancel}
-            className="p-1 rounded-lg text-slate-400 dark:text-slate-500 hover:text-slate-700 hover:dark:text-slate-200 hover:bg-slate-100 hover:dark:bg-slate-700 transition-colors"
+            className="p-1 rounded-md text-muted hover:text-fg hover:bg-surface-hover transition-colors cursor-pointer"
             title="Отмена"
           >
-            <X className="w-4 h-4" />
+            <X className="w-3.5 h-3.5" />
           </button>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-2.5">
           <StepperField
-            label="X, мм"
+            label="dX, мм"
             value={xStr}
             inputMode="decimal"
             autoFocus
@@ -107,7 +99,7 @@ export const MoveDialog: React.FC<MoveDialogProps> = ({ isOpen, ids, onClose, on
             onEnter={confirm}
           />
           <StepperField
-            label="Y, мм"
+            label="dY, мм"
             value={yStr}
             inputMode="decimal"
             placeholder="0"
@@ -117,19 +109,19 @@ export const MoveDialog: React.FC<MoveDialogProps> = ({ isOpen, ids, onClose, on
           />
         </div>
 
-        <div className="mt-5 flex items-center justify-end gap-2">
+        <div className="mt-4 flex items-center justify-end gap-2">
           <button
             onClick={cancel}
-            className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 hover:dark:bg-slate-800 transition-colors"
+            className="px-3 py-1.5 rounded-lg text-xs font-medium text-muted hover:text-fg hover:bg-surface-hover transition-colors cursor-pointer"
           >
             Отмена
           </button>
           <button
             onClick={confirm}
             disabled={!canApply}
-            className="px-5 py-2 rounded-xl text-xs font-bold text-primary-fg bg-primary hover:opacity-90 active:opacity-100 disabled:opacity-40 disabled:cursor-not-allowed shadow-sm transition-all cursor-pointer"
+            className="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-primary-fg bg-primary hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-opacity cursor-pointer"
           >
-            Подтвердить
+            Применить
           </button>
         </div>
       </div>

@@ -1,91 +1,164 @@
 @import "tailwindcss";
 
-/* Тёмная тема включаем классом .dark на <html> (а не только по системной настройке). */
+/* Тёмная тема включается классом .dark на <html> */
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* Интерфейс для цеха: шрифт крупнее на ~20%. Масштабируем только текстовые кегли
-   через @theme — отступы/размеры (spacing) не трогаем, иначе панели распухнут.
-   Мелкие px-кегли (text-[9/10/11px]) в компонентах подняты вручную до 11/12/13px. */
 @theme {
-  --text-xs: 0.9rem;      /* 12 → 14.4px */
-  --text-xs--line-height: 1.25rem;
-  --text-sm: 1.05rem;     /* 14 → 16.8px */
-  --text-sm--line-height: 1.45rem;
-  --text-base: 1.2rem;    /* 16 → 19.2px */
-  --text-base--line-height: 1.7rem;
-  --text-lg: 1.35rem;     /* 18 → 21.6px */
-  --text-lg--line-height: 1.85rem;
-  --text-xl: 1.5rem;      /* 20 → 24px */
-  --text-xl--line-height: 2rem;
+  --font-sans: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 
-  /* Семантическая монохромная палитра (значения берутся из runtime-переменных
-     ниже и сами переключаются в .dark). Единый стиль вместо «радуги» акцентов. */
+  /* Точная инженерная шкала типографики (Operate-режим: высокая плотность и читаемость в цеху) */
+  --text-xs: 0.78125rem;     /* 12.5px */
+  --text-xs--line-height: 1.15rem;
+  --text-sm: 0.84375rem;     /* 13.5px */
+  --text-sm--line-height: 1.25rem;
+  --text-base: 0.9375rem;    /* 15px */
+  --text-base--line-height: 1.4rem;
+  --text-lg: 1.0625rem;      /* 17px */
+  --text-lg--line-height: 1.5rem;
+  --text-xl: 1.25rem;        /* 20px */
+  --text-xl--line-height: 1.75rem;
+
+  /* Семантическая индустриальная палитра (60% нейтральный холст, 30% структурные панели, 10% акцент) */
+  --color-canvas: var(--c-canvas);
+  --color-surface: var(--c-surface);
+  --color-surface-subtle: var(--c-surface-subtle);
+  --color-surface-hover: var(--c-surface-hover);
+  --color-fg: var(--c-fg);
+  --color-fg-secondary: var(--c-fg-secondary);
+  --color-muted: var(--c-muted);
+  --color-line: var(--c-line);
+  --color-line-strong: var(--c-line-strong);
   --color-primary: var(--c-primary);
   --color-primary-fg: var(--c-primary-fg);
   --color-accent: var(--c-accent);
   --color-accent-fg: var(--c-accent-fg);
-  --color-line: var(--c-line);
-  --color-muted: var(--c-muted);
   --color-danger: var(--c-danger);
   --color-danger-fg: var(--c-danger-fg);
+  --color-warning: var(--c-warning);
+  --color-success: var(--c-success);
 }
 
 :root {
-  --c-primary: #212529;      /* solid-кнопки, активные вкладки, выбор */
-  --c-primary-fg: #ffffff;
-  --c-accent: #687385;       /* приглушённый акцент: иконки, вторичные выделения */
+  --c-canvas: #f3f4f6;
+  --c-surface: #ffffff;
+  --c-surface-subtle: #f8f9fa;
+  --c-surface-hover: #f1f3f5;
+  --c-fg: #111827;
+  --c-fg-secondary: #374151;
+  --c-muted: #6b7280;
+  --c-line: #e5e7eb;
+  --c-line-strong: #d1d5db;
+  --c-primary: #18181b;
+  --c-primary-fg: #fafafa;
+  --c-accent: #2563eb;
   --c-accent-fg: #ffffff;
-  --c-line: #e2e8f0;         /* рамки */
-  --c-muted: #64748b;        /* вторичный текст */
-  --c-danger: #dc2626;       /* только ошибки/удаление */
+  --c-danger: #dc2626;
   --c-danger-fg: #ffffff;
+  --c-warning: #d97706;
+  --c-success: #16a34a;
 }
 
 .dark {
-  --c-primary: #f8fafc;      /* на тёмном фоне solid = светлая плашка */
-  --c-primary-fg: #0b1220;
-  --c-accent: #94a3b8;
-  --c-accent-fg: #0b1220;
-  --c-line: #334155;
-  --c-muted: #94a3b8;
+  --c-canvas: #0b0e14;
+  --c-surface: #12161f;
+  --c-surface-subtle: #181d29;
+  --c-surface-hover: #1f2636;
+  --c-fg: #f3f4f6;
+  --c-fg-secondary: #d1d5db;
+  --c-muted: #8b95a5;
+  --c-line: #232a38;
+  --c-line-strong: #323c4e;
+  --c-primary: #f3f4f6;
+  --c-primary-fg: #0b0e14;
+  --c-accent: #3b82f6;
+  --c-accent-fg: #ffffff;
   --c-danger: #f87171;
-  --c-danger-fg: #0b1220;
+  --c-danger-fg: #0b0e14;
+  --c-warning: #fbbf24;
+  --c-success: #4ade80;
 }
 
 @layer base {
   html {
     color-scheme: light;
+    font-family: var(--font-sans);
   }
   html.dark {
     color-scheme: dark;
   }
   html,
   body {
-    /* телефонам запрещаем «pull-to-refresh» и системный зум страницы — жестикулирует холст */
     overscroll-behavior: none;
   }
   body {
-    @apply antialiased selection:bg-primary selection:text-primary-fg;
+    @apply antialiased bg-canvas text-fg selection:bg-accent/20 selection:text-fg;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
     -webkit-tap-highlight-color: transparent;
     touch-action: manipulation;
-    /* Мягкая смена фона/текста при переключении темы (холст перекрашивается сам). */
-    transition: background-color 0.2s ease, color 0.2s ease;
+    transition: background-color 150ms cubic-bezier(0.16, 1, 0.3, 1), color 150ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  /* Оптическая компенсация в тёмной теме */
+  .dark body {
+    letter-spacing: 0.005em;
+  }
+
+  /* Чёткие кольца фокуса для клавиатурной навигации */
+  *:focus-visible {
+    outline: 2px solid var(--c-accent);
+    outline-offset: 1px;
+  }
+
+  /* Все моноширинные и числовые элементы используют табличные цифры */
+  .font-mono,
+  input[type="number"],
+  input[inputmode="decimal"],
+  input[inputmode="numeric"] {
+    font-variant-numeric: tabular-nums;
   }
 }
 
-/* Custom smooth scrollbars */
+/* Скрытие полосы прокрутки для компактных горизонтальных панелей */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Тонкие нативные скроллбары в палитре интерфейса */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.4);
-  border-radius: 9999px;
+  background: rgba(148, 163, 184, 0.35);
+  border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(148, 163, 184, 0.7);
+  background: rgba(148, 163, 184, 0.65);
+}
+
+/* Подсветка активного окна и фокусной строки в редакторе G-кода */
+.monaco-editor .gcode-active-band-line {
+  background-color: rgba(245, 158, 11, 0.08);
+}
+.dark .monaco-editor .gcode-active-band-line {
+  background-color: rgba(251, 191, 36, 0.07);
+}
+.monaco-editor .gcode-focus-line {
+  background-color: rgba(249, 115, 22, 0.16);
+  box-shadow: inset 2px 0 0 #f97316;
+}
+.dark .monaco-editor .gcode-focus-line {
+  background-color: rgba(249, 115, 22, 0.2);
+  box-shadow: inset 2px 0 0 #fb923c;
+}
+.monaco-editor .gcode-focus-margin {
+  border-left: 3px solid #f97316;
 }

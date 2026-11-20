@@ -14,3 +14,8 @@ export function parseDecimalOrNull(raw: string): number | null {
 export function parseDecimal(raw: string, fallback = 0): number {
   return parseDecimalOrNull(raw) ?? fallback;
 }
+
+/** Округление до 3 знаков после запятой (стандартная точность ЧПУ в мм). */
+export function round3(n: number): number {
+  return Math.round(n * 1000) / 1000;
+}

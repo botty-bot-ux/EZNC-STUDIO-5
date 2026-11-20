@@ -5,8 +5,9 @@ import { loadInitialProjectState } from './projectStoreInit';
 import { makeStoreCore } from './projectStoreCore';
 import { createUiSlice } from './slices/uiSlice';
 import { createSelectionSlice } from './slices/selectionSlice';
-import { createObjectsSlice } from './slices/objectsSlice';
-import { createOperationsSlice } from './slices/operationsSlice';
+import { createMachineSlice } from './slices/machineSlice';
+import { createObjectsCrudSlice } from './slices/objectsCrudSlice';
+import { createObjectsTransformSlice } from './slices/objectsTransformSlice';
 import { createGcodeSlice } from './slices/gcodeSlice';
 import { createProjectSlice } from './slices/projectSlice';
 import { createHistorySlice } from './slices/historySlice';
@@ -16,8 +17,7 @@ export type { ProjectStore } from './projectStore.types';
 
 // Глобальный стор проекта (Zustand). Реализация разбита на срезы (store/slices/*),
 // которые собираются здесь в один create() и разделяют ОДИН контекст set/get +
-// общие хелперы истории/синхронизации (makeStoreCore). Публичный API не изменился:
-// `useProjectStore`, `useSelectedObjectId`, `getLastSelectedId`, `Theme`.
+// общие хелперы истории/синхронизации (makeStoreCore).
 export const useProjectStore = create<ProjectStore>((set, get) => {
   const core = makeStoreCore(set, get);
   const ctx: StoreCtx = { set, get, ...core };
@@ -27,26 +27,30 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
     projectName: loaded.projectName,
     machine: loaded.machine,
     objects: loaded.objects,
-    operations: loaded.operations,
     templates: loaded.templates,
 
     selectedObjectIds: [],
-    selectedOperationId: null,
     shapeDialog: null,
+    pendingVectorImport: null,
     liveEdit: null,
     liveMeasure: null,
     liveMove: null,
     liveScale: null,
+    liveRotate: null,
     parallelPreview: null,
     underlay: DEFAULT_UNDERLAY,
     activeTool: 'select',
+    filletRadius: 10,
     arcMode: 'bulge',
     lineMode: 'line',
     canvasGrabbing: false,
-    activeTab: 'gcode',
+    activeTab: 'properties',
     viewMode: 'edit',
     renderMode: '2d',
     simActiveLayerId: null,
+    gcodeScrollPreview: null,
+    canvasFocusRequest: null,
+    canvasFitSeq: 0,
 
     theme: loaded.theme,
 
@@ -68,14 +72,17 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
     leftPanelOpen: true,
     rightPanelOpen: true,
     panelDismissed: false,
+    safetyDrawerOpen: false,
 
     mobileSheet: 'none',
+    toast: null,
 
-    // Действия, собранные из срезов (общий ctx → та же история/автосейв, что и в монолите).
+    // Действия, собранные из срезов (общий ctx → единая история и атомарный автосейв).
     ...createUiSlice(ctx),
     ...createSelectionSlice(ctx),
-    ...createObjectsSlice(ctx),
-    ...createOperationsSlice(ctx),
+    ...createMachineSlice(ctx),
+    ...createObjectsCrudSlice(ctx),
+    ...createObjectsTransformSlice(ctx),
     ...createGcodeSlice(ctx),
     ...createProjectSlice(ctx),
     ...createHistorySlice(ctx),
@@ -84,8 +91,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
 
 // --- Производные селекторы выделения ---
 // selectedObjectIds — единственный источник истины; «основная» фигура (для
-// панели Свойств, грифов и подсветки) = ПОСЛЕДНИЙ id. Индекс в конце массива
-// выбран потому, что так исторически проставлялось удалённое поле selectedObjectId.
+// панели Свойств, грифов и подсветки) = ПОСЛЕДНИЙ id.
 
 /** React-хук: id основной выбранной фигуры или null. */
 export const useSelectedObjectId = (): string | null =>

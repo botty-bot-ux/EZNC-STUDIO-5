@@ -1,4 +1,4 @@
-import { ParallelPreviewState, Point2D } from '../../types';
+import { FilletPreviewState, ParallelPreviewState, Point2D, TrimPreviewState } from '../../types';
 import { SnapPointInfo, worldToCanvas } from './canvasUtils';
 import { CanvasPalette, LIGHT_PALETTE } from './canvasPalette';
 
@@ -341,5 +341,104 @@ export function drawParallelPreview(
     }
   }
 
+  ctx.restore();
+}
+
+/**
+ * Превью инструмента «Ножницы»: подсвечивает отсекаемый участок пунктирным красным
+ * и отмечает точки разреза на пересечениях.
+ */
+export function drawTrimPreview(
+  ctx: CanvasRenderingContext2D,
+  preview: TrimPreviewState,
+  pan: Point2D,
+  zoom: number
+) {
+  const wToC = (x: number, y: number) => worldToCanvas(x, y, pan, zoom);
+  ctx.save();
+
+  if (preview.removeSegment) {
+    ctx.strokeStyle = '#ef4444';
+    ctx.lineWidth = 4;
+    ctx.lineCap = 'round';
+    ctx.setLineDash([7, 5]);
+    if (preview.removeSegment.kind === 'line') {
+      const p1 = wToC(preview.removeSegment.start.x, preview.removeSegment.start.y);
+      const p2 = wToC(preview.removeSegment.end.x, preview.removeSegment.end.y);
+      ctx.beginPath();
+      ctx.moveTo(p1.x, p1.y);
+      ctx.lineTo(p2.x, p2.y);
+      ctx.stroke();
+    } else {
+      const seg = preview.removeSegment;
+      const cp = wToC(seg.center.x, seg.center.y);
+      const rPx = seg.radius * zoom;
+      const pS = wToC(
+        seg.center.x + seg.radius * Math.cos(seg.startAngle),
+        seg.center.y + seg.radius * Math.sin(seg.startAngle)
+      );
+      const pE = wToC(
+        seg.center.x + seg.radius * Math.cos(seg.endAngle),
+        seg.center.y + seg.radius * Math.sin(seg.endAngle)
+      );
+      const a1 = Math.atan2(pS.y - cp.y, pS.x - cp.x);
+      const a2 = Math.atan2(pE.y - cp.y, pE.x - cp.x);
+      ctx.beginPath();
+      ctx.arc(cp.x, cp.y, rPx, a1, a2, !seg.clockwise);
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
+  }
+
+  for (const pt of preview.cutPoints) {
+    const c = wToC(pt.x, pt.y);
+    ctx.fillStyle = '#ffffff';
+    ctx.strokeStyle = '#ef4444';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(c.x, c.y, 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+/**
+ * Превью инструмента «Скругление»: касательная дуга и точки касания на обоих отрезках.
+ */
+export function drawFilletPreview(
+  ctx: CanvasRenderingContext2D,
+  preview: FilletPreviewState,
+  pan: Point2D,
+  zoom: number
+) {
+  const wToC = (x: number, y: number) => worldToCanvas(x, y, pan, zoom);
+  const { arc, tangent1, tangent2 } = preview;
+  const cp = wToC(arc.centerX, arc.centerY);
+  const pS = wToC(arc.startX, arc.startY);
+  const pE = wToC(arc.endX, arc.endY);
+  const a1 = Math.atan2(pS.y - cp.y, pS.x - cp.x);
+  const a2 = Math.atan2(pE.y - cp.y, pE.x - cp.x);
+
+  ctx.save();
+  ctx.strokeStyle = '#2563eb';
+  ctx.lineWidth = 3;
+  ctx.setLineDash([6, 4]);
+  ctx.beginPath();
+  ctx.arc(cp.x, cp.y, arc.radius * zoom, a1, a2, !arc.clockwise);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  for (const t of [tangent1, tangent2]) {
+    const tp = wToC(t.x, t.y);
+    ctx.fillStyle = '#ffffff';
+    ctx.strokeStyle = '#2563eb';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(tp.x, tp.y, 4.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  }
   ctx.restore();
 }

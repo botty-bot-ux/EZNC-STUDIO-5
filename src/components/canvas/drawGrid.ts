@@ -131,10 +131,12 @@ export function drawGrid(
 
   // 2. Machine Bounds in World and Canvas space
   const bounds = machine.bounds;
-  const minX = Math.min(bounds.xMin, bounds.xMax);
-  const maxX = Math.max(bounds.xMin, bounds.xMax);
-  const minY = Math.min(bounds.yMin, bounds.yMax);
-  const maxY = Math.max(bounds.yMin, bounds.yMax);
+  const offX = machine.workOffset?.x ?? 0;
+  const offY = machine.workOffset?.y ?? 0;
+  const minX = Math.min(bounds.xMin, bounds.xMax) - offX;
+  const maxX = Math.max(bounds.xMin, bounds.xMax) - offX;
+  const minY = Math.min(bounds.yMin, bounds.yMax) - offY;
+  const maxY = Math.max(bounds.yMin, bounds.yMax) - offY;
 
   const left = pan.x + minY * zoom;
   const right = pan.x + maxY * zoom;

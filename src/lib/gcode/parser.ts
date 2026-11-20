@@ -1,4 +1,5 @@
 import { CADObject, Point2D, ProjectData, ToolpathSegment } from '../../types';
+import { translateCADObject } from '../geometry/transform';
 import {
   DEFAULT_DEPTH_MM,
   DEFAULT_IMPORT_RADIUS_MM,
@@ -191,7 +192,8 @@ function makeMotionSegment(st: MotionState, f: LineFrame, id: string): ToolpathS
  */
 export function parseGcodeToCadObjects(
   gcode: string,
-  existingObjects: CADObject[] = []
+  existingObjects: CADObject[] = [],
+  workOffset?: Point2D
 ): (CADObject & { importedFeedCut?: number; importedFeedPlunge?: number })[] {
   if (!gcode || !gcode.trim()) return [];
 
@@ -577,6 +579,17 @@ export function parseGcodeToCadObjects(
     }
   }
 
+  if (workOffset && (workOffset.x !== 0 || workOffset.y !== 0)) {
+    return result.map((obj) => {
+      const shifted = translateCADObject(obj, -workOffset.x, -workOffset.y);
+      return {
+        ...shifted,
+        ...(obj.importedFeedCut !== undefined ? { importedFeedCut: obj.importedFeedCut } : {}),
+        ...(obj.importedFeedPlunge !== undefined ? { importedFeedPlunge: obj.importedFeedPlunge } : {}),
+      };
+    });
+  }
+
   return result;
 }
 
@@ -617,16 +630,29 @@ export function parseGcodeToSegments(gcode: string): ToolpathSegment[] {
   const lines = gcode.split('\n');
 
   const st = createMotionState();
+  let currentObjectId: string | undefined;
 
   for (let idx = 0; idx < lines.length; idx++) {
-    const line = stripLineComments(lines[idx]);
+    const rawLine = lines[idx];
+    const idMatch = rawLine.match(/^\s*;.*\[ID:\s*([^\]]+)\]/i);
+    if (idMatch && idMatch[1]) {
+      currentObjectId = idMatch[1].trim();
+    }
+
+    const line = stripLineComments(rawLine);
     if (!line) continue;
 
     const frame = scanLineTokens(line, st);
     if (!frame.moved) continue;
 
     const seg = makeMotionSegment(st, frame, `parse_${segments.length}`);
-    if (seg) segments.push(seg);
+    if (seg) {
+      seg.lineNumber = idx + 1;
+      if (currentObjectId) {
+        seg.objectId = currentObjectId;
+      }
+      segments.push(seg);
+    }
 
     st.x = frame.targetX;
     st.y = frame.targetY;

@@ -1,6 +1,4 @@
-// Палитра холста (2D-контекст рисует свои цвета, а не Tailwind-классы).
-// Разные роли переключаются вместе с темой приложения; акцентные цвета
-// (синий/красный/зелёный/циан/пурпур для траекторий и ручек) общие для обеих тем.
+// Палитра холста (2D-контекст рисует свои цвета, согласованные с CSS-переменными темы).
 
 export interface CanvasPalette {
   /** Фон рабочей области. */
@@ -11,8 +9,6 @@ export interface CanvasPalette {
   /** Линии сетки: мелкая и крупная. */
   gridMinor: string;
   gridMajor: string;
-  /** Пунктирная рамка границ станка. */
-  frameLine: string;
   /** Плашка под подписями (мм, оси). */
   labelChip: string;
   /** Рамка плашки (0,0). */
@@ -30,35 +26,33 @@ export interface CanvasPalette {
 }
 
 export const LIGHT_PALETTE: CanvasPalette = {
-  bg: '#f8fafc',
-  bgFade0: 'rgba(248, 250, 252, 0)',
-  bgFade1: 'rgba(248, 250, 252, 1)',
-  gridMinor: '#cbd5e1',
-  gridMajor: '#94a3b8',
-  frameLine: '#64748b',
-  labelChip: 'rgba(255, 255, 255, 0.92)',
-  chipBorder: '#cbd5e1',
-  labelText: '#475569',
-  labelTextStrong: '#1e293b',
-  objectIdle: '#0f172a',
-  measureBadgeBg: '#0f172a',
+  bg: '#f3f4f6',
+  bgFade0: 'rgba(243, 244, 246, 0)',
+  bgFade1: 'rgba(243, 244, 246, 1)',
+  gridMinor: '#dde1e7',
+  gridMajor: '#bfc6d1',
+  labelChip: 'rgba(255, 255, 255, 0.94)',
+  chipBorder: '#d1d5db',
+  labelText: '#4b5563',
+  labelTextStrong: '#111827',
+  objectIdle: '#111827',
+  measureBadgeBg: '#111827',
   accentBlue: '#2563eb',
 };
 
 export const DARK_PALETTE: CanvasPalette = {
-  bg: '#0f172a',
-  bgFade0: 'rgba(15, 23, 42, 0)',
-  bgFade1: 'rgba(15, 23, 42, 1)',
-  gridMinor: '#1e293b',
-  gridMajor: '#334155',
-  frameLine: '#64748b',
-  labelChip: 'rgba(30, 41, 59, 0.92)',
-  chipBorder: '#334155',
-  labelText: '#94a3b8',
-  labelTextStrong: '#e2e8f0',
-  objectIdle: '#e2e8f0',
-  measureBadgeBg: '#020617',
-  accentBlue: '#60a5fa',
+  bg: '#0b0e14',
+  bgFade0: 'rgba(11, 14, 20, 0)',
+  bgFade1: 'rgba(11, 14, 20, 1)',
+  gridMinor: '#171d29',
+  gridMajor: '#263042',
+  labelChip: 'rgba(18, 22, 31, 0.94)',
+  chipBorder: '#263042',
+  labelText: '#8b95a5',
+  labelTextStrong: '#f3f4f6',
+  objectIdle: '#e5e7eb',
+  measureBadgeBg: '#0b0e14',
+  accentBlue: '#3b82f6',
 };
 
 export function paletteForTheme(theme: 'light' | 'dark'): CanvasPalette {

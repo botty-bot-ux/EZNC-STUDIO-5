@@ -12,20 +12,20 @@ interface LineModeOption {
 const OPTIONS: LineModeOption[] = [
   {
     id: 'line',
-    label: 'Линия',
-    hint: 'Обычная линия: клик старт, клик конец — одно звено.',
+    label: 'Отрезок',
+    hint: 'Одиночный отрезок между двумя точками',
     Icon: Minus,
   },
   {
     id: 'polyline',
     label: 'Полилиния',
-    hint: 'Ломаная из нескольких звеньев: кликай узлы, Enter или двойной клик — завершить.',
+    hint: 'Ломаная из нескольких звеньев (Enter — завершить)',
     Icon: Waypoints,
   },
   {
     id: 'polygon',
     label: 'Контур',
-    hint: 'Замкнутая полилиния: кликай узлы, клик по первой точке или Enter — замкнуть.',
+    hint: 'Замкнутая полилиния (Enter — замкнуть)',
     Icon: Hexagon,
   },
 ];
@@ -35,30 +35,31 @@ interface LineModeSelectorProps {
   onChange: (mode: LineMode) => void;
 }
 
-/**
- * Плавающий переключатель способа построения линии. Показывается, когда активен
- * инструмент «Линия». Меняет под-режим (lineMode) в сторе.
- */
 export const LineModeSelector: React.FC<LineModeSelectorProps> = ({ value, onChange }) => {
   return (
-    <div className="absolute top-3 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-1 rounded-2xl shadow-md text-slate-700 dark:text-slate-200 max-w-[95vw]">
-      <span className="px-2 text-[11px] font-semibold text-slate-400 dark:text-slate-500 shrink-0">
-        Линия:
-      </span>
+    <div
+      role="radiogroup"
+      aria-label="Способ построения линии"
+      className="pointer-events-auto flex items-center gap-0.5 bg-surface/95 backdrop-blur-md border border-line p-1 rounded-lg shadow-sm text-fg max-w-[94vw] overflow-x-auto no-scrollbar select-none"
+    >
+      <span className="px-2 text-[11px] font-medium text-muted shrink-0">Режим:</span>
       {OPTIONS.map(({ id, label, hint, Icon }) => {
         const active = value === id;
         return (
           <button
             key={id}
+            type="button"
+            role="radio"
+            aria-checked={active}
             title={hint}
             onClick={() => onChange(id)}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer shrink-0 ${
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
               active
-                ? 'bg-primary text-primary-fg'
-                : 'hover:bg-slate-100 hover:dark:bg-slate-700 text-slate-600 dark:text-slate-300'
+                ? 'bg-primary text-primary-fg font-semibold'
+                : 'text-fg-secondary hover:text-fg hover:bg-surface-hover'
             }`}
           >
-            <Icon className="w-3.5 h-3.5" />
+            <Icon className="w-3.5 h-3.5 shrink-0" />
             <span>{label}</span>
           </button>
         );

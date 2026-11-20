@@ -2,14 +2,18 @@ import {
   ActiveTool,
   ArcMode,
   CADObject,
+  FilletPreviewState,
+  GcodeScrollPreview,
   LineMode,
   MachineSettings,
   ParallelPreviewState,
   Point2D,
   ToolpathSegment,
+  TrimPreviewState,
   UnderlayState,
   ViewMode,
 } from '../../types';
+import { TrajectoryBoundsSummary } from '../../lib/geometry/bounds';
 import { DragMode } from './canvasHitTest';
 import { HoveredHandle, SnapPointInfo } from './canvasUtils';
 import { CanvasPalette } from './canvasPalette';
@@ -17,13 +21,17 @@ import {
   drawAxisOrigin,
   drawCADObjects,
   drawDrawingPreview,
+  drawFilletPreview,
+  drawGcodeScrollHighlight,
   drawGrid,
   drawMachineBoundsAndStock,
   drawMeasurementTool,
+  drawOutOfBoundsSegments,
   drawParallelPreview,
   drawSelectionBox,
   drawSnapIndicator,
   drawToolpathSegments,
+  drawTrimPreview,
   drawUnderlay,
 } from './canvasDrawers';
 
@@ -58,6 +66,10 @@ export interface SceneRenderParams {
   measureStartPt: Point2D | null;
   measureEndPt: Point2D | null;
   activeSnapInfo: SnapPointInfo | null;
+  gcodeScrollPreview: GcodeScrollPreview | null;
+  boundsSummary?: TrajectoryBoundsSummary;
+  trimPreview?: TrimPreviewState | null;
+  filletPreview?: FilletPreviewState | null;
 }
 
 /**
@@ -76,8 +88,8 @@ export function drawScene(p: SceneRenderParams): void {
   // 1b. Подложка — фоновая референсная картинка (поверх фона, под остальными слоями)
   drawUnderlay(ctx, p.underlayImg, p.underlay, pan, zoom);
 
-  // 2. Machine Bounds & Stock
-  drawMachineBoundsAndStock(ctx, p.machine, pan, zoom, p.palette);
+  // 2. Stock Sheet
+  drawMachineBoundsAndStock(ctx, p.machine, pan, zoom);
 
   // 3. Axis Origin & Work Zero
   drawAxisOrigin(ctx, p.machine, pan, zoom);
@@ -87,6 +99,17 @@ export function drawScene(p: SceneRenderParams): void {
     drawToolpathSegments(ctx, p.toolpathSegments, pan, zoom);
   }
 
+  // 4b. Подсветка сегментов траектории, выходящих за пределы стола (X, Y или Z)
+  if (p.boundsSummary && p.boundsSummary.outOfBoundsSegmentIds.size > 0) {
+    drawOutOfBoundsSegments(
+      ctx,
+      p.toolpathSegments,
+      p.boundsSummary.outOfBoundsSegmentIds,
+      pan,
+      zoom
+    );
+  }
+
   // 5. CAD Objects
   drawCADObjects(ctx, p.displayObjects, p.selectedObjectIds, p.hoveredHandle, p.dragMode, pan, zoom, p.machine.toolDiameter, p.palette);
 
@@ -94,10 +117,21 @@ export function drawScene(p: SceneRenderParams): void {
   if (p.parallelPreview) {
     drawParallelPreview(ctx, p.parallelPreview, pan, zoom);
   }
+  if (p.trimPreview) {
+    drawTrimPreview(ctx, p.trimPreview, pan, zoom);
+  }
+  if (p.filletPreview) {
+    drawFilletPreview(ctx, p.filletPreview, pan, zoom);
+  }
 
   // 5b. Selection Box Marquee
   if (p.dragMode === 'selection_box' && p.selectionBoxStart && p.selectionBoxCurrent) {
     drawSelectionBox(ctx, p.selectionBoxStart, p.selectionBoxCurrent);
+  }
+
+  // 5c. Подсветка активных строк G-кода при прокрутке редактора
+  if (p.gcodeScrollPreview) {
+    drawGcodeScrollHighlight(ctx, p.gcodeScrollPreview, pan, zoom, p.palette);
   }
 
   // 6. Active Drawing Preview

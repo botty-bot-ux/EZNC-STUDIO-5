@@ -21,44 +21,28 @@ export const PointProperties: React.FC<PointPropertiesProps> = ({ obj, onUpdate 
   };
 
   return (
-    <div className="space-y-2">
-      {/* 3 Buttons for Drill Mode */}
-      <div className="flex items-center gap-2">
-        <label className="text-[13px] text-slate-500 dark:text-slate-400 font-medium shrink-0">Сверление:</label>
-        <div className="grid grid-cols-3 gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl flex-1">
-          <button
-            type="button"
-            onClick={() => setDrillMode('11mm')}
-            className={`py-0.5 px-1.5 text-xs font-semibold rounded-lg transition-all ${
-              currentMode === '11mm'
-                ? 'bg-primary text-primary-fg shadow-sm font-bold'
-                : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:dark:text-slate-100 hover:bg-slate-200/60 hover:dark:bg-slate-600/60'
-            }`}
-          >
-            11 мм
-          </button>
-          <button
-            type="button"
-            onClick={() => setDrillMode('9mm')}
-            className={`py-0.5 px-1.5 text-xs font-semibold rounded-lg transition-all ${
-              currentMode === '9mm'
-                ? 'bg-primary text-primary-fg shadow-sm font-bold'
-                : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:dark:text-slate-100 hover:bg-slate-200/60 hover:dark:bg-slate-600/60'
-            }`}
-          >
-            9 мм
-          </button>
-          <button
-            type="button"
-            onClick={() => setDrillMode('3mm')}
-            className={`py-0.5 px-1.5 text-xs font-semibold rounded-lg transition-all ${
-              currentMode === '3mm'
-                ? 'bg-primary text-primary-fg shadow-sm font-bold'
-                : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:dark:text-slate-100 hover:bg-slate-200/60 hover:dark:bg-slate-600/60'
-            }`}
-          >
-            3 мм
-          </button>
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <label className="text-xs text-muted font-medium shrink-0">Диаметр сверления</label>
+        <div className="grid grid-cols-3 gap-0.5 bg-surface-subtle border border-line p-0.5 rounded-lg flex-1 max-w-[200px]">
+          {(['11mm', '9mm', '3mm'] as const).map((m) => {
+            const active = currentMode === m;
+            const label = m === '11mm' ? '11 мм' : m === '9mm' ? '9 мм' : '3 мм';
+            return (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setDrillMode(m)}
+                className={`py-1 px-1.5 text-xs font-mono rounded-md transition-colors cursor-pointer ${
+                  active
+                    ? 'bg-primary text-primary-fg font-semibold'
+                    : 'text-fg-secondary hover:text-fg hover:bg-surface-hover'
+                }`}
+              >
+                {label}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -67,14 +51,17 @@ export const PointProperties: React.FC<PointPropertiesProps> = ({ obj, onUpdate 
           label="X, мм"
           value={obj.x}
           onChange={(x) => onUpdate({ x })}
+          decimals={1}
+          step={1}
         />
         <PropertyInput
           label="Y, мм"
           value={obj.y}
           onChange={(y) => onUpdate({ y })}
+          decimals={1}
+          step={1}
         />
       </div>
     </div>
   );
 };
-

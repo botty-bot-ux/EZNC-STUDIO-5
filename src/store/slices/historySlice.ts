@@ -2,7 +2,7 @@ import { HISTORY_LIMIT } from '../projectStoreCore';
 import { HistoryState, ProjectStore, StoreCtx } from '../projectStore.types';
 
 /**
- * Срез истории: откат/повтор изменений objects/operations/machine. Снимки создаются
+ * Срез истории: откат/повтор изменений objects и machine. Снимки создаются
  * в pushHistory (core), а undo/redo перекладывают их между стеками и пересобирают
  * G-код через syncAndSave. Любой undo/redo закрывает текущую «сессию ввода».
  */
@@ -22,13 +22,11 @@ export function createHistorySlice(
 
       const currentSnapshot: HistoryState = {
         objects: structuredClone(get().objects),
-        operations: structuredClone(get().operations),
         machine: structuredClone(get().machine),
       };
 
       syncAndSave({
         objects: previous.objects,
-        operations: previous.operations,
         machine: previous.machine,
         historyUndo: newUndo,
         historyRedo: [currentSnapshot, ...get().historyRedo.slice(0, HISTORY_LIMIT - 1)],
@@ -45,13 +43,11 @@ export function createHistorySlice(
 
       const currentSnapshot: HistoryState = {
         objects: structuredClone(get().objects),
-        operations: structuredClone(get().operations),
         machine: structuredClone(get().machine),
       };
 
       syncAndSave({
         objects: next.objects,
-        operations: next.operations,
         machine: next.machine,
         historyUndo: [...get().historyUndo, currentSnapshot].slice(-HISTORY_LIMIT),
         historyRedo: newRedo,

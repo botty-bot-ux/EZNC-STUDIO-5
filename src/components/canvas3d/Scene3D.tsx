@@ -1,9 +1,16 @@
 import React from 'react';
 import * as THREE from 'three';
-import { Canvas, useFrame } from '@react-three/fiber';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, Text } from '@react-three/drei';
+import { Pause, Play, RotateCcw } from 'lucide-react';
+import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { useProjectStore } from '../../store/useProjectStore';
-import { MachineSettings, ToolpathSegment } from '../../types';
+import {
+  buildGridLines,
+  buildScene,
+  BuiltSimulation,
+  revealedCount,
+} from './buildSimulation';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Симуляция съёма фрезой в 3D.
@@ -11,224 +18,7 @@ import { MachineSettings, ToolpathSegment } from '../../types';
 // Чистый ПОТРЕБИТЕЛЬ состояния: читает toolpathSegments (уже Z-aware из
 // генератора G-кода) и machine.toolDiameter (ширина паза = диаметр фрезы).
 // Ничего не пишет в стор, не создаёт вторую логику правки геометрии.
-//
-// Координаты: мир CAD — X вправо, Y «вверх», Z = -глубина (врезание вниз).
-// three.js — Y-up, поэтому мировая глубина уходит в −Y сцены, а мировой Y → −Z.
 // ─────────────────────────────────────────────────────────────────────────────
-
-// Паз рисуем только там, где фреза реально снимает материал: горизонтальные
-// подачи/дуги с смещением по XY и сверловка (тип 'drill'). Чистые вертикальные
-// plunges (feed без движения по XY) — это врезка в одной точке, паза не дают.
-function isGroove(seg: ToolpathSegment): boolean {
-  const moved = Math.abs(seg.endX - seg.startX) > 0.01 || Math.abs(seg.endY - seg.startY) > 0.01;
-  if (seg.type === 'drill') return true;
-  if (seg.type === 'rapid') return false;
-  return moved;
-}
-
-interface GroovePiece {
-  matrix: THREE.Matrix4;
-}
-
-// Один шаг таймлайна фрезы — короткий отрезок пути (прямой или сегмент дуги).
-// Плотная разбивка нужна, чтобы дуги изгибались, а паз открывался постепенно.
-interface Step {
-  a: THREE.Vector3; // старт (в сцене)
-  b: THREE.Vector3; // конец (в сцене)
-  lenXY: number; // горизонтальная длина шага, мм (для постоянной скорости)
-  cut: boolean; // true — снимает материал (рисуем паз); false — холостой ход/врезка
-  objectId?: string; // слой для подсветки
-}
-
-interface Built {
-  steps: Step[];
-  grooves: GroovePiece[]; // матрицы пазов — по одному на cut-шаг
-  grooveStepIndex: number[]; // индекс шага для каждого паза (строго возрастает)
-  board: { cx: number; cy: number; cz: number; w: number; h: number; d: number };
-  span: number;
-}
-
-function buildScene(segs: ToolpathSegment[], toolDiameter: number, machine: MachineSettings): Built | null {
-  if (segs.length === 0) return null;
-
-  let minX = Infinity,
-    maxX = -Infinity,
-    minY = Infinity,
-    maxY = -Infinity,
-    minZ = 0;
-  for (const s of segs) {
-    minX = Math.min(minX, s.startX, s.endX);
-    maxX = Math.max(maxX, s.startX, s.endX);
-    minY = Math.min(minY, s.startY, s.endY);
-    maxY = Math.max(maxY, s.startY, s.endY);
-    minZ = Math.min(minZ, s.startZ, s.endZ);
-  }
-  if (![minX, maxX, minY, maxY, minZ].every(Number.isFinite)) return null;
-
-  // Толщина листа = «Глубина реза Z» (machine.cutDepth), но не тоньше самого
-  // глубокого вреза (иначе паз торчал бы за дно) и не меньше заготовки-минимума.
-  const cutDepth = machine.cutDepth ?? 0;
-  const thickness = Math.max(cutDepth, Math.abs(minZ), 8);
-
-  // Габарит листа ДСП = «Заготовка листа» (stockSheet). В мировых координатах лист
-  // занимает X∈[−widthX,0], Y∈[−widthY,0] (так его рисует 2D), поэтому центр —
-  // (−widthX/2, −widthY/2). Если лист выключен — подгоняем плиту под содержимое.
-  const sheet = machine.stockSheet;
-  const useSheet = !!sheet && sheet.enabled && sheet.preset !== 'none' && sheet.widthX > 0 && sheet.widthY > 0;
-  let bw: number, bd: number, cxWorld: number, czWorld: number;
-  if (useSheet && sheet) {
-    bw = sheet.widthX;
-    bd = sheet.widthY;
-    cxWorld = -sheet.widthX / 2;
-    czWorld = -sheet.widthY / 2;
-  } else {
-    const margin = 40 + toolDiameter;
-    bw = maxX - minX + margin * 2;
-    bd = maxY - minY + margin * 2;
-    cxWorld = (minX + maxX) / 2;
-    czWorld = (minY + maxY) / 2;
-  }
-
-  const board = {
-    cx: cxWorld,
-    cy: -thickness / 2,
-    cz: -czWorld,
-    w: bw,
-    h: thickness,
-    d: bd,
-  };
-
-  const grooves: GroovePiece[] = [];
-  const grooveStepIndex: number[] = [];
-  const steps: Step[] = [];
-
-  const up = new THREE.Vector3(0, 1, 0);
-  const q = new THREE.Quaternion();
-  const pos = new THREE.Vector3();
-  const scl = new THREE.Vector3();
-  const m = new THREE.Matrix4();
-
-  // Шаг выборки пути: чтобы соседние боксы пазов перекрывались и сливались в
-  // непрерывный канал (особенно на дугах). Не мельче 2 мм и не крупнее 25 мм.
-  const sampleStep = Math.max(2, Math.min(toolDiameter * 0.6, 25));
-  const lip = 0.2; // минимальный выступ над поверхностью против z-fighting
-
-  // Разбиваем сегмент на мировые точки вдоль РЕАЛЬНОЙ траектории (дуга — по дуге).
-  const samplePoints = (s: ToolpathSegment): { x: number; y: number; z: number }[] => {
-    const pts: { x: number; y: number; z: number }[] = [];
-    const isArc = s.type === 'arc_cw' || s.type === 'arc_ccw';
-    if (!isArc) {
-      const len = Math.hypot(s.endX - s.startX, s.endY - s.startY);
-      const n = Math.max(1, Math.ceil(len / sampleStep));
-      for (let i = 0; i <= n; i++) {
-        const t = i / n;
-        pts.push({
-          x: s.startX + (s.endX - s.startX) * t,
-          y: s.startY + (s.endY - s.startY) * t,
-          z: s.startZ + (s.endZ - s.startZ) * t,
-        });
-      }
-      return pts;
-    }
-    const cx = s.centerX ?? (s.startX + s.endX) / 2;
-    const cy = s.centerY ?? (s.startY + s.endY) / 2;
-    const r = Math.hypot(s.startX - cx, s.startY - cy);
-    const a0 = Math.atan2(s.startY - cy, s.startX - cx);
-    const a1 = Math.atan2(s.endY - cy, s.endX - cx);
-    const cw = s.type === 'arc_cw';
-    let delta = a1 - a0;
-    if (cw) {
-      while (delta > 0) delta -= Math.PI * 2;
-      if (Math.abs(delta) < 1e-9) delta = -Math.PI * 2; // полная окружность
-    } else {
-      while (delta < 0) delta += Math.PI * 2;
-      if (Math.abs(delta) < 1e-9) delta = Math.PI * 2; // полная окружность
-    }
-    const n = Math.max(2, Math.ceil((Math.abs(delta) * r) / sampleStep));
-    for (let i = 0; i <= n; i++) {
-      const ang = a0 + delta * (i / n);
-      pts.push({
-        x: cx + r * Math.cos(ang),
-        y: cy + r * Math.sin(ang),
-        z: s.startZ + (s.endZ - s.startZ) * (i / n),
-      });
-    }
-    return pts;
-  };
-
-  for (const s of segs) {
-    const cut = isGroove(s);
-    const pts = samplePoints(s);
-    // Общая граница соседних шагов одного сегмента (b шага i == a шага i+1) держим
-    // одним Vector3: несём конец прошлого шага как начало текущего. a/b читаются
-    // только как скаляры (.x/.y/.z) в useFrame и GhostPath, поэтому расшаривание
-    // безопасно и режет число new THREE.Vector3 примерно вдвое на длинных путях.
-    // Сбрасываем на каждом сегменте — стык между сегментами не гарантирует непрерывность.
-    let carry: THREE.Vector3 | null = null;
-    for (let i = 0; i < pts.length - 1; i++) {
-      const p0 = pts[i];
-      const p1 = pts[i + 1];
-      // мир→сцена (x,y,z)→(x,z,−y): инлайн вместо toScene, чтобы не аллоцировать
-      // промежуточный массив на каждом из десятков тысяч шагов.
-      const ax = p0.x;
-      const ay = p0.z;
-      const az = -p0.y;
-      const bx = p1.x;
-      const by = p1.z;
-      const bz = -p1.y;
-      const stepIndex = steps.length;
-      const a = carry ?? new THREE.Vector3(ax, ay, az);
-      const b = new THREE.Vector3(bx, by, bz);
-      carry = b;
-      steps.push({
-        a,
-        b,
-        lenXY: Math.hypot(p1.x - p0.x, p1.y - p0.y),
-        cut,
-        objectId: s.objectId,
-      });
-
-      if (!cut) continue;
-
-      const dx = bx - ax;
-      const dz = bz - az;
-      const len = Math.hypot(dx, dz);
-      // Глубина паза не больше толщины листа: сквозной рез заполняет всю толщу,
-      // но не торчит за нижнюю грань заготовки.
-      const depth = Math.min(Math.max(Math.abs(p1.z), 0.2), thickness);
-
-      let angleY = 0;
-      let length = len;
-      if (len < 0.01) {
-        length = toolDiameter; // сверловка / врезка — пятно фрезы
-      } else {
-        angleY = Math.atan2(dx, dz);
-      }
-
-      q.setFromAxisAngle(up, angleY);
-      pos.set((ax + bx) / 2, (lip - depth) / 2, (az + bz) / 2);
-      scl.set(toolDiameter, depth + lip, length);
-      m.compose(pos, q, scl);
-      grooves.push({ matrix: m.clone() });
-      grooveStepIndex.push(stepIndex);
-    }
-  }
-
-  const span = Math.max(bw, bd);
-  return { steps, grooves, grooveStepIndex, board, span };
-}
-
-// Верхняя граница: сколько пазов уже прорезано, если текущий шаг = currentStep.
-function revealedCount(grooveStepIndex: number[], currentStep: number): number {
-  let lo = 0,
-    hi = grooveStepIndex.length;
-  while (lo < hi) {
-    const mid = (lo + hi) >> 1;
-    if (grooveStepIndex[mid] <= currentStep) lo = mid + 1;
-    else hi = mid;
-  }
-  return lo;
-}
 
 interface Clock {
   prog: number;
@@ -239,15 +29,24 @@ interface Clock {
 }
 
 interface SceneContentsProps {
-  built: Built | null;
+  built: BuiltSimulation | null;
   toolDiameter: number;
   clockRef: React.MutableRefObject<Clock>;
   onActiveLayer: (id: string | null) => void;
   labelRef: React.RefObject<HTMLSpanElement | null>;
+  sliderRef: React.RefObject<HTMLInputElement | null>;
   onDone: () => void;
 }
 
-const SceneContents: React.FC<SceneContentsProps> = ({ built, toolDiameter, clockRef, onActiveLayer, labelRef, onDone }) => {
+const CameraCapture: React.FC<{ cameraRef: React.MutableRefObject<THREE.Camera | null> }> = ({ cameraRef }) => {
+  const { camera } = useThree();
+  React.useEffect(() => {
+    cameraRef.current = camera;
+  }, [camera, cameraRef]);
+  return null;
+};
+
+const SceneContents: React.FC<SceneContentsProps> = ({ built, toolDiameter, clockRef, onActiveLayer, labelRef, sliderRef, onDone }) => {
   const instRef = React.useRef<THREE.InstancedMesh>(null);
   const cutterRef = React.useRef<THREE.Mesh>(null);
   const lastActiveIdRef = React.useRef<string | null>(null);
@@ -266,10 +65,14 @@ const SceneContents: React.FC<SceneContentsProps> = ({ built, toolDiameter, cloc
     clockRef.current.total = built.steps.length;
     clockRef.current.prog = 0;
     clockRef.current.done = false;
+    if (sliderRef.current) {
+      sliderRef.current.max = String(built.steps.length);
+      sliderRef.current.value = '0';
+    }
     lastActiveIdRef.current = null;
     pendingActiveIdRef.current = null;
     onActiveLayer(null);
-  }, [built, clockRef, onActiveLayer]);
+  }, [built, clockRef, onActiveLayer, sliderRef]);
 
   useFrame((_, delta) => {
     const clock = clockRef.current;
@@ -298,9 +101,15 @@ const SceneContents: React.FC<SceneContentsProps> = ({ built, toolDiameter, cloc
       if (mesh.count !== reveal) mesh.count = reveal;
     }
 
-    // Подпись прогресса обновляем прямо из useFrame — один владелец цикла анимации.
+    // Подпись прогресса и ползунок обновляем прямо из useFrame — один владелец цикла анимации.
+    const stepped = Math.min(Math.floor(clock.prog), total);
     if (labelRef.current) {
-      labelRef.current.textContent = `${Math.min(Math.floor(clock.prog), total)} / ${total}`;
+      labelRef.current.textContent = `${stepped} / ${total}`;
+    }
+    if (sliderRef.current) {
+      const maxStr = String(total);
+      if (sliderRef.current.max !== maxStr) sliderRef.current.max = maxStr;
+      sliderRef.current.value = String(stepped);
     }
 
     // Активный слой = фигура текущего шага; пишем в стор только при смене.
@@ -373,7 +182,7 @@ const SceneContents: React.FC<SceneContentsProps> = ({ built, toolDiameter, cloc
   );
 };
 
-const GhostPath: React.FC<{ built: Built }> = React.memo(({ built }) => {
+const GhostPath: React.FC<{ built: BuiltSimulation }> = React.memo(({ built }) => {
   const positions = React.useMemo(() => {
     const pts = new Float32Array(built.steps.length * 6);
     let i = 0;
@@ -400,31 +209,6 @@ const GhostPath: React.FC<{ built: Built }> = React.memo(({ built }) => {
 GhostPath.displayName = 'GhostPath';
 
 // ─────────── сетка-«пол» под листом (повторяет двухуровневую сетку 2D) ───────────
-
-// Линии сетки по границам станка: минор каждые `step`, мажор каждые 5·step.
-// Мир CAD (x,y) → сцена (x, floorY, −y). major=true → только мажорные линии.
-function buildGridLines(
-  xMin: number,
-  xMax: number,
-  yMin: number,
-  yMax: number,
-  step: number,
-  floorY: number,
-  major: boolean
-): Float32Array {
-  const pts: number[] = [];
-  let i = 0;
-  for (let wx = Math.ceil(xMin / step) * step; wx <= xMax + 1e-6; wx += step, i++) {
-    if ((i % 5 === 0) !== major) continue;
-    pts.push(wx, floorY, -yMin, wx, floorY, -yMax);
-  }
-  i = 0;
-  for (let wy = Math.ceil(yMin / step) * step; wy <= yMax + 1e-6; wy += step, i++) {
-    if ((i % 5 === 0) !== major) continue;
-    pts.push(xMin, floorY, -wy, xMax, floorY, -wy);
-  }
-  return new Float32Array(pts);
-}
 
 interface FloorGridProps {
   bounds: { xMin: number; xMax: number; yMin: number; yMax: number };
@@ -471,19 +255,20 @@ const BoardDimensions: React.FC<BoardDimensionsProps> = React.memo(({ board, flo
   // Вынос за габарит листа и размер шрифта — от масштаба плиты (мир в мм).
   const off = Math.max(board.w, board.d) * 0.05;
   const fs = Math.max(50, Math.round(Math.max(board.w, board.d) * 0.045));
-  const color = '#0f172a';
+  const isDark = useProjectStore((s) => s.theme === 'dark');
+  const textColor = isDark ? '#e5e7eb' : '#111827';
   return (
     <>
       {/* X — ребро вдоль сцены-X (ширина листа widthX), по переднему краю пола. */}
       <group position={[board.cx, floorY + 1, board.cz + board.d / 2 + off]} rotation={[-Math.PI / 2, 0, 0]}>
-        <Text fontSize={fs} color={color} anchorX="center" anchorY="middle">
+        <Text fontSize={fs} color={textColor} anchorX="center" anchorY="middle">
           {`X · ${w} мм`}
         </Text>
       </group>
       {/* Y — ребро вдоль сцены-Z (глубина листа widthY), по правому краю пола. */}
       <group position={[board.cx + board.w / 2 + off, floorY + 1, board.cz]} rotation={[-Math.PI / 2, 0, 0]}>
         <group rotation={[0, 0, Math.PI / 2]}>
-          <Text fontSize={fs} color={color} anchorX="center" anchorY="middle">
+          <Text fontSize={fs} color={textColor} anchorX="center" anchorY="middle">
             {`Y · ${d} мм`}
           </Text>
         </group>
@@ -516,6 +301,8 @@ const Scene3D: React.FC = () => {
   const [speedMul, setSpeedMul] = React.useState<SpeedMul>(1);
   const [, forceRender] = React.useState(0);
   const progLabelRef = React.useRef<HTMLSpanElement>(null);
+  const sliderRef = React.useRef<HTMLInputElement>(null);
+  const cameraRef = React.useRef<THREE.Camera | null>(null);
 
   // Любое изменение геометрии/инструмента (новая ссылка на toolpathSegments, другой
   // диаметр фрезы) — сброс и пауза симуляции. Превью-состояние живёт в ref, не в объектах.
@@ -524,6 +311,7 @@ const Scene3D: React.FC = () => {
     clockRef.current.done = false;
     clockRef.current.playing = false;
     setPlaying(false);
+    if (sliderRef.current) sliderRef.current.value = '0';
   }, [built]);
 
   React.useEffect(() => {
@@ -546,11 +334,46 @@ const Scene3D: React.FC = () => {
     c.done = false;
     c.playing = false;
     setPlaying(false);
+    if (sliderRef.current) sliderRef.current.value = '0';
     forceRender((v) => v + 1);
   };
 
+  const handleScrub = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = Number(e.target.value);
+    const c = clockRef.current;
+    c.playing = false;
+    setPlaying(false);
+    c.prog = val;
+    c.done = c.total > 0 && val >= c.total;
+  };
+
+  const controlsRef = React.useRef<OrbitControlsImpl | null>(null);
   const camDist = built ? built.span * 1.15 : 2000;
-  const center = built ? new THREE.Vector3(built.board.cx, 0, built.board.cz) : new THREE.Vector3(0, 0, 0);
+  const center = React.useMemo(
+    () => (built ? new THREE.Vector3(built.board.cx, 0, built.board.cz) : new THREE.Vector3(0, 0, 0)),
+    [built]
+  );
+
+  React.useEffect(() => {
+    const controls = controlsRef.current;
+    if (!controls) return;
+    controls.target.copy(center);
+    controls.update();
+  }, [center]);
+
+  const setCameraPreset = (preset: 'top' | 'iso') => {
+    const cam = cameraRef.current;
+    const controls = controlsRef.current;
+    if (!cam || !controls) return;
+    if (preset === 'top') {
+      // Небольшой сдвиг по Z исключает вырождение OrbitControls на полярном угле 0.
+      cam.position.set(center.x, center.y + camDist * 1.45, center.z + 0.5);
+    } else {
+      cam.position.set(center.x + camDist, camDist * 0.9, center.z + camDist);
+    }
+    controls.target.copy(center);
+    controls.update();
+  };
 
   // Сетка-пол: шаг подбираем по габариту рабочей зоны (≈не более ~40 ячеек по
   // большей оси), как в 2D подбираем динамический step; пол — чуть ниже дна листа.
@@ -560,12 +383,13 @@ const Scene3D: React.FC = () => {
   const floorY = built ? built.board.cy - built.board.h / 2 - 1 : -1;
 
   return (
-    <div className="absolute inset-0 bg-gradient-to-b from-slate-200 to-slate-300 dark:from-slate-800 dark:to-slate-900">
+    <div className="absolute inset-0 bg-canvas">
       <Canvas
         camera={{ position: [center.x + camDist, camDist * 0.9, center.z + camDist], fov: 45, near: 1, far: camDist * 20 }}
         dpr={[1, 2]}
         gl={{ antialias: true, powerPreference: 'high-performance' }}
       >
+        <CameraCapture cameraRef={cameraRef} />
         <FloorGrid bounds={machine.bounds} step={gridStep} floorY={floorY} />
         {built && <BoardDimensions board={built.board} floorY={floorY} />}
         <SceneContents
@@ -574,11 +398,12 @@ const Scene3D: React.FC = () => {
           clockRef={clockRef}
           onActiveLayer={setSimActiveLayerId}
           labelRef={progLabelRef}
+          sliderRef={sliderRef}
           onDone={() => setPlaying(false)}
         />
         <OrbitControls
+          ref={controlsRef}
           makeDefault
-          target={[center.x, center.y, center.z]}
           maxPolarAngle={Math.PI / 2.05}
           mouseButtons={{
             LEFT: THREE.MOUSE.ROTATE,
@@ -588,57 +413,89 @@ const Scene3D: React.FC = () => {
         />
       </Canvas>
 
-      {/* Верхняя подсказка — в 3D-режиме инструментов черчения нет. */}
-      <div className="pointer-events-none absolute left-1/2 top-20 -translate-x-1/2 rounded-full bg-slate-900/70 px-3 py-1 text-xs font-medium text-slate-100 backdrop-blur dark:bg-slate-950/70">
-        3D-просмотр · ЛКМ — вращение · колесо — зум · нажатое колесо — панорама
+      {/* Быстрые ракурсы 3D-камеры и подсказка управления */}
+      <div className="pointer-events-auto absolute top-3 left-3 flex items-center gap-1 rounded-lg border border-line bg-surface/92 backdrop-blur-md p-1 shadow-sm select-none">
+        <button
+          type="button"
+          onClick={() => setCameraPreset('top')}
+          title="Вид строго сверху на плиту"
+          className="px-2.5 py-1 rounded-md text-xs font-medium text-fg-secondary hover:text-fg hover:bg-surface-hover transition-colors cursor-pointer"
+        >
+          Сверху
+        </button>
+        <button
+          type="button"
+          onClick={() => setCameraPreset('iso')}
+          title="Изометрический обзор 3D"
+          className="px-2.5 py-1 rounded-md text-xs font-medium text-fg-secondary hover:text-fg hover:bg-surface-hover transition-colors cursor-pointer"
+        >
+          Изометрия
+        </button>
       </div>
 
-      {/* Панель симуляции (play/pause/reset/speed) — вне холста, живёт в ref-часах. */}
-      <div className="absolute inset-x-0 bottom-6 flex justify-center">
-        <div className="flex items-center gap-3 rounded-2xl border border-slate-200/80 bg-white/95 px-4 py-2.5 shadow-md dark:border-slate-700 dark:bg-slate-900/95">
+      <div className="pointer-events-none hidden md:flex absolute top-3 right-3 items-center gap-2 rounded-lg border border-line bg-surface/90 backdrop-blur-md px-2.5 py-1.5 text-[11px] text-muted select-none">
+        <span>ЛКМ — вращение</span>
+        <span aria-hidden="true">·</span>
+        <span>Колесо — масштаб</span>
+        <span aria-hidden="true">·</span>
+        <span>СКМ — панорама</span>
+      </div>
+
+      {/* Панель симуляции (play/pause/reset/scrubber/speed) */}
+      <div className="absolute inset-x-0 bottom-3 flex justify-center px-3 pointer-events-none select-none">
+        <div className="pointer-events-auto flex flex-wrap items-center justify-center gap-2.5 rounded-lg border border-line bg-surface/95 backdrop-blur-md px-3 py-1.5 shadow-[0_8px_24px_-4px_rgba(0,0,0,0.08)] dark:shadow-[0_12px_32px_-4px_rgba(0,0,0,0.45)]">
           <button
+            type="button"
             onClick={togglePlay}
             disabled={!built || built.steps.length === 0}
             title={playing ? 'Пауза' : 'Проиграть съём фрезой'}
-            className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-primary-fg disabled:opacity-40"
+            className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-fg disabled:opacity-40 cursor-pointer"
           >
             {playing ? (
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                <rect x="3" y="2" width="4" height="12" rx="1" />
-                <rect x="9" y="2" width="4" height="12" rx="1" />
-              </svg>
+              <Pause className="w-3.5 h-3.5 fill-current" />
             ) : (
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                <path d="M4 2.5v11a1 1 0 0 0 1.54.84l8-5.5a1 1 0 0 0 0-1.68l-8-5.5A1 1 0 0 0 4 2.5Z" />
-              </svg>
+              <Play className="w-3.5 h-3.5 fill-current" />
             )}
           </button>
           <button
+            type="button"
             onClick={reset}
             disabled={!built || built.steps.length === 0}
             title="Сбросить в начало"
-            className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 disabled:opacity-40 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+            className="flex h-8 w-8 items-center justify-center rounded-lg border border-line bg-surface-subtle text-fg-secondary hover:text-fg hover:bg-surface-hover disabled:opacity-40 cursor-pointer transition-colors"
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
-              <path d="M3 3v5h5" />
-            </svg>
+            <RotateCcw className="w-3.5 h-3.5" />
           </button>
 
-          <div className="mx-1 h-6 w-px bg-slate-200 dark:bg-slate-700" />
+          <div className="h-5 w-px bg-line hidden sm:block" />
 
-          <div className="flex items-center gap-2 text-xs font-medium text-slate-600 dark:text-slate-300">
-            Скорость
-            <div className="flex items-center gap-0.5 rounded-lg border border-slate-200 bg-slate-50 p-0.5 dark:border-slate-700 dark:bg-slate-800">
+          <input
+            ref={sliderRef}
+            type="range"
+            min={0}
+            max={built?.steps.length ?? 0}
+            step={1}
+            defaultValue={0}
+            disabled={!built || built.steps.length === 0}
+            onChange={handleScrub}
+            title="Перемотать симуляцию к нужному шагу"
+            className="w-24 sm:w-40 md:w-52 accent-accent cursor-pointer disabled:opacity-40 disabled:cursor-default"
+          />
+
+          <div className="h-5 w-px bg-line" />
+
+          <div className="flex items-center gap-2 text-xs font-medium text-muted">
+            <span className="hidden sm:inline">Скорость</span>
+            <div className="flex items-center gap-0.5 rounded-lg border border-line bg-surface-subtle p-0.5">
               {SPEED_STEPS.map((m) => (
                 <button
                   key={m}
                   onClick={() => setSpeedMul(m)}
                   title={`${Math.round(m * BASE_MM_S)} мм/с`}
-                  className={`rounded-md px-2 py-1 text-xs font-semibold tabular-nums transition-colors ${
+                  className={`rounded-md px-2 py-1 text-xs font-mono font-semibold transition-colors cursor-pointer ${
                     speedMul === m
                       ? 'bg-primary text-primary-fg'
-                      : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'
+                      : 'text-muted hover:text-fg'
                   }`}
                 >
                   ×{m}
@@ -647,16 +504,16 @@ const Scene3D: React.FC = () => {
             </div>
           </div>
 
-          <span ref={progLabelRef} className="min-w-[64px] text-right font-mono text-xs text-slate-500 dark:text-slate-400">
+          <span ref={progLabelRef} className="min-w-[68px] text-right font-mono text-xs text-muted">
             0 / 0
           </span>
         </div>
       </div>
 
       {(!built || built.steps.length === 0) && (
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-          <div className="rounded-2xl border border-slate-200 bg-white/90 px-6 py-4 text-sm text-slate-500 shadow dark:border-slate-700 dark:bg-slate-900/90 dark:text-slate-400">
-            Нет траектории. Нарисуйте контур/линии во вкладке 2D — паз появится здесь.
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-4">
+          <div className="rounded-xl border border-line bg-surface/95 px-5 py-3.5 text-xs text-muted shadow-md">
+            Нет траектории. Нарисуйте линии или контур в режиме 2D — симуляция съёма появится здесь.
           </div>
         </div>
       )}

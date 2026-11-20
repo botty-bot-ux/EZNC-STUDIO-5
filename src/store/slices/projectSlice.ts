@@ -1,10 +1,11 @@
-import { OperationItem, ProjectData } from '../../types';
+import { CADObject, NewCADObjectInput, ProjectData } from '../../types';
 import {
   extractProjectDataFromNC,
   parseGcodeToCadObjects,
   parseGcodeToSegments,
 } from '../../lib/gcode/parser';
 import { DEFAULT_TEMPLATES } from '../../lib/postprocessor/templates';
+import { createObjectId } from '../../lib/utils/id';
 import {
   INITIAL_MACHINE,
   DEFAULT_UNDERLAY,
@@ -21,26 +22,45 @@ export function createProjectSlice(
   ctx: StoreCtx
 ): Pick<
   ProjectStore,
-  'setProjectName' | 'newProject' | 'loadProjectJSON' | 'loadProjectNC'
+  'setProjectName' | 'newProject' | 'loadProjectJSON' | 'loadProjectNC' | 'importVectorObjects'
 > {
   const { get, pushHistory, syncAndSave } = ctx;
 
   return {
     setProjectName: (name: string) => syncAndSave({ projectName: name }),
 
-    newProject: (mode: ProjectMode) => {
+    newProject: (mode: ProjectMode, options) => {
       pushHistory();
+      const baseMachine = structuredClone(PROJECT_MODE_PRESETS[mode]);
+      const nextBounds = options?.bounds
+        ? { ...baseMachine.bounds, ...options.bounds }
+        : baseMachine.bounds;
+      const nextStockSheet = options?.stockSheet
+        ? {
+            enabled: true,
+            preset: 'custom' as const,
+            widthX: 1081,
+            widthY: 1681,
+            color: '#22c55e',
+            ...baseMachine.stockSheet,
+            ...options.stockSheet,
+          }
+        : baseMachine.stockSheet;
+
       syncAndSave({
         projectName: 'Новый_Проект_ЧПУ',
-        // Режим, выбранный при создании: свой лист и фреза.
-        machine: structuredClone(PROJECT_MODE_PRESETS[mode]),
+        // Режим, выбранный при создании: свой лист, границы стола и фреза.
+        machine: {
+          ...baseMachine,
+          bounds: nextBounds,
+          stockSheet: nextStockSheet,
+        },
         objects: [],
-        operations: [],
         manualGcodeDirty: false,
         selectedObjectIds: [],
-        selectedOperationId: null,
         underlay: DEFAULT_UNDERLAY,
         activeTool: 'select',
+        canvasFitSeq: get().canvasFitSeq + 1,
       });
     },
 
@@ -51,13 +71,16 @@ export function createProjectSlice(
           pushHistory();
           syncAndSave({
             projectName: parsed.name || 'Загруженный_Проект',
-            machine: { ...INITIAL_MACHINE, ...parsed.machine, controllerProfile: 'ncstudio' },
+            machine: {
+              ...INITIAL_MACHINE,
+              ...parsed.machine,
+              bounds: { ...INITIAL_MACHINE.bounds, ...parsed.machine?.bounds },
+              controllerProfile: 'ncstudio',
+            },
             objects: parsed.objects,
-            operations: parsed.operations || [],
             templates: parsed.postprocessorTemplates || DEFAULT_TEMPLATES,
             manualGcodeDirty: false,
             selectedObjectIds: [],
-            selectedOperationId: null,
             underlay: DEFAULT_UNDERLAY,
           });
           return true;
@@ -77,13 +100,16 @@ export function createProjectSlice(
         pushHistory();
         syncAndSave({
           projectName: extracted.name || fileName?.replace(/\.[^/.]+$/, '') || 'Проект_NcStudio',
-          machine: { ...INITIAL_MACHINE, ...extracted.machine, controllerProfile: 'ncstudio' },
+          machine: {
+            ...INITIAL_MACHINE,
+            ...extracted.machine,
+            bounds: { ...INITIAL_MACHINE.bounds, ...extracted.machine?.bounds },
+            controllerProfile: 'ncstudio',
+          },
           objects: extracted.objects,
-          operations: extracted.operations || [],
           templates: extracted.postprocessorTemplates || DEFAULT_TEMPLATES,
           manualGcodeDirty: false,
           selectedObjectIds: [],
-          selectedOperationId: null,
           underlay: DEFAULT_UNDERLAY,
         });
         return true;
@@ -93,34 +119,19 @@ export function createProjectSlice(
       const parsedSegments = parseGcodeToSegments(fileContent);
       if (parsedSegments.length > 0) {
         pushHistory();
-        const importedCadObjects = parseGcodeToCadObjects(fileContent);
+        const importedCadObjects = parseGcodeToCadObjects(
+          fileContent,
+          [],
+          get().machine.workOffset
+        );
         const cleanName = fileName?.replace(/\.[^/.]+$/, '') || 'Импортированная_Программа_NC';
-
-        const newOps: OperationItem[] = importedCadObjects.map((obj, idx) => ({
-          id: `op_imp_${idx + 1}`,
-          name: `Обработка ${obj.name}`,
-          enabled: true,
-          type: obj.type === 'point' ? 'drill' : 'cutContour',
-          linkedObjectIds: [obj.id],
-          safeZ: get().machine.safeZ,
-          startZ: 0,
-          finalDepth: obj.depth || 5,
-          passDepth: obj.depth || 5,
-          spindleSpeed: get().machine.spindleSpeed,
-          feedCut: obj.importedFeedCut || get().machine.feedCut || 1200,
-          feedPlunge: obj.importedFeedPlunge || get().machine.feedPlunge || 300,
-          feedDrill: get().machine.feedDrill || 500,
-          direction: 'cw',
-        }));
 
         syncAndSave({
           projectName: cleanName,
           manualGcode: fileContent,
           manualGcodeDirty: true,
           objects: importedCadObjects.length > 0 ? importedCadObjects : get().objects,
-          operations: newOps.length > 0 ? newOps : get().operations,
           selectedObjectIds: [],
-          selectedOperationId: null,
           underlay: DEFAULT_UNDERLAY,
           viewMode: 'preview',
         });
@@ -129,6 +140,38 @@ export function createProjectSlice(
       }
 
       return false;
+    },
+
+    importVectorObjects: (
+      rawObjs: NewCADObjectInput[],
+      mode: 'append' | 'replace',
+      suggestedName?: string
+    ) => {
+      if (rawObjs.length === 0) return;
+      pushHistory();
+      const created: CADObject[] = rawObjs.map((raw) => ({
+        ...raw,
+        id: raw.id || createObjectId('imp'),
+      })) as CADObject[];
+      const newIds = created.map((o) => o.id);
+
+      if (mode === 'replace') {
+        syncAndSave({
+          ...(suggestedName ? { projectName: suggestedName } : {}),
+          objects: created,
+          manualGcodeDirty: false,
+          selectedObjectIds: newIds,
+          underlay: DEFAULT_UNDERLAY,
+          activeTool: 'select',
+        });
+        return;
+      }
+
+      syncAndSave({
+        objects: [...get().objects, ...created],
+        selectedObjectIds: newIds,
+        activeTool: 'select',
+      });
     },
   };
 }

@@ -1,6 +1,7 @@
 import React from 'react';
 import { ArrowLeftRight } from 'lucide-react';
 import { LineObject } from '../../../types';
+import { round3 } from '../../../lib/utils/num';
 import { PropertyInput } from './PropertyInput';
 
 interface LinePropertiesProps {
@@ -9,6 +10,30 @@ interface LinePropertiesProps {
 }
 
 export const LineProperties: React.FC<LinePropertiesProps> = ({ obj, onUpdate }) => {
+  const dx = obj.endX - obj.startX;
+  const dy = obj.endY - obj.startY;
+  const length = Math.hypot(dx, dy);
+  const angleRad = Math.atan2(dy, dx);
+  const angleDeg = ((angleRad * 180) / Math.PI + 360) % 360;
+
+  const handleLengthChange = (nextLen: number) => {
+    const safeLen = Math.max(0.1, nextLen);
+    const dir = length > 1e-6 ? angleRad : 0;
+    onUpdate({
+      endX: round3(obj.startX + Math.cos(dir) * safeLen),
+      endY: round3(obj.startY + Math.sin(dir) * safeLen),
+    });
+  };
+
+  const handleAngleChange = (nextDeg: number) => {
+    const rad = (nextDeg * Math.PI) / 180;
+    const len = length > 1e-6 ? length : 100;
+    onUpdate({
+      endX: round3(obj.startX + Math.cos(rad) * len),
+      endY: round3(obj.startY + Math.sin(rad) * len),
+    });
+  };
+
   const handleSwapPoints = () => {
     onUpdate({
       startX: obj.endX,
@@ -19,27 +44,54 @@ export const LineProperties: React.FC<LinePropertiesProps> = ({ obj, onUpdate })
   };
 
   return (
-    <div className="flex items-center gap-2">
-      {/* Точка 1 (X1, Y1) */}
-      <div className="flex-1 space-y-1.5">
-        <PropertyInput label="X1, мм" value={obj.startX} onChange={(startX) => onUpdate({ startX })} decimals={1} step={1} />
-        <PropertyInput label="Y1, мм" value={obj.startY} onChange={(startY) => onUpdate({ startY })} decimals={1} step={1} />
+    <div className="space-y-3">
+      {/* Главные понятные параметры отрезка: Длина и Угол */}
+      <div className="grid grid-cols-2 gap-2">
+        <PropertyInput
+          layout="stacked"
+          label="Длина, мм"
+          value={length}
+          onChange={handleLengthChange}
+          decimals={1}
+          step={1}
+          fallbackValue={10}
+        />
+        <PropertyInput
+          layout="stacked"
+          label="Угол, °"
+          value={angleDeg}
+          onChange={handleAngleChange}
+          decimals={1}
+          step={5}
+          fallbackValue={0}
+        />
       </div>
 
-      {/* Кнопка "Поменять точки местами" */}
-      <button
-        type="button"
-        onClick={handleSwapPoints}
-        title="Поменять начальную и конечную точки местами"
-        className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 hover:dark:bg-slate-600 border border-slate-200/80 dark:border-slate-700/80 text-slate-600 dark:text-slate-300 hover:text-primary transition-colors shrink-0 flex items-center justify-center self-center"
-      >
-        <ArrowLeftRight className="w-4 h-4" />
-      </button>
+      {/* Точные координаты концов */}
+      <div className="pt-2 border-t border-line space-y-1.5">
+        <div className="flex items-center justify-between text-[11px] text-muted">
+          <span className="font-medium">Координаты концов</span>
+          <button
+            type="button"
+            onClick={handleSwapPoints}
+            title="Поменять начало и конец местами (развернуть направление резки)"
+            className="inline-flex items-center gap-1 text-[11px] text-fg-secondary hover:text-fg transition-colors cursor-pointer"
+          >
+            <ArrowLeftRight className="w-3 h-3" />
+            <span>Развернуть</span>
+          </button>
+        </div>
 
-      {/* Точка 2 (X2, Y2) */}
-      <div className="flex-1 space-y-1.5">
-        <PropertyInput label="X2, мм" value={obj.endX} onChange={(endX) => onUpdate({ endX })} decimals={1} step={1} />
-        <PropertyInput label="Y2, мм" value={obj.endY} onChange={(endY) => onUpdate({ endY })} decimals={1} step={1} />
+        <div className="grid grid-cols-2 gap-2">
+          <div className="space-y-1.5 min-w-0">
+            <PropertyInput label="X1" value={obj.startX} onChange={(startX) => onUpdate({ startX })} decimals={1} step={1} />
+            <PropertyInput label="Y1" value={obj.startY} onChange={(startY) => onUpdate({ startY })} decimals={1} step={1} />
+          </div>
+          <div className="space-y-1.5 min-w-0">
+            <PropertyInput label="X2" value={obj.endX} onChange={(endX) => onUpdate({ endX })} decimals={1} step={1} />
+            <PropertyInput label="Y2" value={obj.endY} onChange={(endY) => onUpdate({ endY })} decimals={1} step={1} />
+          </div>
+        </div>
       </div>
     </div>
   );

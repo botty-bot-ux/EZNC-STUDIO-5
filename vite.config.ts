@@ -13,7 +13,27 @@ export default defineConfig(() => {
         'react': path.resolve(import.meta.dirname, 'node_modules/react'),
         'react-dom': path.resolve(import.meta.dirname, 'node_modules/react-dom'),
       },
-      dedupe: ['react', 'react-dom'],
+      dedupe: ['react', 'react-dom', 'three'],
+    },
+    optimizeDeps: {
+      // Предварительно бандлим лениво загружаемые 3D- и Monaco-пакеты вместе с React,
+      // чтобы при переходе в 3D/G-код с отключённым HMR не возникал повторный прогон
+      // optimizeDeps с новым ?v=... хэшем и второй копией React.
+      include: [
+        'react',
+        'react-dom',
+        'react-dom/client',
+        'react/jsx-runtime',
+        'react/jsx-dev-runtime',
+        'three',
+        '@react-three/fiber',
+        '@react-three/drei',
+        '@monaco-editor/react',
+        'zustand',
+        'zustand/react/shallow',
+        'lucide-react',
+        'file-saver',
+      ],
     },
     build: {
       rollupOptions: {
@@ -37,6 +57,9 @@ export default defineConfig(() => {
       hmr: process.env.DISABLE_HMR !== 'true',
       // Disable file watching when DISABLE_HMR is true to save CPU during agent edits.
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
+      headers: {
+        'Cache-Control': 'no-store',
+      },
     },
   };
 });

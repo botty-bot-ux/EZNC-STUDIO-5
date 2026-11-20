@@ -12,11 +12,31 @@ createRoot(document.getElementById('root')!).render(
 // SW нужен только в проде (офлайн-установка на планшет у станка). В dev он
 // вредил бы: cache-first отдавал устаревшие модули Vite. Регистрируем относительный
 // путь (BASE_URL → './' при base:'./'), чтобы работало и в корне, и на подпути gh-pages.
-if ('serviceWorker' in navigator && import.meta.env.PROD) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`).catch((error) => {
-      console.log('SW registration failed: ', error);
+if ('serviceWorker' in navigator) {
+  if (import.meta.env.PROD) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`).catch((error) => {
+        console.log('SW registration failed: ', error);
+      });
     });
-  });
+  } else {
+    // В dev принудительно снимаем любые ранее зарегистрированные SW и очищаем их кэши,
+    // чтобы браузер не отдавал устаревшие модули интерфейса.
+    const hadController = Boolean(navigator.serviceWorker.controller);
+    navigator.serviceWorker
+      .getRegistrations()
+      .then((regs) => Promise.all(regs.map((r) => r.unregister())))
+      .then(async (results) => {
+        if ('caches' in window) {
+          const keys = await caches.keys();
+          await Promise.all(keys.filter((k) => k.startsWith('eznc-')).map((k) => caches.delete(k)));
+        }
+        if (hadController && results.some(Boolean) && !sessionStorage.getItem('eznc_sw_cleaned')) {
+          sessionStorage.setItem('eznc_sw_cleaned', '1');
+          window.location.reload();
+        }
+      })
+      .catch(() => {});
+  }
 }
 

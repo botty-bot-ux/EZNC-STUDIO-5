@@ -4,10 +4,8 @@ import { useShallow } from 'zustand/react/shallow';
 import { useProjectStore } from '../../store/useProjectStore';
 import { MobileSheet } from '../../types';
 
-// Нижняя панель вкладок для телефонов: открывает шторку с нужной панелью.
-// Повторный тап по активной вкладке — закрывает шторку.
 const TABS: Array<{ id: Exclude<MobileSheet, 'none'>; label: string; Icon: typeof Shapes }> = [
-  { id: 'figures', label: 'Фигуры', Icon: Shapes },
+  { id: 'figures', label: 'Объекты', Icon: Shapes },
   { id: 'properties', label: 'Свойства', Icon: SlidersHorizontal },
   { id: 'gcode', label: 'G-код', Icon: Code },
   { id: 'machine', label: 'Станок', Icon: Compass },
@@ -34,14 +32,13 @@ export const MobileTabBar: React.FC = () => {
     if (id === 'figures') {
       setMobileSheet('figures');
     } else {
-      // setActiveTab заодно переключит viewMode (для G-кода) и откроет шторку
       setActiveTab(id);
     }
   };
 
   return (
     <nav
-      className="absolute inset-x-0 bottom-0 z-30 flex items-stretch bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 shadow-[0_-4px_20px_rgba(15,23,42,0.08)] select-none"
+      className="flex items-stretch bg-surface border-t border-line select-none z-30 shrink-0"
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
       {TABS.map(({ id, label, Icon }) => {
@@ -50,20 +47,20 @@ export const MobileTabBar: React.FC = () => {
           <button
             key={id}
             onClick={() => openTab(id)}
-            className={`relative flex-1 flex flex-col items-center justify-center gap-0.5 py-2 text-[12px] font-bold transition-colors ${
-              active ? 'text-primary' : 'text-slate-500 dark:text-slate-400'
+            className={`relative flex-1 flex flex-col items-center justify-center gap-0.5 py-2 text-[11px] font-semibold transition-colors ${
+              active ? 'text-fg bg-surface-subtle' : 'text-muted hover:text-fg'
             }`}
           >
-            <Icon className="w-5 h-5" />
-            <span>{label}</span>
-            {id === 'figures' && objects.length > 0 && (
-              <span className="absolute top-1 right-[22%] bg-primary text-primary-fg text-[11px] font-bold px-1 rounded-full min-w-[15px] text-center border border-white dark:border-slate-700">
-                {objects.length}
-              </span>
-            )}
-            {id === 'machine' && errorCount > 0 && (
-              <span className="absolute top-1.5 right-[24%] w-2 h-2 rounded-full bg-danger animate-pulse" />
-            )}
+            <div className="flex items-center gap-1">
+              <Icon className={`w-4 h-4 ${active ? 'text-accent' : ''}`} />
+              {id === 'figures' && objects.length > 0 && (
+                <span className="font-mono text-[10px] text-muted">{objects.length}</span>
+              )}
+              {id === 'machine' && errorCount > 0 && (
+                <span className="font-mono text-[10px] font-bold text-danger">!{errorCount}</span>
+              )}
+            </div>
+            <span className="whitespace-nowrap">{label}</span>
           </button>
         );
       })}

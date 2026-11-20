@@ -1,4 +1,4 @@
-import { CADObject, MachineSettings, OperationItem, UnderlayState } from '../types';
+import { CADObject, MachineSettings, UnderlayState } from '../types';
 
 export const LOCAL_STORAGE_KEY = 'cnc_studio_project_v1';
 
@@ -11,6 +11,8 @@ export const INITIAL_MACHINE: MachineSettings = {
     xMax: 0,
     yMin: -2000,
     yMax: 0,
+    zMin: -50,
+    zMax: 100,
   },
   // Заготовка листа по умолчанию выключена (как при выключении тумблером в панели:
   // preset 'none'). Размеры сохранены — включение возвращает лист 1081×1681.
@@ -40,6 +42,11 @@ export const INITIAL_MACHINE: MachineSettings = {
 // Режим проекта выбирается при создании (модалка «Новый проект»).
 // Тип листа = выбор фрезы: изголовье — узор фрезой Ø3, царга — рез/сверловка фрезой Ø8.
 export type ProjectMode = 'head' | 'rail';
+
+/** Признак режима «Царга» (крупная фреза Ø5+ мм): единая проверка для UI. */
+export function isRailMachine(machine: Pick<MachineSettings, 'toolDiameter'>): boolean {
+  return (machine.toolDiameter ?? 0) >= 5;
+}
 
 export const PROJECT_MODE_PRESETS: Record<ProjectMode, MachineSettings> = {
   head: INITIAL_MACHINE,
@@ -106,43 +113,6 @@ export const INITIAL_OBJECTS: CADObject[] = [
     endY: -200,
     depth: 5,
     operationType: 'cut',
-  },
-];
-
-export const INITIAL_OPERATIONS: OperationItem[] = [
-  {
-    id: 'op_drill_holes',
-    name: 'Сверление отверстий',
-    enabled: true,
-    type: 'drill',
-    linkedObjectIds: ['obj_hole_1', 'obj_hole_2'],
-    safeZ: 5,
-    startZ: 0,
-    finalDepth: 33,
-    passDepth: 16,
-    spindleSpeed: 15000,
-    feedCut: 1200,
-    feedPlunge: 300,
-    feedDrill: 1000,
-    direction: 'cw',
-    comment: 'Сверление отверстий 11мм и 9мм',
-  },
-  {
-    id: 'op_cut_lines',
-    name: 'Резка по линиям',
-    enabled: true,
-    type: 'cutContour',
-    linkedObjectIds: ['obj_line_1', 'obj_line_2'],
-    safeZ: 10,
-    startZ: 0,
-    finalDepth: 5,
-    passDepth: 5,
-    spindleSpeed: 15000,
-    feedCut: 1200,
-    feedPlunge: 300,
-    feedDrill: 500,
-    direction: 'cw',
-    comment: 'Контурная резка по линиям',
   },
 ];
 

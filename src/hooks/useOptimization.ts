@@ -7,7 +7,7 @@ import { useProjectStore } from '../store/useProjectStore';
  * route optimization (with an in-place undo), and tracking the last optimization result.
  * The actual file saving lives in the Header (it needs the native Save dialog).
  */
-export function useOptimization() {
+export function useOptimization(onEmpty?: () => void) {
   const optimizeRoute = useProjectStore((s) => s.optimizeRoute);
   const undo = useProjectStore((s) => s.undo);
 
@@ -26,7 +26,7 @@ export function useOptimization() {
     if (res) {
       setOptResult(res);
     } else {
-      alert('Нет объектов для оптимизации.');
+      onEmpty?.();
     }
   };
 

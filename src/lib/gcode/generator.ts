@@ -205,9 +205,13 @@ export function generateGcode(
     const opFeedCut = machine.feedCut || linkedOp?.feedCut || 1000;
     const opFeedPlunge = machine.feedPlunge || linkedOp?.feedPlunge || 300;
     const opFeedDrill = machine.feedDrill || linkedOp?.feedDrill || 500;
-    // Глубина реза = пресет листа (cutDepth), затем своя глубина фигуры, затем 5.
+    // Глубина реза: если у фигуры явно включён useOwnDepth (например, паз 4 мм на листе 17.5 мм),
+    // берём её собственную глубину obj.depth; иначе — пресет листа (machine.cutDepth), затем obj.depth, затем 5.
     // finalDepth устаревших операций НЕ перекрывает выбор листа (иначе Z не меняется при смене режима).
-    const cutZ = -Math.abs(machine.cutDepth ?? obj.depth ?? 5);
+    const effectiveDepth = obj.useOwnDepth
+      ? (obj.depth ?? machine.cutDepth ?? 5)
+      : (machine.cutDepth ?? obj.depth ?? 5);
+    const cutZ = -Math.abs(effectiveDepth);
 
     // 1. DRILLING / HOLES (11mm & 9mm modes)
     if (obj.type === 'point') {
@@ -350,18 +354,53 @@ export function generateGcode(
     }
     // 4. RECTANGLE OBJECT
     else if (obj.type === 'rectangle') {
-      const w = obj.width;
-      const h = obj.height;
-      const c1 = getPoint({ x: obj.x, y: obj.y });
-      const c2 = getPoint({ x: obj.x + w, y: obj.y });
-      const c3 = getPoint({ x: obj.x + w, y: obj.y + h });
-      const c4 = getPoint({ x: obj.x, y: obj.y + h });
+      const x0 = Math.min(obj.x, obj.x + obj.width);
+      const y0 = Math.min(obj.y, obj.y + obj.height);
+      const wAbs = Math.abs(obj.width);
+      const hAbs = Math.abs(obj.height);
+      const cornerR = Math.max(0, Math.min(obj.cornerRadius ?? 0, wAbs / 2, hAbs / 2));
 
-      beginCutAt(c1, cutZ, opFeedPlunge, obj.id);
-      addFeedMove({ x: c2.x, y: c2.y, z: cutZ }, opFeedCut, undefined, obj.id);
-      addFeedMove({ x: c3.x, y: c3.y, z: cutZ }, opFeedCut, undefined, obj.id);
-      addFeedMove({ x: c4.x, y: c4.y, z: cutZ }, opFeedCut, undefined, obj.id);
-      addFeedMove({ x: c1.x, y: c1.y, z: cutZ }, opFeedCut, undefined, obj.id);
+      if (cornerR < 0.01) {
+        const w = obj.width;
+        const h = obj.height;
+        const c1 = getPoint({ x: obj.x, y: obj.y });
+        const c2 = getPoint({ x: obj.x + w, y: obj.y });
+        const c3 = getPoint({ x: obj.x + w, y: obj.y + h });
+        const c4 = getPoint({ x: obj.x, y: obj.y + h });
+
+        beginCutAt(c1, cutZ, opFeedPlunge, obj.id);
+        addFeedMove({ x: c2.x, y: c2.y, z: cutZ }, opFeedCut, undefined, obj.id);
+        addFeedMove({ x: c3.x, y: c3.y, z: cutZ }, opFeedCut, undefined, obj.id);
+        addFeedMove({ x: c4.x, y: c4.y, z: cutZ }, opFeedCut, undefined, obj.id);
+        addFeedMove({ x: c1.x, y: c1.y, z: cutZ }, opFeedCut, undefined, obj.id);
+      } else {
+        const pStart = getPoint({ x: x0 + cornerR, y: y0 });
+        const p2 = getPoint({ x: x0 + wAbs - cornerR, y: y0 });
+        const p3 = getPoint({ x: x0 + wAbs, y: y0 + cornerR });
+        const p4 = getPoint({ x: x0 + wAbs, y: y0 + hAbs - cornerR });
+        const p5 = getPoint({ x: x0 + wAbs - cornerR, y: y0 + hAbs });
+        const p6 = getPoint({ x: x0 + cornerR, y: y0 + hAbs });
+        const p7 = getPoint({ x: x0, y: y0 + hAbs - cornerR });
+        const p8 = getPoint({ x: x0, y: y0 + cornerR });
+
+        beginCutAt(pStart, cutZ, opFeedPlunge, obj.id);
+        if (wAbs - 2 * cornerR > 0.01) {
+          addFeedMove({ x: p2.x, y: p2.y, z: cutZ }, opFeedCut, undefined, obj.id);
+        }
+        addArcMove(false, { x: p3.x, y: p3.y, z: cutZ }, 0, cornerR, opFeedCut, undefined, obj.id);
+        if (hAbs - 2 * cornerR > 0.01) {
+          addFeedMove({ x: p4.x, y: p4.y, z: cutZ }, opFeedCut, undefined, obj.id);
+        }
+        addArcMove(false, { x: p5.x, y: p5.y, z: cutZ }, -cornerR, 0, opFeedCut, undefined, obj.id);
+        if (wAbs - 2 * cornerR > 0.01) {
+          addFeedMove({ x: p6.x, y: p6.y, z: cutZ }, opFeedCut, undefined, obj.id);
+        }
+        addArcMove(false, { x: p7.x, y: p7.y, z: cutZ }, 0, -cornerR, opFeedCut, undefined, obj.id);
+        if (hAbs - 2 * cornerR > 0.01) {
+          addFeedMove({ x: p8.x, y: p8.y, z: cutZ }, opFeedCut, undefined, obj.id);
+        }
+        addArcMove(false, { x: pStart.x, y: pStart.y, z: cutZ }, cornerR, 0, opFeedCut, undefined, obj.id);
+      }
     }
     // 5. CIRCLE OBJECT
     else if (obj.type === 'circle') {

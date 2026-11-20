@@ -35,63 +35,24 @@ export function createGcodeSlice(
         pushHistory();
         syncAndSave({
           objects: extracted.objects,
-          operations: extracted.operations || get().operations,
+          manualGcodeDirty: false,
           viewMode: 'preview',
         });
         return;
       }
 
       const existingObjs = get().objects;
-      const updatedCadObjects = parseGcodeToCadObjects(gcode, existingObjs);
+      const updatedCadObjects = parseGcodeToCadObjects(
+        gcode,
+        existingObjs,
+        get().machine.workOffset
+      );
 
       if (updatedCadObjects.length > 0) {
         pushHistory();
-
-        const existingOps = get().operations;
-        const updatedObjIds = new Set(updatedCadObjects.map((o) => o.id));
-
-        let finalOps = existingOps
-          .map((op) => ({
-            ...op,
-            linkedObjectIds: op.linkedObjectIds.filter((id) => updatedObjIds.has(id)),
-          }))
-          .filter((op) => op.linkedObjectIds.length > 0);
-
-        const currentLinkedIds = new Set(finalOps.flatMap((op) => op.linkedObjectIds));
-        const unlinkedObjs = updatedCadObjects.filter((o) => !currentLinkedIds.has(o.id));
-
-        if (unlinkedObjs.length > 0) {
-          if (finalOps.length > 0) {
-            finalOps[0] = {
-              ...finalOps[0],
-              linkedObjectIds: [...finalOps[0].linkedObjectIds, ...unlinkedObjs.map((o) => o.id)],
-            };
-          } else {
-            finalOps = [
-              {
-                id: `op_${Date.now()}`,
-                name: 'Обработка контуров',
-                enabled: true,
-                type: 'cutContour',
-                linkedObjectIds: unlinkedObjs.map((o) => o.id),
-                safeZ: get().machine.safeZ,
-                startZ: 0,
-                finalDepth: unlinkedObjs[0]?.depth || 5,
-                passDepth: unlinkedObjs[0]?.depth || 5,
-                spindleSpeed: get().machine.spindleSpeed,
-                feedCut: get().machine.feedCut || 1200,
-                feedPlunge: get().machine.feedPlunge || 300,
-                feedDrill: get().machine.feedDrill || 500,
-                direction: 'cw',
-              },
-            ];
-          }
-        }
-
         syncAndSave({
           objects: updatedCadObjects,
-          operations: finalOps,
-          toolpathSegments: segs,
+          manualGcodeDirty: false,
           viewMode: 'preview',
         });
       } else {
@@ -100,8 +61,8 @@ export function createGcodeSlice(
     },
 
     regenerateGcode: () => {
-      const { objects, operations, machine, templates } = get();
-      const res = generateGcode(objects, operations, machine, templates);
+      const { objects, machine, templates } = get();
+      const res = generateGcode(objects, [], machine, templates);
       set({
         generatedGcode: res.gcode,
         manualGcode: res.gcode,
@@ -116,7 +77,7 @@ export function createGcodeSlice(
         name: get().projectName,
         machine: { ...get().machine, controllerProfile: 'ncstudio' },
         objects: get().objects,
-        operations: get().operations,
+        operations: [],
         postprocessorTemplates: get().templates,
       };
       return JSON.stringify(exportData, null, 2);
@@ -125,7 +86,9 @@ export function createGcodeSlice(
     // Clean G-code for the machine — no embedded "; NCSTUDIO_PROJECT" metadata and no
     // per-object ";[ID: ...]" comment headers (those stay only in the editor/preview G-code).
     exportGcode: () => {
-      const gcode = get().generatedGcode || get().manualGcode;
+      const gcode = get().manualGcodeDirty
+        ? get().manualGcode
+        : get().generatedGcode || get().manualGcode;
       return gcode
         .split('\n')
         .filter((line) => !OBJECT_MARKER_LINE_RE.test(line))

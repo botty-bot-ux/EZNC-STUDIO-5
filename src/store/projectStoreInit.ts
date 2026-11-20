@@ -1,7 +1,6 @@
 import {
   CADObject,
   MachineSettings,
-  OperationItem,
   PostprocessorTemplates,
   ProjectData,
   ToolpathSegment,
@@ -10,19 +9,13 @@ import {
 import { generateGcode } from '../lib/gcode/generator';
 import { analyzeProjectWarnings } from '../lib/utils/warnings';
 import { DEFAULT_TEMPLATES } from '../lib/postprocessor/templates';
-import {
-  INITIAL_MACHINE,
-  INITIAL_OBJECTS,
-  INITIAL_OPERATIONS,
-  LOCAL_STORAGE_KEY,
-} from './initialState';
+import { INITIAL_MACHINE, INITIAL_OBJECTS, LOCAL_STORAGE_KEY } from './initialState';
 import { Theme, applyThemeClass, readStoredTheme } from './theme';
 
 export interface InitialProjectState {
   projectName: string;
   machine: MachineSettings;
   objects: CADObject[];
-  operations: OperationItem[];
   templates: PostprocessorTemplates;
   generatedGcode: string;
   toolpathSegments: ToolpathSegment[];
@@ -36,7 +29,6 @@ export function loadInitialProjectState(): InitialProjectState {
   let initName = 'Проект_ЧПУ_Деталь_1';
   let initMachine = INITIAL_MACHINE;
   let initObjects = INITIAL_OBJECTS;
-  let initOperations = INITIAL_OPERATIONS;
   let initTemplates = DEFAULT_TEMPLATES;
 
   try {
@@ -45,7 +37,11 @@ export function loadInitialProjectState(): InitialProjectState {
       const parsed = JSON.parse(saved) as ProjectData;
       if (parsed && parsed.objects && parsed.machine) {
         initName = parsed.name || initName;
-        initMachine = { ...INITIAL_MACHINE, ...parsed.machine };
+        initMachine = {
+          ...INITIAL_MACHINE,
+          ...parsed.machine,
+          bounds: { ...INITIAL_MACHINE.bounds, ...parsed.machine.bounds },
+        };
         // One-time refresh: a cached project that still carries the OLD default tool/feeds
         // (i.e. never customized) is upgraded to the new «Изголовье» defaults. Edited projects
         // keep their own values.
@@ -54,7 +50,6 @@ export function loadInitialProjectState(): InitialProjectState {
           initMachine = { ...INITIAL_MACHINE };
         }
         initObjects = parsed.objects;
-        initOperations = parsed.operations || [];
         initTemplates = parsed.postprocessorTemplates || DEFAULT_TEMPLATES;
 
         // Automatically upgrade old default templates to new standard NC Studio 5 template
@@ -72,8 +67,8 @@ export function loadInitialProjectState(): InitialProjectState {
     // fallback
   }
 
-  const initialGen = generateGcode(initObjects, initOperations, initMachine, initTemplates);
-  const initialWarns = analyzeProjectWarnings(initObjects, initOperations, initMachine);
+  const initialGen = generateGcode(initObjects, [], initMachine, initTemplates);
+  const initialWarns = analyzeProjectWarnings(initObjects, [], initMachine);
 
   const initialTheme = readStoredTheme();
   applyThemeClass(initialTheme);
@@ -82,7 +77,6 @@ export function loadInitialProjectState(): InitialProjectState {
     projectName: initName,
     machine: initMachine,
     objects: initObjects,
-    operations: initOperations,
     templates: initTemplates,
     generatedGcode: initialGen.gcode,
     toolpathSegments: initialGen.segments,
